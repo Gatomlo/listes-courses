@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le Cabas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
+<style>
+:root{
+  --bg:#f3f5f0; --surface:#fff; --sunk:#e9ede4; --ink:#1c2418; --muted:#66705f; --line:#dde3d6;
+  --leaf:#2f7d4f; --leaf-soft:#dcefe2; --carrot:#d9772b; --carrot-soft:#fbe9d8;
+  --im:#c8313b; --im-soft:#f9e0e1; --co:#e08a12; --co-soft:#fcecd2; --plum:#5b4bb7; --plum-soft:#e7e3fa;
+  --display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --body:"Nunito Sans","Segoe UI",system-ui,sans-serif; --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121610; --surface:#1b2118; --sunk:#242b20; --ink:#eef2ea; --muted:#a3ad9b; --line:#2f382a;
+  --leaf:#5cc488; --leaf-soft:#173322; --carrot:#f0a05c; --carrot-soft:#3a2917;
+  --im:#ff6f78; --im-soft:#3d1c1f; --co:#f5b04a; --co-soft:#3a2b12; --plum:#a597ff; --plum-soft:#2a2550; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121610; --surface:#1b2118; --sunk:#242b20; --ink:#eef2ea; --muted:#a3ad9b; --line:#2f382a;
+  --leaf:#5cc488; --leaf-soft:#173322; --carrot:#f0a05c; --carrot-soft:#3a2917;
+  --im:#ff6f78; --im-soft:#3d1c1f; --co:#f5b04a; --co-soft:#3a2b12; --plum:#a597ff; --plum-soft:#2a2550; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--body)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.wrap{display:flex;gap:32px;justify-content:center;align-items:flex-start;padding:24px 16px}
+.notice{max-width:300px;position:sticky;top:24px;font-size:14px;color:var(--muted)}
+.notice h1{font:800 28px/1.1 var(--display);color:var(--ink);margin:0 0 8px}
+.notice h3{color:var(--ink);font:600 15px var(--display);margin:18px 0 6px}
+.notice ul{padding-left:18px;margin:6px 0}
+@media (max-width:820px){.notice{display:none}.wrap{padding:0}}
+.phone{width:390px;max-width:100%;min-height:780px;background:var(--bg);border:1px solid var(--line);border-radius:28px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+@media (max-width:820px){.phone{border:0;border-radius:0;min-height:100vh;width:100%}}
+header.top{padding:14px 16px 10px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+header.top .back{border:0;background:var(--sunk);border-radius:10px;width:34px;height:34px;font-size:18px}
+header.top h2{font:800 20px/1.15 var(--display);margin:0;flex:1}
+header.top small{display:block;font:400 12px var(--body);color:var(--muted)}
+main{flex:1;overflow-y:auto;padding:14px 16px 90px}
+nav.tabs{position:absolute;bottom:0;left:0;right:0;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+nav.tabs button{flex:1;border:0;background:none;padding:9px 0 11px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;position:relative}
+nav.tabs button.on{color:var(--leaf);font-weight:700}
+nav.tabs svg{width:22px;height:22px}
+.badge{background:var(--carrot);color:#fff;border-radius:99px;font-size:11px;font-weight:700;padding:0 6px;min-width:18px;text-align:center}
+nav.tabs .badge{position:absolute;top:4px;left:calc(50% + 6px)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:10px}
+.card.click{cursor:pointer}
+.card h4{margin:0;font:600 16px var(--display)}
+.row{display:flex;align-items:center;gap:8px}
+.grow{flex:1;min-width:0}
+.muted{color:var(--muted);font-size:13px}
+.sec{font:600 12px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
+.pill{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:1px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.p-leaf{background:var(--leaf-soft);color:var(--leaf)}.p-carrot{background:var(--carrot-soft);color:var(--carrot)}
+.p-plum{background:var(--plum-soft);color:var(--plum)}.p-grey{background:var(--sunk);color:var(--muted)}
+.st{border:0;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700}
+.st-im{background:var(--im-soft);color:var(--im)}.st-co{background:var(--co-soft);color:var(--co)}
+.st.manual{outline:2px dashed currentColor;outline-offset:1px}
+.btn{border:0;border-radius:12px;padding:10px 14px;font-weight:700;background:var(--leaf);color:#fff}
+.btn.sec2{background:var(--sunk);color:var(--ink)}
+.btn.sm{padding:5px 10px;font-size:13px;border-radius:9px}
+.btn.full{width:100%}
+.seg{display:flex;background:var(--sunk);border-radius:12px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;border-radius:9px;padding:7px 0;font-weight:600;font-size:13px;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px #0002}
+.item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .nm{font-weight:600}
+.item.pending{opacity:.6}
+.item.done .nm{text-decoration:line-through;color:var(--muted)}
+.chk{width:26px;height:26px;border-radius:8px;border:2px solid var(--line);background:var(--surface);flex:none;display:grid;place-items:center;color:#fff;font-weight:800}
+.chk.on{background:var(--leaf);border-color:var(--leaf)}
+.price{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.saving{border-radius:var(--r);padding:14px;margin-bottom:12px;border:1px solid var(--line)}
+.saving.good{background:var(--leaf-soft);border-color:transparent}
+.saving.meh{background:var(--carrot-soft);border-color:transparent}
+.saving big{font:800 26px var(--display);display:block}
+.scen{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:14px}
+.bar{height:8px;border-radius:99px;background:var(--sunk);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%}
+.slot .meal{cursor:pointer;text-align:left}
+textarea.txt{resize:vertical;font:inherit}
+input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:10px 12px}
+.ac{background:var(--surface);border:1px solid var(--line);border-radius:11px;margin-top:4px;overflow:hidden}
+.ac button{display:flex;width:100%;border:0;background:none;padding:9px 12px;text-align:left;gap:8px;border-bottom:1px solid var(--line)}
+.ac button:last-child{border-bottom:0}
+.day{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.day .d{width:46px;flex:none;text-align:center}
+.day .d b{display:block;font:800 20px var(--display)}
+.day .d span{font-size:11px;color:var(--muted);text-transform:uppercase}
+.slot{display:flex;gap:6px;align-items:center;font-size:14px;padding:2px 0}
+.slot .lbl{width:62px;color:var(--muted);font-size:12px}
+.slot .meal{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:3px 9px;font-weight:600}
+.slot .add{border:1px dashed var(--line);background:none;border-radius:9px;padding:2px 9px;color:var(--muted);font-size:12px}
+.sheet-bg{position:absolute;inset:0;background:#0006;display:flex;align-items:flex-end;z-index:5}
+.sheet{background:var(--surface);width:100%;border-radius:22px 22px 0 0;padding:16px 16px 22px;max-height:85%;overflow-y:auto}
+.sheet h3{font:800 19px var(--display);margin:0 0 10px}
+.toast{position:absolute;left:16px;right:16px;bottom:78px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px;font-size:14px;z-index:6}
+.role{display:flex;gap:6px;margin:8px 0}
+.role button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 10px;font-weight:600}
+.role button.on{background:var(--leaf);color:#fff;border-color:var(--leaf)}
+.ord{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.acc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.acc-h{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:12px 14px;text-align:left}
+.acc-h .muted{font-size:13px}
+.acc-i{width:32px;height:32px;border-radius:10px;background:var(--sunk);display:grid;place-items:center;flex:none}
+.acc-c{font-size:22px;color:var(--muted);transition:transform .2s}
+.acc.open .acc-c{transform:rotate(90deg)}
+.acc-b{padding:0 14px;border-top:1px solid var(--line)}
+.ord:last-child{border-bottom:0}
+.ord button{border:0;background:var(--sunk);border-radius:7px;width:28px;height:26px}
+/* Menu imprimable : aperçu dans le téléphone + feuille A4 paysage à l'impression */
+.pm{background:#fff;color:#1c2418;border-radius:10px;padding:14px;box-shadow:0 2px 10px #0003;font-family:var(--body)}
+.pm h1{font:800 20px var(--display);margin:0;color:#2f7d4f}
+.pm .meta{font-size:11px;color:#66705f;margin-bottom:8px}
+.pm table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:10px}
+.pm th,.pm td{border:1px solid #dde3d6;padding:4px;font-size:9px;vertical-align:top;text-align:left;word-wrap:break-word}
+.pm th{background:#dcefe2;font-weight:700}
+.pm td.sl{background:#f3f5f0;font-weight:700;color:#66705f;width:56px}
+.pm td .np{color:#66705f}
+.pm td.today{background:#fbe9d8}
+.pm .foot{font-size:9px;color:#66705f;display:flex;justify-content:space-between}
+.opt{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px}
+.opt button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:5px 11px;font-size:13px;font-weight:600}
+.opt button.on{background:var(--leaf);border-color:var(--leaf);color:#fff}
+#printArea{display:none}
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body{background:#fff}
+  .wrap{display:none}
+  #printArea{display:block}
+  #printArea .pm{box-shadow:none;padding:0}
+  #printArea .pm h1{font-size:26px}
+  #printArea .pm .meta{font-size:13px}
+  #printArea .pm th,#printArea .pm td{font-size:13px;padding:8px;height:60px}
+  #printArea .pm .foot{font-size:11px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="notice">
+    <h1>Le Cabas</h1>
+    <p>Maquette cliquable (données fictives, rien n'est enregistré).</p>
+    <h3>Rôle simulé</h3>
+    <div class="role" id="roleSw"></div>
+    <p>En <b>membre</b>, les ajouts deviennent des suggestions à valider.</p>
+    <h3>À essayer</h3>
+    <ul>
+      <li>Liste du 3 oct. → onglet <b>Magasins</b> : économie du split et répartition.</li>
+      <li>Toucher l'étiquette magasin d'un article pour le déplacer.</li>
+      <li><b>Faire les courses</b> : vue par rayon, cocher, saisir un prix.</li>
+      <li><b>Menu</b> : ajouter un plat, voir les ingrédients fusionnés dans la liste.</li>
+      <li><b>Menu</b> : toucher un repas → recette, personnes, changer, retirer.</li>
+      <li><b>Plats</b> : recherche (nom ou ingrédient), filtres, édition ; ingrédient absent → création dans le catalogue.</li>
+      <li><b>Faire les courses → Terminer → Scanner le ticket</b> : mise à jour des prix du magasin.</li>
+      <li><b>Menu → Exporter</b> : aperçu A4, impression, PDF, lien d'affichage.</li>
+      <li><b>🏷 sur un article</b> : promo avec prix pour ces courses ou jusqu'à une date.</li>
+      <li><b>Foyer</b> : suggestions, ordre des rayons, seuil.</li>
+    </ul>
+  </aside>
+  <div class="phone" id="phone"></div>
+</div>
+<div id="printArea"></div>
+<script>
+// ---------- Données fictives ----------
+const STORES=[{id:'im',name:'Intermarché'},{id:'co',name:'Colruyt'}];
+const CATS={fl:'Fruits & légumes',fr:'Frais',bo:'Boucherie',ep:'Épicerie',bs:'Boissons',dr:'Droguerie'};
+const ORDER={im:['fl','fr','bo','ep','bs','dr'],co:['ep','bs','dr','bo','fr','fl']};
+const P={}; // produit : [nom, cat, unité, prix im, prix co, nb relevés, récurrent, base]
+[['lait','Lait demi-écrémé 1 L','fr','bouteille',1.05,0.99,5,'chaque liste'],
+ ['pain','Pain de mie','ep','paquet',1.89,1.65,4],
+ ['ban','Bananes','fl','kg',1.79,1.69,5,'chaque liste'],
+ ['oign','Oignons','fl','pièce',0.25,0.22,3],
+ ['hache','Haché porc-bœuf 500 g','bo','barquette',4.20,4.65,5],
+ ['toma','Tomates concassées 400 g','ep','boîte',0.79,0.65,4],
+ ['lasa','Feuilles de lasagne','ep','paquet',1.49,1.29,2],
+ ['rape','Fromage râpé 200 g','fr','sachet',2.29,2.49,4],
+ ['hari','Haricots rouges 400 g','ep','boîte',0.89,0.75,2],
+ ['poul','Blancs de poulet 600 g','bo','barquette',7.90,8.60,4],
+ ['coco','Lait de coco 400 ml','ep','boîte',1.59,1.39,2],
+ ['riz','Riz basmati 1 kg','ep','paquet',2.99,2.49,3],
+ ['caro','Carottes 1 kg','fl','sachet',1.19,0.99,3],
+ ['poir','Poireaux','fl','pièce',0.89,null,2],
+ ['cafe','Café moulu 500 g','ep','paquet',6.49,5.79,5,'toutes les 2 listes'],
+ ['vais','Liquide vaisselle','dr','flacon',2.15,1.89,2],
+ ['pq','Papier toilette x12','dr','paquet',6.99,5.99,3],
+ ['yao','Yaourts nature x8','fr','pack',2.39,2.59,5,'chaque liste'],
+ ['spag','Spaghetti 1 kg','ep','paquet',1.59,1.39,3],
+ ['lard','Lardons 200 g','bo','barquette',2.49,2.79,3],
+ ['oeuf','Œufs x12','fr','boîte',3.29,3.19,4],
+ ['jus',"Jus d'orange 1 L",'bs','brique',1.99,1.79,3],
+ ['huile',"Huile d'olive 1 L",'ep','bouteille',8.99,8.49,1,null,true],
+ ['curry','Curry en poudre','ep','pot',1.99,2.29,1,null,true],
+ ['boui','Bouillon cubes','ep','boîte',1.49,1.29,2,null,true],
+ ['sel','Sel fin','ep','paquet',0.69,0.59,1,null,true],
+].forEach(([id,n,c,u,im,co,nb,rec,base])=>P[id]={id,n,c,u,price:{im,co},nb,rec:rec||null,base:!!base});
+
+const DISHES={
+  lasa:{n:'Lasagnes',time:'1 h 15',steps:["Faire revenir les oignons émincés dans l'huile, ajouter le haché.","Ajouter les tomates concassées, saler, laisser mijoter 20 min.","Béchamel : 40 g beurre, 40 g farine, 50 cl de lait.","Alterner feuilles, sauce, béchamel ; finir par le fromage râpé.","Four 180 °C, 35 min."],ing:[['hache',1],['toma',2],['lasa',1],['rape',1],['oign',2],['lait',1],['huile'],['sel']]},
+  chili:{n:'Chili con carne',time:'45 min',url:'https://recettes.example/chili-con-carne',note:'Version douce pour les enfants : moitié du piment.',ing:[['hache',1],['hari',2],['toma',1],['oign',1],['riz',1],['curry']]},
+  curry:{n:'Poulet curry coco',ing:[['poul',1],['coco',1],['riz',1],['oign',1],['curry']]},
+  soupe:{n:'Soupe carottes-poireaux',ing:[['caro',1],['poir',2],['oign',1],['boui']]},
+  carbo:{n:'Pâtes carbonara',ing:[['spag',1],['lard',1],['oeuf',1]]},
+  croque:{n:'Croque-monsieur',ing:[]},
+  crepes:{n:'Crêpes',time:'30 min + repos 1 h',steps:['250 g farine, 4 œufs, 50 cl lait, 1 pincée de sel.','Laisser reposer 1 h.'],ing:[['oeuf',1],['lait',1]]},
+};
+const SLOTS=[['pdj','P.-déj.'],['midi','Midi'],['soir','Soir'],['coll','Collation']];
+const S={
+  role:'manager', view:'home', listId:'l2', listTab:'items', shopStore:'im', menuFrom:'2026-10-03',
+  pr:{range:'week',slots:{midi:true,soir:true},persons:false,shop:true},
+  members:[{n:'Thomas',e:'thomas@exemple.be',r:'manager'},{n:'Léa',e:'lea@exemple.be',r:'member'},{n:'Noah',e:'noah@exemple.be',r:'member'}],
+  promos:[{pid:'hache',sid:'co',price:3.49,list:'l2',note:'Dépliant Colruyt'},{pid:'cafe',sid:'im',price:4.99,until:'2026-10-10',note:'2e à -50 %'}],
+  q2:'',q3:'',q4:'',dfilter:'all',acc:{sugg:true}, threshold:5, nbAvg:5, showExtra:false, sheet:null, toast:'', q:'',
+  lists:[
+    {id:'back',type:'backlog',title:'À prévoir',items:[
+      {pid:'pq',q:1,o:'manual'},{pid:'vais',q:1,o:'manual'},{pid:'jus',q:2,o:'suggestion',by:'Léa',sugg:'pending'}]},
+    {id:'l1',type:'dated',date:'2026-09-19',status:'Clôturée',est:118.40,items:[]},
+    {id:'l2',type:'dated',date:'2026-10-03',status:'En préparation',items:[
+      {pid:'lait',q:3,o:'recurring'},{pid:'ban',q:1,o:'recurring'},{pid:'yao',q:2,o:'recurring'},
+      {pid:'cafe',q:1,o:'recurring'},{pid:'pain',q:2,o:'manual'},{pid:'pq',q:1,o:'manual'},
+      {pid:'oeuf',q:1,o:'suggestion',by:'Léa',sugg:'pending'}]},
+    {id:'l3',type:'dated',date:'2026-10-17',status:'En préparation',items:[{pid:'riz',q:1,o:'manual'}]},
+  ],
+  meals:[
+    {d:'2026-10-03',s:'soir',dish:'carbo',p:4},{d:'2026-10-04',s:'midi',dish:'curry',p:4},
+    {d:'2026-10-05',s:'soir',dish:'soupe',p:4},{d:'2026-10-07',s:'soir',dish:'lasa',p:4},
+    {d:'2026-10-09',s:'soir',dish:'croque',p:4},{d:'2026-10-10',s:'midi',dish:'chili',p:6},
+    {d:'2026-10-12',s:'soir',dish:'crepes',p:4,by:'Léa',sugg:'pending'},
+  ],
+  baseOn:{}, assign:{}, checked:{}, prices:{}
+};
+// ---------- Utilitaires ----------
+const $=s=>document.querySelector(s);
+const eur=v=>v==null?'—':v.toFixed(2).replace('.',',')+' €';
+const D=s=>new Date(s+'T12:00');
+const fmtD=(s,o={weekday:'short',day:'numeric',month:'short'})=>D(s).toLocaleDateString('fr-BE',o);
+const addDays=(s,n)=>{const d=D(s);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const list=id=>S.lists.find(l=>l.id===id);
+const dated=()=>S.lists.filter(l=>l.type==='dated').sort((a,b)=>a.date<b.date?-1:1);
+const isMgr=()=>S.role==='manager';
+function period(l){const ds=dated(),i=ds.indexOf(l),nx=ds[i+1];return [l.date,nx?addDays(nx.date,-1):addDays(l.date,13)]}
+function mealsOf(l){const [a,b]=period(l);return S.meals.filter(m=>m.d>=a&&m.d<=b).sort((x,y)=>(x.d+x.s)<(y.d+y.s)?-1:1)}
+// Promos : prix valable pour une sortie de courses précise (list) ou jusqu'à une date (until)
+function promoFor(pid,sid,l=list(S.listId)){const ref=l&&l.date||'2026-10-01';
+  return S.promos.find(p=>p.pid===pid&&p.sid===sid&&(p.list?p.list===l?.id:ref<=p.until))}
+function effPrice(pid){const o={};for(const s of STORES){const pr=promoFor(pid,s.id);o[s.id]=pr&&pr.price!=null?pr.price:P[pid].price[s.id]}return o}
+function promoPills(pid){return STORES.map(s=>{const p=promoFor(pid,s.id);return p?`<span class="pill p-carrot" style="cursor:pointer" onclick="act.promo('${pid}','${s.id}')">🏷 ${s.name} ${p.price!=null?eur(p.price):"promo"} ${p.list?'· ces courses':'· jusqu\'au '+fmtD(p.until,{day:'numeric',month:'short'})}</span>`:''}).join(' ')}
+function bestStore(pid){const pr=effPrice(pid);let b=null;for(const s of STORES)if(pr[s.id]!=null&&(b==null||pr[s.id]<pr[b]))b=s.id;return b||'im'}
+
+// Lignes de la liste = articles manuels + ingrédients des repas (fusionnés)
+function lines(l){
+  const out=[],by={};
+  for(const it of l.items){const x={...it,from:[]};out.push(x);if(!it.sugg||it.sugg==='ok')by[it.pid]=x}
+  const base={};
+  if(l.type==='dated')for(const m of mealsOf(l)){
+    if(m.sugg==='pending')continue;
+    const dish=DISHES[m.dish];
+    for(const [pid,q] of dish.ing){
+      if(m.skip&&m.skip.includes(pid))continue; // encore en réserve
+      if(P[pid].base){(base[pid]=base[pid]||[]).push(dish.n);continue}
+      const qq=Math.ceil((q||1)*m.p/4*10)/10;
+      if(by[pid]){by[pid].q=+(by[pid].q+qq).toFixed(1);by[pid].from.push(dish.n)}
+      else{const x={pid,q:qq,o:'meal',from:[dish.n]};by[pid]=x;out.push(x)}
+    }
+  }
+  for(const x of out){x.q=Math.ceil(x.q);x.key=l.id+':'+x.pid;x.store=S.assign[x.key]||bestStore(x.pid);x.manual=!!S.assign[x.key]}
+  const baseL=Object.entries(base).map(([pid,from])=>({pid,from,key:l.id+':'+pid,q:1}));
+  for(const b of baseL)if(S.baseOn[b.key]){b.store=S.assign[b.key]||bestStore(b.pid);b.manual=!!S.assign[b.key];b.o='base';out.push(b)}
+  return {items:out.filter(x=>x.sugg!=='no'),base:baseL};
+}
+function scenarios(items){
+  const act=items.filter(x=>!x.sugg||x.sugg==='ok'),r={split:0,unk:{}};
+  for(const s of STORES){r[s.id]=0;r.unk[s.id]=0}
+  for(const x of act){
+    const pr=effPrice(x.pid);
+    for(const s of STORES){if(pr[s.id]==null)r.unk[s.id]++;r[s.id]+=(pr[s.id]??pr[bestStore(x.pid)])*x.q}
+    r.split+=(pr[x.store]??pr[bestStore(x.pid)])*x.q;
+  }
+  const mono=STORES.reduce((b,s)=>r[s.id]<r[b]?s.id:b,STORES[0].id);
+  r.mono=mono;r.save=r[mono]-r.split;return r;
+}
+// ---------- Rendu ----------
+const ICON={
+ book:'<path d="M5 4.5A1.5 1.5 0 016.5 3H19v15H6.5A1.5 1.5 0 005 19.5v-15zM5 19.5A1.5 1.5 0 006.5 21H19" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>',
+ list:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+ menu:'<rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+ cat:'<path d="M4 7l8-4 8 4-8 4-8-4zM4 12l8 4 8-4M4 17l8 4 8-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>',
+ home:'<circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.8c1.9.7 3 2.4 3.5 5.2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>'
+};
+function pendingCount(){return S.lists.reduce((n,l)=>n+l.items.filter(i=>i.sugg==='pending').length,0)+S.meals.filter(m=>m.sugg==='pending').length}
+function render(){
+  $('#roleSw').innerHTML=[['manager','Gestionnaire (Thomas)'],['member','Membre (Léa)']].map(([k,t])=>`<button class="${S.role===k?'on':''}" onclick="act.role('${k}')">${t}</button>`).join('');
+  const v=VIEWS[S.view](); const tab=S.view==='list'||S.view==='shop'?'home':S.view==='product'?'cat':S.view==='printMenu'?'menu':S.view==='dishEdit'?'dishes':S.view==='scan'?'home':S.view;
+  const pc=pendingCount();
+  $('#phone').innerHTML=`<header class="top">${v.back?`<button class="back" onclick="act.go('${v.back}')">‹</button>`:''}<h2>${v.title}${v.sub?`<small>${v.sub}</small>`:''}</h2>${v.right||''}</header>
+  <main>${v.body}</main>
+  <nav class="tabs">${[['home','Listes','list'],['menu','Menu','menu'],['dishes','Plats','book'],['cat','Catalogue','cat'],['foyer','Foyer','home']].map(([k,t,i])=>`<button class="${tab===k?'on':''}" onclick="act.go('${k}')"><svg viewBox="0 0 24 24" fill="none">${ICON[i]}</svg>${t}${k==='foyer'&&pc&&isMgr()?`<span class="badge">${pc}</span>`:''}</button>`).join('')}</nav>
+  ${S.sheet?`<div class="sheet-bg" onclick="if(event.target===this)act.close()"><div class="sheet">${S.sheet()}</div></div>`:''}
+  ${S.toast?`<div class="toast">${S.toast}</div>`:''}`;
+}
+const storeBtn=x=>{const s=STORES.find(s=>s.id===x.store);return `<button class="st st-${x.store}${x.manual?' manual':''}" title="Changer de magasin" onclick="event.stopPropagation();act.swap('${x.key}','${x.store}')">${s.name}</button>`};
+function srcPill(x){
+  if(x.sugg==='pending')return `<span class="pill p-carrot">suggéré par ${x.by}</span>`;
+  if(x.from&&x.from.length)return `<span class="pill p-plum">pour ${x.from.join(', ')}</span>`;
+  return {recurring:'<span class="pill p-leaf">récurrent</span>',base:'<span class="pill p-grey">de base</span>'}[x.o]||'';
+}
+function priceHint(x){const pr=effPrice(x.pid),o=STORES.filter(s=>s.id!==x.store).map(s=>pr[s.id]==null?`${s.name} : prix inconnu`:`${s.name} ${eur(pr[s.id])}`).join(' · ');return `${eur(pr[x.store])} / ${P[x.pid].u} · ${o}`}
+const hasRecipe=d=>!!(d.url||(d.steps&&d.steps.length)||d.note);
+function recipeHtml(d,p){
+  const f=(p||4)/(d.portions||4);
+  return `${d.time?`<p class="muted">⏱ ${d.time} · pour ${p||d.portions||4} personnes</p>`:''}
+   ${d.ing.length?`<div class="sec">Ingrédients</div>${d.ing.map(([pid,q])=>`<div class="item"><span class="grow">${P[pid].n}</span>${P[pid].base||!q?'<span class="pill p-grey">selon goût</span>':`<span class="price">${String(+(q*f).toFixed(1)).replace('.',',')} ${P[pid].u}</span>`}</div>`).join('')}`:''}
+   ${d.steps&&d.steps.length?`<div class="sec">Préparation</div><ol style="padding-left:20px;margin:0">${d.steps.map(s=>`<li style="margin-bottom:6px">${s}</li>`).join('')}</ol>`:''}
+   ${d.note?`<div class="sec">Notes</div><p style="margin:0">${d.note}</p>`:''}
+   ${d.url?`<a class="btn sec2 full" style="display:block;text-align:center;text-decoration:none;margin-top:12px" href="${d.url}" target="_blank" rel="noopener">🔗 Ouvrir la recette en ligne</a>`:''}
+   ${hasRecipe(d)?'':'<p class="muted">Aucune recette renseignée pour ce plat.</p>'}`;
+}
+function prRange(){
+  if(S.pr.range==='list'){const ds=dated(),l=ds.filter(l=>l.date<=S.menuFrom).at(-1)||ds[0],[a,b]=period(l);return [a,Math.round((D(b)-D(a))/864e5)+1]}
+  return [S.menuFrom,S.pr.range==='2w'?14:7];
+}
+function menuSheet(){
+  const [from,days]=prRange(),slots=SLOTS.filter(([k])=>S.pr.slots[k]),shopDays=dated().map(l=>l.date);
+  let t='';
+  for(let w=0;w<days;w+=7){
+    const cols=[];for(let i=w;i<Math.min(days,w+7);i++)cols.push(addDays(from,i));
+    t+=`<table><tr><th style="width:56px"></th>${cols.map(d=>`<th>${fmtD(d,{weekday:'short',day:'numeric',month:'short'})}${S.pr.shop&&shopDays.includes(d)?' 🛒':''}</th>`).join('')}</tr>
+    ${slots.map(([k,lbl])=>`<tr><td class="sl">${lbl}</td>${cols.map(d=>{const m=S.meals.find(m=>m.d===d&&m.s===k&&m.sugg!=='pending');return `<td>${m?DISHES[m.dish].n+(S.pr.persons?` <span class="np">(${m.p} p.)</span>`:''):''}</td>`}).join('')}</tr>`).join('')}</table>`;
+  }
+  return `<div class="pm"><h1>Menu du ${fmtD(from,{day:'numeric',month:'long'})} au ${fmtD(addDays(from,days-1),{day:'numeric',month:'long'})}</h1><div class="meta">Foyer Phoenix${S.pr.shop?' · 🛒 = jour de courses':''}</div>${t}<div class="foot"><span>Le Cabas</span><span>Imprimé le ${new Date().toLocaleDateString('fr-BE')}</span></div></div>`;
+}
+const VIEWS={
+ home(){
+  const ds=dated(),cur=ds.filter(l=>l.status!=='Clôturée'),old=ds.filter(l=>l.status==='Clôturée'),bk=list('back');
+  const card=l=>{const L=lines(l),sc=scenarios(L.items),n=mealsOf(l).filter(m=>m.sugg!=='pending').length;return `<div class="card click" onclick="act.open('${l.id}')"><div class="row"><div class="grow"><h4>Courses du ${fmtD(l.date,{weekday:'long',day:'numeric',month:'long'})}</h4><div class="muted">${L.items.length} articles · ${n} repas · ≈ ${eur(sc.split)}</div></div><span class="pill ${l.status==='En préparation'?'p-leaf':'p-grey'}">${l.status}</span></div></div>`};
+  return {title:'Listes',sub:'Foyer Phoenix',body:`
+   <div class="card click" onclick="act.open('back')"><div class="row"><div class="grow"><h4>À prévoir</h4><div class="muted">${bk.items.length} articles en attente d'une sortie</div></div><span class="pill p-grey">permanente</span></div></div>
+   <div class="sec">Prochaines courses</div>${cur.map(card).join('')}
+   <button class="btn sec2 full" onclick="act.newList()">＋ Nouvelle liste datée</button>
+   <div class="sec">Historique</div>${old.map(l=>`<div class="card"><div class="row"><div class="grow"><h4>Courses du ${fmtD(l.date,{day:'numeric',month:'long'})}</h4><div class="muted">Estimé ${eur(l.est)} · 23 articles achetés · 2 tickets scannés (14 prix mis à jour)</div></div></div></div>`).join('')}`};
+ },
+ list(){
+  const l=list(S.listId),L=lines(l),sc=scenarios(L.items),bk=l.type==='backlog';
+  const title=bk?'À prévoir':'Courses du '+fmtD(l.date,{day:'numeric',month:'long'});
+  const [a,b]=bk?[]:period(l);
+  const add=`<div style="margin-bottom:12px"><input class="txt" placeholder="${isMgr()?'Ajouter un article…':'Suggérer un article…'}" value="${S.q}" oninput="act.search(this.value)" id="q">${S.q?`<div class="ac">${Object.values(P).filter(p=>p.n.toLowerCase().includes(S.q.toLowerCase())).slice(0,5).map(p=>`<button onclick="act.add('${p.id}')"><span class="grow">${p.n}</span><span class="muted">${CATS[p.c]}</span></button>`).join('')||''}<button onclick="act.newProd(S.q,'list')"><b>＋ Créer « ${S.q} » dans le catalogue</b></button></div>`:''}</div>`;
+  const tabs=bk?'':`<div class="seg">${[['items','Articles'],['meals','Repas'],['stores','Magasins']].map(([k,t])=>`<button class="${S.listTab===k?'on':''}" onclick="act.tab('${k}')">${t}</button>`).join('')}</div>`;
+  let body='';
+  if(bk||S.listTab==='items'){
+   const g={};for(const x of L.items)(g[P[x.pid].c]=g[P[x.pid].c]||[]).push(x);
+   body=add+Object.keys(CATS).filter(c=>g[c]).map(c=>`<div class="sec">${CATS[c]}</div><div class="card" style="padding:2px 14px">${g[c].map(x=>`
+     <div class="item ${x.sugg==='pending'?'pending':''}"><div class="grow"><div class="nm">${x.q} × ${P[x.pid].n}</div><div class="muted">${priceHint(x)}</div><div style="margin-top:3px">${srcPill(x)} ${promoPills(x.pid)}</div></div>
+     ${x.sugg==='pending'&&isMgr()?`<button class="btn sm" onclick="act.sugg('${l.id}','${x.pid}','ok')">✓</button><button class="btn sm sec2" onclick="act.sugg('${l.id}','${x.pid}','no')">✕</button>`:`<button class="btn sm sec2" title="Promo" onclick="act.promo('${x.pid}')">🏷</button>${storeBtn(x)}`}</div>`).join('')}</div>`).join('');
+   if(!bk&&L.base.length)body+=`<div class="sec">À vérifier dans les placards</div><div class="card" style="padding:2px 14px">${L.base.map(b=>`<div class="item"><button class="chk ${S.baseOn[b.key]?'on':''}" onclick="act.base('${b.key}')">${S.baseOn[b.key]?'✓':''}</button><div class="grow"><div class="nm">${P[b.pid].n}</div><div class="muted">pour ${b.from.join(', ')} · cocher = à acheter</div></div></div>`).join('')}</div>`;
+  } else if(S.listTab==='meals'){
+   const ms=mealsOf(l);
+   body=`<p class="muted">Repas du ${fmtD(a)} au ${fmtD(b)} (jusqu'à la liste suivante).</p><div class="card" style="padding:2px 14px">${ms.map(m=>{const d=DISHES[m.dish];return `<div class="item ${m.sugg==='pending'?'pending':''}"><div style="width:74px" class="muted">${fmtD(m.d,{weekday:'short',day:'numeric'})}<br>${SLOTS.find(s=>s[0]===m.s)[1]}</div><div class="grow"><div class="nm">${d.n}</div><div class="muted">${m.p} pers. · ${d.ing.length?d.ing.length+' ingrédients':'ingrédients non détaillés (rappel)'}</div>${m.sugg==='pending'?`<span class="pill p-carrot">suggéré par ${m.by}</span>`:''}</div></div>`}).join('')}</div>
+   <button class="btn sec2 full" onclick="act.go('menu')">Ouvrir le menu</button>`;
+   const memo=ms.filter(m=>!DISHES[m.dish].ing.length);
+   if(memo.length)body+=`<div class="sec">Rappels (plats sans détail)</div>${memo.map(m=>`<div class="card muted">📝 ${DISHES[m.dish].n} — penser aux ingrédients habituels</div>`).join('')}`;
+  } else {
+   const rec=sc.save>=S.threshold, max=Math.max(...STORES.map(s=>sc[s.id]));
+   body=`<div class="saving ${rec?'good':'meh'}"><div class="muted">${rec?'Deux magasins valent la peine':'Un seul magasin suffit'}</div><big>${eur(Math.abs(sc.save))} ${sc.save>=0?"d'économie":'de surcoût'}</big><div class="muted">en répartissant vs tout chez ${STORES.find(s=>s.id===sc.mono).name} · seuil ${eur(S.threshold)}</div></div>
+   <div class="card"><div class="scen">${STORES.map(s=>`<div>Tout chez ${s.name}${sc.unk[s.id]?` <span class="pill p-carrot">${sc.unk[s.id]} prix inconnu</span>`:''}<div class="bar"><i style="width:${sc[s.id]/max*100}%;background:var(--${s.id})"></i></div></div><div class="price">${eur(sc[s.id])}</div>`).join('')}
+   <div><b>Répartition actuelle</b><div class="bar"><i style="width:${sc.split/max*100}%;background:var(--leaf)"></i></div></div><div class="price">${eur(sc.split)}</div></div></div>
+   <div class="sec">Listes par magasin</div>
+   ${STORES.map(s=>{const its=L.items.filter(x=>x.store===s.id&&(!x.sugg||x.sugg==='ok'));const t=its.reduce((n,x)=>n+(effPrice(x.pid)[s.id]??0)*x.q,0);return `<div class="card click" onclick="act.shop('${s.id}')"><div class="row"><span class="st st-${s.id}">${s.name}</span><div class="grow muted">${its.length} articles · triés par rayon</div><span class="price">${eur(t)}</span></div></div>`}).join('')}
+   <div class="row" style="gap:8px"><button class="btn sec2 grow" onclick="act.allTo('im')">Tout IM</button><button class="btn sec2 grow" onclick="act.allTo('co')">Tout Colruyt</button><button class="btn sec2 grow" onclick="act.allTo(null)">Conseil</button></div>
+   <p class="muted">Astuce : dans « Articles », toucher l'étiquette d'un magasin le déplace. Les choix manuels sont en pointillé.</p>`;
+  }
+  const right=!bk&&isMgr()?`<button class="btn sm sec2" onclick="act.closeList()">Clôturer</button>`:'';
+  return {title,sub:bk?'Liste permanente':`${l.status} · repas du ${fmtD(a,{day:'numeric',month:'short'})} au ${fmtD(b,{day:'numeric',month:'short'})}`,back:'home',right,body:tabs+body};
+ },
+ shop(){
+  const l=list(S.listId),L=lines(l),sid=S.shopStore,st=STORES.find(s=>s.id===sid);
+  const its=L.items.filter(x=>x.store===sid&&(!x.sugg||x.sugg==='ok'));
+  const todo=its.filter(x=>!S.checked[x.key]),done=its.filter(x=>S.checked[x.key]);
+  const row=x=>`<div class="item ${S.checked[x.key]?'done':''}" onclick="act.check('${x.key}','${x.pid}')"><span class="chk ${S.checked[x.key]?'on':''}">${S.checked[x.key]?'✓':''}</span><div class="grow"><div class="nm" style="font-size:17px">${x.q} × ${P[x.pid].n}</div><div class="muted">${S.prices[x.key]?'payé '+eur(S.prices[x.key]):'≈ '+eur(effPrice(x.pid)[sid])}${promoFor(x.pid,sid)?' · <span class="pill p-carrot">🏷 promo</span>':''}</div></div></div>`;
+  const body=`<div class="seg">${STORES.map(s=>`<button class="${sid===s.id?'on':''}" onclick="act.shop('${s.id}')">${s.name}</button>`).join('')}</div>
+   <div class="row muted" style="margin-bottom:6px"><span class="grow">🟢 Léa est aussi en courses · synchro en direct</span><span>${done.length}/${its.length}</span></div>
+   ${ORDER[sid].filter(c=>todo.some(x=>P[x.pid].c===c)).map(c=>`<div class="sec">${CATS[c]}</div><div class="card" style="padding:2px 14px">${todo.filter(x=>P[x.pid].c===c).map(row).join('')}</div>`).join('')}
+   ${done.length?`<div class="sec">Dans le caddie (${done.length})</div><div class="card" style="padding:2px 14px">${done.map(row).join('')}</div>`:''}
+   <button class="btn full" onclick="act.ticket('${sid}')">Terminer chez ${st.name} · saisir le ticket</button>`;
+  return {title:'En courses · '+st.name,sub:'Ordre des rayons de '+st.name,back:'list',body};
+ },
+ menu(){
+  const from=S.menuFrom,slots=SLOTS.filter(s=>S.showExtra||s[0]==='midi'||s[0]==='soir');
+  const ds=dated();let html='';
+  for(let i=0;i<14;i++){
+   const d=addDays(from,i),l=ds.find(l=>l.date===d);
+   if(l)html+=`<div class="sec">🛒 Liste du ${fmtD(d,{day:'numeric',month:'long'})}</div>`;
+   html+=`<div class="day"><div class="d"><span>${fmtD(d,{weekday:'short'})}</span><b>${D(d).getDate()}</b></div><div class="grow">${slots.map(([k,t])=>{const m=S.meals.find(m=>m.d===d&&m.s===k);return `<div class="slot"><span class="lbl">${t}</span>${m?`<button class="meal" onclick="act.meal(${S.meals.indexOf(m)})" ${m.sugg==='pending'?'style="opacity:.6"':''}>${hasRecipe(DISHES[m.dish])?'📖 ':''}${DISHES[m.dish].n}${m.p!==4?` · ${m.p} p.`:''}</button>${m.sugg==='pending'?'<span class="pill p-carrot">suggéré</span>':''}`:`<button class="add" onclick="act.addMeal('${d}','${k}')">＋</button>`}</div>`}).join('')}</div></div>`;
+  }
+  return {title:'Menu',sub:'Les plats alimentent la liste de leur période',right:`<button class="btn sm sec2" onclick="act.exportMenu()">🖨 Exporter</button>`,body:`<div class="row" style="justify-content:flex-end;margin-bottom:8px"><button class="btn sm sec2" onclick="act.extra()">${S.showExtra?'Masquer':'Afficher'} p.-déj. / collation</button></div><div class="row" style="margin-bottom:8px"><button class="btn sm sec2" onclick="act.week(-7)">‹ Sem.</button><div class="grow" style="text-align:center;font-weight:700">${fmtD(from,{day:'numeric',month:'short'})} → ${fmtD(addDays(from,13),{day:'numeric',month:'short'})}</div><button class="btn sm sec2" onclick="act.week(7)">Sem. ›</button></div>${html}
+   <button class="btn sec2 full" style="margin-top:12px" onclick="act.go('dishes')">📖 Tous les plats</button>`};
+ },
+ scan(){
+  const {sid,lines:ls}=S.scanD,st=STORES.find(s=>s.id===sid),tot=ls.reduce((n,l)=>n+l.unit*l.qty,0),todo=ls.filter(l=>l.ok&&!l.pid).length;
+  const opts=Object.values(P).map(p=>`<option value="${p.id}">${p.n}</option>`).join('');
+  return {title:'Ticket '+st.name,sub:`Lu le ${fmtD('2026-10-03',{day:'numeric',month:'long'})} · ${ls.length} lignes`,back:'shop',body:`
+   <div class="card row"><div style="width:52px;height:70px;border-radius:8px;background:repeating-linear-gradient(#fff 0 6px,#e9ede4 6px 8px);border:1px solid var(--line)"></div><div class="grow"><b>${st.name} · magasin et date détectés</b><div class="muted">Lecture sur le téléphone (Tesseract.js), rien n'est envoyé</div></div></div>
+   <div class="row" style="gap:6px;margin-bottom:6px"><span class="pill p-leaf">${ls.filter(l=>l.pid).length} reconnues</span>${todo?`<span class="pill p-carrot">${todo} à associer</span>`:''}</div>
+   <div class="card" style="padding:2px 14px">${ls.map((l,i)=>{
+     const d=l.avg!=null&&l.pid?(l.unit-l.avg)/l.avg*100:null;
+     return `<div class="item" style="align-items:flex-start;${l.ok?'':'opacity:.45'}"><button class="chk ${l.ok?'on':''}" onclick="S.scanD.lines[${i}].ok=!S.scanD.lines[${i}].ok;render()">${l.ok?'✓':''}</button><div class="grow">
+      <div class="muted" style="font-family:monospace;font-size:12px">${l.raw} · ${l.qty} × ${l.unit.toFixed(2).replace('.',',')}</div>
+      ${l.pid&&l.pid!=='_new'?`<div class="nm">→ ${P[l.pid].n}</div><div class="muted">moyenne ${eur(l.avg)}${d!=null&&Math.abs(d)>=1?` · <b style="color:var(${d>0?'--im':'--leaf'})">${d>0?'+':''}${d.toFixed(0)} %</b>`:''}${l.alias?' · <span class="pill p-plum">correspondance mémorisée</span>':''}</div>`
+      :`<select class="txt" style="margin-top:4px;padding:6px" onchange="act.scanMap(${i},this.value)"><option>Associer à un produit…</option><option value="_new">＋ Créer dans le catalogue</option><option value="_ign">Ignorer cette ligne</option>${opts}</select>`}
+     </div><span class="price">${eur(l.unit*l.qty)}</span></div>`}).join('')}</div>
+   <p class="muted">Chaque ligne validée devient un relevé de prix ${st.name} (moyenne recalculée) et coche l'article correspondant de la liste.</p>
+   <button class="btn full" onclick="act.scanOk()">Valider et mettre à jour les prix</button>`};
+ },
+ dishes(){
+  const q=S.q3.toLowerCase().trim(),f=S.dfilter;
+  const all=Object.entries(DISHES).filter(([k,d])=>(!q||d.n.toLowerCase().includes(q)||d.ing.some(([p])=>P[p].n.toLowerCase().includes(q)))&&(f==='all'||(f==='recipe'&&hasRecipe(d))||(f==='memo'&&!d.ing.length)||(f==='planned'&&S.meals.some(m=>m.dish===k))));
+  const next=k=>S.meals.filter(m=>m.dish===k&&m.d>='2026-10-01').sort((x,y)=>x.d<y.d?-1:1)[0];
+  return {title:'Plats',sub:Object.keys(DISHES).length+' plats du foyer',right:isMgr()?'<button class="btn sm" onclick="act.newDish()">＋ Plat</button>':'',body:`
+   <input class="txt" id="q3" placeholder="🔍 Rechercher un plat ou un ingrédient…" value="${S.q3}" oninput="act.search3(this.value)">
+   <div class="opt">${[['all','Tous'],['recipe','📖 Avec recette'],['memo','Sans détail'],['planned','Au menu']].map(([k,t])=>`<button class="${f===k?'on':''}" onclick="S.dfilter='${k}';render()">${t}</button>`).join('')}</div>
+   ${all.map(([k,d])=>{const n=next(k),hit=q&&!d.n.toLowerCase().includes(q)?d.ing.filter(([p])=>P[p].n.toLowerCase().includes(q)).map(([p])=>P[p].n):[];return `<div class="card click" onclick="act.editDish('${k}')"><div class="row"><div class="grow"><h4>${d.n}${hasRecipe(d)?' <span class="pill p-plum">📖</span>':''}</h4><div class="muted">${hit.length?'contient '+hit.join(', '):d.ing.length?d.ing.length+' ingrédients'+(d.time?' · ⏱ '+d.time:''):'Ingrédients connus par cœur'}</div>${n?`<span class="pill p-leaf">prévu ${fmtD(n.d,{weekday:'short',day:'numeric',month:'short'})}</span>`:''}</div><span class="muted">›</span></div></div>`}).join('')||`<p class="muted">Aucun plat trouvé.</p>${isMgr()&&q?`<button class="btn full" onclick="act.newDish(S.q3)">＋ Créer le plat « ${S.q3} »</button>`:''}`}`};
+ },
+ dishEdit(){
+  const e=S.ed,ro=!isMgr(),used=S.meals.filter(m=>m.dish===e.k).length;
+  const res=S.q2?Object.values(P).filter(p=>p.n.toLowerCase().includes(S.q2.toLowerCase())&&!e.ing.some(i=>i[0]===p.id)).slice(0,5):[];
+  return {title:e.isNew?'Nouveau plat':e.n,sub:ro?'Lecture seule (membre)':used?`Prévu dans ${used} repas`:'Plat du foyer',back:'dishes',body:`
+   <div class="card"><label class="muted">Nom</label><input class="txt" value="${e.n}" ${ro?'disabled':''} oninput="S.ed.n=this.value">
+    <div class="row" style="margin-top:8px;gap:8px"><div class="grow"><label class="muted">Portions de référence</label><input class="txt" type="number" value="${e.portions}" ${ro?'disabled':''} oninput="S.ed.portions=+this.value"></div><div class="grow"><label class="muted">Temps</label><input class="txt" value="${e.time}" placeholder="ex. 45 min" ${ro?'disabled':''} oninput="S.ed.time=this.value"></div></div></div>
+   <div class="sec">Ingrédients</div><div class="card" style="padding:2px 14px">${e.ing.map(([pid,q],i)=>`<div class="item"><span class="grow">${P[pid].n}</span>${P[pid].base?'<span class="pill p-grey">de base</span>':`<input class="txt" style="width:62px;padding:5px 8px" type="number" step="0.5" value="${q??''}" placeholder="—" ${ro?'disabled':''} oninput="S.ed.ing[${i}][1]=this.value?+this.value:undefined"><span class="muted" style="width:62px">${P[pid].u}</span>`}${ro?'':`<button class="btn sm sec2" onclick="act.ingDel(${i})">✕</button>`}</div>`).join('')||'<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>'}</div>
+   ${ro?'':`<input class="txt" placeholder="Ajouter un ingrédient du catalogue…" value="${S.q2}" oninput="act.search2(this.value)" id="q2">${S.q2?`<div class="ac">${res.map(p=>`<button onclick="act.ingAdd('${p.id}')"><span class="grow">${p.n}</span><span class="muted">${CATS[p.c]}</span></button>`).join('')}${Object.values(P).some(p=>p.n.toLowerCase()===S.q2.toLowerCase().trim())?'':`<button onclick="act.newProd(S.q2,'dish')"><b>＋ Créer « ${S.q2} » dans le catalogue</b></button>`}</div>`:''}<p class="muted">Quantités facultatives, ajustées au nombre de personnes du repas.</p>`}
+   <div class="sec">Recette (facultatif)</div><div class="card">
+    <label class="muted">Lien vers une recette en ligne</label><input class="txt" value="${e.url}" placeholder="https://…" ${ro?'disabled':''} oninput="S.ed.url=this.value">
+    <label class="muted" style="display:block;margin-top:8px">Étapes (une par ligne)</label><textarea class="txt" rows="5" ${ro?'disabled':''} oninput="S.ed.steps=this.value">${e.steps}</textarea>
+    <label class="muted" style="display:block;margin-top:8px">Notes</label><textarea class="txt" rows="2" ${ro?'disabled':''} oninput="S.ed.note=this.value">${e.note}</textarea>
+    <p class="muted" style="margin-bottom:0">📎 Photo ou PDF de la recette (ex. page de livre) : prévu.</p></div>
+   ${ro?`<button class="btn full" onclick="act.recipe('${e.k}')">📖 Voir la recette</button>`:`<button class="btn full" onclick="act.saveDish()">Enregistrer</button>
+   ${e.isNew?'':`<div class="row" style="gap:8px;margin-top:8px"><button class="btn sec2 grow" onclick="act.recipe('${e.k}')">📖 Aperçu recette</button><button class="btn sec2 grow" style="color:var(--im)" onclick="act.delDish()">Supprimer le plat</button></div>`}`}`};
+ },
+ printMenu(){
+  const [from,days]=prRange();
+  return {title:'Exporter le menu',sub:`${fmtD(from,{day:'numeric',month:'short'})} → ${fmtD(addDays(from,days-1),{day:'numeric',month:'short'})} · A4 paysage`,back:'menu',body:`
+   <div class="sec" style="margin-top:0">Période</div><div class="opt">${[['week','7 jours'],['list','Période de la liste'],['2w','14 jours']].map(([k,t])=>`<button class="${S.pr.range===k?'on':''}" onclick="act.pr('range','${k}')">${t}</button>`).join('')}</div>
+   <div class="sec">Créneaux</div><div class="opt">${SLOTS.map(([k,t])=>`<button class="${S.pr.slots[k]?'on':''}" onclick="act.prSlot('${k}')">${t}</button>`).join('')}</div>
+   <div class="sec">Options</div><div class="opt"><button class="${S.pr.persons?'on':''}" onclick="act.pr('persons',${!S.pr.persons})">Nb de personnes</button><button class="${S.pr.shop?'on':''}" onclick="act.pr('shop',${!S.pr.shop})">Jours de courses 🛒</button></div>
+   <div class="sec">Aperçu</div>${menuSheet()}
+   <div class="row" style="gap:8px;margin-top:12px"><button class="btn grow" onclick="act.print()">🖨 Imprimer</button><button class="btn grow" onclick="act.print('pdf')">⬇ PDF</button></div>
+   <div class="row" style="gap:8px;margin-top:8px"><button class="btn sec2 grow" onclick="act.toastMsg('Image PNG du menu (fond d\\'écran, envoi par message)')">🖼 Image</button><button class="btn sec2 grow" onclick="act.toastMsg('Lien d\\'affichage en lecture seule copié · se met à jour tout seul')">🔗 Lien d'affichage</button></div>`};
+ },
+ cat(){
+  const g={};for(const p of Object.values(P))(g[p.c]=g[p.c]||[]).push(p);
+  return {title:'Catalogue',sub:Object.keys(P).length+' produits communs au foyer',body:Object.keys(CATS).map(c=>`<div class="sec">${CATS[c]}</div><div class="card" style="padding:2px 14px">${g[c].map(p=>{const b=bestStore(p.id);return `<div class="item" style="cursor:pointer" onclick="act.product('${p.id}')"><div class="grow"><div class="nm">${p.n}</div><div class="muted">${STORES.map(s=>`${s.name} ${eur(p.price[s.id])}`).join(' · ')}</div><div style="margin-top:3px">${p.rec?`<span class="pill p-leaf">récurrent : ${p.rec}</span> `:''}${p.base?'<span class="pill p-grey">ingrédient de base</span>':''}</div></div><span class="st st-${b}">${STORES.find(s=>s.id===b).name}</span></div>`}).join('')}</div>`).join('')};
+ },
+ product(){
+  const p=P[S.pid],hist=[['2026-09-19','co',p.price.co],['2026-09-19','im',p.price.im],['2026-09-05','co',p.price.co&&p.price.co+0.06],['2026-08-22','im',p.price.im&&p.price.im-0.04],['2026-08-22','co',p.price.co&&p.price.co-0.05]].filter(h=>h[2]);
+  return {title:p.n,sub:CATS[p.c]+' · par '+p.u,back:'cat',body:`
+   <div class="card"><div class="sec" style="margin-top:0">Prix moyen (${S.nbAvg} derniers relevés)</div>${STORES.map(s=>`<div class="row" style="padding:4px 0"><span class="st st-${s.id}">${s.name}</span><span class="grow muted">${p.price[s.id]==null?'aucun relevé':Math.min(p.nb,S.nbAvg)+' relevés'}</span><span class="price">${eur(p.price[s.id])}</span>${bestStore(p.id)===s.id?'<span class="pill p-leaf">conseillé</span>':''}</div>`).join('')}</div>
+   <div class="card"><div class="row"><div class="grow"><b>Récurrent</b><div class="muted">Ajouté automatiquement aux nouvelles listes</div></div><select class="txt" style="width:auto"><option>${p.rec||'non'}</option><option>chaque liste</option><option>toutes les 2 listes</option><option>non</option></select></div>
+   <div class="row" style="margin-top:10px"><div class="grow"><b>Ingrédient de base</b><div class="muted">Proposé « à vérifier », jamais ajouté d'office</div></div><span class="pill ${p.base?'p-leaf':'p-grey'}">${p.base?'oui':'non'}</span></div>
+   <div class="row" style="margin-top:10px"><div class="grow"><b>Magasin forcé</b><div class="muted">Ignore le conseil prix</div></div><select class="txt" style="width:auto"><option>aucun</option>${STORES.map(s=>`<option>${s.name}</option>`).join('')}</select></div></div>
+   <div class="sec">Derniers relevés</div><div class="card" style="padding:2px 14px">${hist.map(h=>`<div class="item"><span class="muted" style="width:70px">${fmtD(h[0],{day:'numeric',month:'short'})}</span><span class="st st-${h[1]}">${STORES.find(s=>s.id===h[1]).name}</span><span class="grow muted">coché en magasin</span><span class="price">${eur(h[2])}</span></div>`).join('')}</div>
+   <button class="btn sec2 full" onclick="act.toastMsg('Saisie manuelle d\\'un prix (magasin, date, promo oui/non)')">＋ Ajouter un relevé</button>`};
+ },
+ foyer(){
+  const sug=[];S.lists.forEach(l=>l.items.forEach(i=>{if(i.sugg==='pending')sug.push(`<div class="item"><div class="grow"><div class="nm">${i.q} × ${P[i.pid].n}</div><div class="muted">${i.by} → ${l.type==='backlog'?'À prévoir':'liste du '+fmtD(l.date,{day:'numeric',month:'short'})}</div></div>${isMgr()?`<button class="btn sm" onclick="act.sugg('${l.id}','${i.pid}','ok')">Accepter</button><button class="btn sm sec2" onclick="act.sugg('${l.id}','${i.pid}','no')">✕</button>`:'<span class="pill p-carrot">en attente</span>'}</div>`)}));
+  S.meals.forEach((m,ix)=>{if(m.sugg==='pending')sug.push(`<div class="item"><div class="grow"><div class="nm">🍽 ${DISHES[m.dish].n}</div><div class="muted">${m.by} → ${fmtD(m.d)} ${m.s}</div></div>${isMgr()?`<button class="btn sm" onclick="act.msugg(${ix},'ok')">Accepter</button><button class="btn sm sec2" onclick="act.msugg(${ix},'no')">✕</button>`:'<span class="pill p-carrot">en attente</span>'}</div>`)});
+  const ord=sid=>`<div style="padding:4px 0 8px"><div class="muted" style="margin:4px 0">Rayons dans l'ordre du parcours</div>${ORDER[sid].map((c,i)=>`<div class="ord"><span class="muted" style="width:18px">${i+1}</span><span class="grow">${CATS[c]} <span class="muted">· ${Object.values(P).filter(p=>p.c===c).length} produits</span></span>${isMgr()?`<button onclick="act.mv('${sid}',${i},-1)" title="Monter">↑</button><button onclick="act.mv('${sid}',${i},1)" title="Descendre">↓</button><button onclick="act.catEdit('${c}')" title="Renommer">✎</button><button onclick="act.catDel('${c}')" title="Supprimer">✕</button>`:''}</div>`).join('')}${isMgr()?`<button class="btn sec2 full" style="margin-top:8px" onclick="act.catEdit(null,'${sid}')">＋ Ajouter un rayon</button>`:''}</div>`;
+  const acc=(id,icon,title,sum,content)=>{const o=S.acc[id];return `<div class="acc${o?' open':''}"><button class="acc-h" aria-expanded="${!!o}" onclick="act.acc('${id}')"><span class="acc-i">${icon}</span><span class="grow"><b>${title}</b><span class="muted">${sum}</span></span><span class="acc-c">›</span></button>${o?`<div class="acc-b">${content}</div>`:''}</div>`};
+  const mem=S.members.map(m=>[m.n,m.r==='manager'?'Gestionnaire':'Membre']);
+  return {title:'Foyer Phoenix',sub:isMgr()?'Vous êtes gestionnaire':'Vous êtes membre',right:`<button class="btn sm sec2" onclick="act.accAll()">${Object.values(S.acc).some(Boolean)?'Tout replier':'Tout ouvrir'}</button>`,body:`
+   ${acc('sugg','💡','Suggestions en attente',sug.length?`<span class="badge" style="margin-left:6px">${sug.length}</span>`:' · rien en attente',sug.join('')||'<p class="muted">Rien en attente.</p>')}
+   ${acc('mem','👥','Membres',` · ${mem.length} personnes`,mem.map(([n,r],i)=>`<div class="item" ${isMgr()?`style="cursor:pointer" onclick="act.member(${i})"`:''}><span class="grow nm">${n}<div class="muted" style="font-weight:400">${S.members[i].e}</div></span><span class="pill ${r==='Gestionnaire'?'p-leaf':'p-grey'}">${r}</span>${isMgr()?'<span class="muted">✎</span>':''}</div>`).join('')+(isMgr()?`<button class="btn sec2 full" style="margin:8px 0" onclick="act.toastMsg('Lien d\\'invitation copié')">＋ Inviter un membre</button>`:''))}
+   ${acc('set','⚙️','Réglages',` · seuil ${eur(S.threshold)}, ${S.nbAvg} relevés, 15 jours`,`<div style="padding:10px 0">
+    <div class="row"><div class="grow"><b>Seuil « 2 magasins »</b><div class="muted">Économie minimale pour conseiller de faire les deux</div></div><input class="txt" type="number" style="width:80px" value="${S.threshold}" ${isMgr()?'':'disabled'} onchange="act.thr(this.value)"></div>
+    <div class="row" style="margin-top:10px"><div class="grow"><b>Prix moyen</b><div class="muted">Nombre de derniers relevés pris en compte</div></div><input class="txt" type="number" style="width:80px" value="${S.nbAvg}" ${isMgr()?'':'disabled'} onchange="S.nbAvg=+this.value"></div>
+    <div class="row" style="margin-top:10px"><div class="grow"><b>Rythme des courses</b><div class="muted">Date proposée pour une nouvelle liste</div></div><span class="pill p-grey">15 jours</span></div></div>`)}
+   ${STORES.map(s=>acc('st_'+s.id,'🏪',s.name,` · ordre des rayons : ${ORDER[s.id].slice(0,2).map(c=>CATS[c]).join(', ')}…`,ord(s.id))).join('')}
+   ${isMgr()?`<button class="btn sec2 full" onclick="act.toastMsg('Ajout d\\'un magasin (nom, couleur)')">＋ Ajouter un magasin</button>`:''}`};
+ }
+};
+// ---------- Actions ----------
+let tt;
+const act={
+ role(r){S.role=r;S.q='';render()},
+ go(v){S.view=v;S.sheet=null;S.q='';render();$('main').scrollTop=0},
+ open(id){S.listId=id;S.listTab='items';act.go('list')},
+ tab(t){S.listTab=t;render()},
+ search(v){S.q=v;render();const q=$('#q');q.focus();q.setSelectionRange(v.length,v.length)},
+ add(pid){const l=list(S.listId),ex=l.items.find(i=>i.pid===pid&&!i.sugg);
+  if(isMgr()){ex?ex.q++:l.items.push({pid,q:1,o:'manual'});S.q='';act.toastMsg(P[pid].n+' ajouté')}
+  else{l.items.push({pid,q:1,o:'suggestion',by:'Léa',sugg:'pending'});S.q='';act.toastMsg('Suggestion envoyée au gestionnaire')}},
+ sugg(lid,pid,st){const i=list(lid).items.find(i=>i.pid===pid&&i.sugg==='pending');i.sugg=st;act.toastMsg(st==='ok'?'Suggestion acceptée':'Suggestion refusée')},
+ msugg(ix,st){if(st==='ok')S.meals[ix].sugg='ok';else S.meals.splice(ix,1);act.toastMsg(st==='ok'?'Plat ajouté au menu':'Plat refusé')},
+ swap(key,cur){const n=STORES[(STORES.findIndex(s=>s.id===cur)+1)%STORES.length].id;const pid=key.split(':')[1];S.assign[key]=n===bestStore(pid)?undefined:n;render()},
+ allTo(sid){const L=lines(list(S.listId));for(const x of L.items)S.assign[x.key]=sid&&sid!==bestStore(x.pid)?sid:undefined;render()},
+ base(k){S.baseOn[k]=!S.baseOn[k];render()},
+ shop(sid){S.shopStore=sid;S.view='shop';render()},
+ check(key,pid){if(S.checked[key]){delete S.checked[key];delete S.prices[key];render();return}
+  S.checked[key]=true;const avg=effPrice(pid)[S.shopStore];
+  S.sheet=()=>`<h3>${P[pid].n}</h3><p class="muted">Prix payé (facultatif) — moyenne ${eur(avg)}</p><input class="txt" id="pp" inputmode="decimal" placeholder="${avg!=null?avg.toFixed(2):'0,00'}"><div class="row" style="margin-top:12px;gap:8px"><button class="btn sec2 grow" onclick="act.close()">Passer</button><button class="btn grow" onclick="act.savePrice('${key}')">Enregistrer le prix</button></div>`;render();},
+ savePrice(key){const v=parseFloat(($('#pp').value||'').replace(',','.'));if(v)S.prices[key]=v;S.sheet=null;act.toastMsg(v?'Relevé enregistré · moyenne mise à jour':'Coché')},
+ ticket(sid){const n=STORES.find(s=>s.id===sid).name;S.sheet=()=>`<h3>Terminer chez ${n}</h3><button class="btn full" onclick="act.scan('${sid}')">📷 Scanner le ticket</button><p class="muted">Lit chaque ligne, met à jour les prix ${n}, coche les articles achetés.</p><button class="btn sec2 full" onclick="act.close();act.toastMsg('Courses terminées sans scan')">Terminer sans scanner</button>`;render()},
+ scan(sid){const L=lines(list(S.listId)),its=L.items.filter(x=>x.store===sid&&(!x.sugg||x.sugg==='ok'));
+  const abbr=n=>n.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9 ]/g,'').split(' ').map(w=>w.slice(0,5)).join(' ').slice(0,22);
+  const lines_=its.map((x,i)=>{const avg=P[x.pid].price[sid]??P[x.pid].price[bestStore(x.pid)];const delta=[0,0.04,-0.06,0,0.1,-0.03][i%6];return {raw:abbr(P[x.pid].n),pid:x.pid,key:x.key,qty:x.q,unit:+(avg+delta).toFixed(2),avg:P[x.pid].price[sid],ok:true,alias:i===2}});
+  lines_.push({raw:'CHIPS PAPRIK 200G',pid:null,qty:1,unit:1.89,ok:true});
+  S.scanD={sid,lines:lines_};S.sheet=null;act.go('scan')},
+ scanMap(i,v){const l=S.scanD.lines[i];if(v==='_ign'){l.ok=false;l.pid=null}else if(v==='_new'){act.toastMsg('Le produit serait créé dans le catalogue');l.pid='_new'}else{l.pid=v;l.ok=true;l.avg=P[v].price[S.scanD.sid];l.alias=true}render()},
+ scanOk(){const {sid,lines:ls}=S.scanD;let n=0;
+  for(const l of ls){if(!l.ok||!l.pid||l.pid==='_new')continue;const p=P[l.pid],old=p.price[sid],k=Math.min(p.nb,S.nbAvg);
+   p.price[sid]=old==null?l.unit:+((old*k+l.unit)/(k+1)).toFixed(2);if(l.key){S.checked[l.key]=true;S.prices[l.key]=l.unit}n++}
+  S.view='shop';S.shopStore=sid;act.toastMsg(`${n} prix ${STORES.find(s=>s.id===sid).name} mis à jour · articles cochés`)},
+ close(){S.sheet=null;render()},
+ closeList(){const l=list(S.listId),L=lines(l),left=L.items.filter(x=>!S.checked[x.key]&&(!x.sugg||x.sugg==='ok')),nx=dated().find(d=>d.date>l.date);
+  S.sheet=()=>`<h3>Clôturer la liste</h3><p class="muted">${left.length} articles non achetés. Où les reporter ?</p>${left.slice(0,6).map(x=>`<div class="item"><span class="grow">${P[x.pid].n}</span><select class="txt" style="width:auto"><option>${nx?'Liste du '+fmtD(nx.date,{day:'numeric',month:'short'}):'Nouvelle liste'}</option><option>À prévoir</option><option>Abandonner</option></select></div>`).join('')}${left.length>6?`<p class="muted">… et ${left.length-6} autres</p>`:''}<button class="btn full" style="margin-top:10px" onclick="act.close();act.toastMsg('Liste clôturée (démo)')">Clôturer</button>`;render()},
+ newList(){const last=dated().at(-1),d=addDays(last.date,15);
+  S.sheet=()=>`<h3>Nouvelle liste</h3><label class="muted">Date des courses (rythme : 15 jours)</label><input class="txt" type="date" value="${d}" id="nd"><div class="sec">Importer</div>
+  <label class="item"><input type="checkbox" checked> <span class="grow">Articles récurrents dus</span><span class="muted">4</span></label>
+  <label class="item"><input type="checkbox" checked> <span class="grow">Depuis « À prévoir »</span><span class="muted">${list('back').items.length}</span></label>
+  <label class="item"><input type="checkbox" checked> <span class="grow">Ingrédients des repas de la période</span></label>
+  <button class="btn full" style="margin-top:10px" onclick="act.createList()">Créer</button>`;render()},
+ createList(){const d=$('#nd').value,id='l'+Date.now();S.lists.push({id,type:'dated',date:d,status:'En préparation',items:Object.values(P).filter(p=>p.rec==='chaque liste').map(p=>({pid:p.id,q:1,o:'recurring'}))});S.sheet=null;act.open(id)},
+ addMeal(d,s){S.q4='';S.sheet=()=>`<h3>${fmtD(d,{weekday:'long',day:'numeric',month:'long'})} · ${SLOTS.find(x=>x[0]===s)[1]}</h3><input class="txt" id="q4" placeholder="🔍 Rechercher un plat…" value="${S.q4}" oninput="act.search4(this.value)" style="margin-bottom:10px">${Object.entries(DISHES).filter(([k,x])=>x.n.toLowerCase().includes(S.q4.toLowerCase())).map(([k,x])=>`<button class="card click" style="width:100%;text-align:left" onclick="act.pickMeal('${d}','${s}','${k}')"><b>${x.n}</b><div class="muted">${x.ing.length?x.ing.length+' ingrédients':'rappel seulement'}</div></button>`).join('')}<button class="btn sec2 full" onclick="act.newDish()">＋ Nouveau plat</button>`;render()},
+ pickMeal(d,s,k){S.pm={ix:null,d,s,dish:k,p:4,skip:[]};act.stockSheet()},
+ mealStock(ix){const m=S.meals[ix];S.pm={ix,d:m.d,s:m.s,dish:m.dish,p:m.p,skip:[...(m.skip||[])]};act.stockSheet()},
+ stockSheet(){const m=S.pm,d=DISHES[m.dish],ing=d.ing.filter(([p])=>!P[p].base);
+  S.sheet=()=>`<h3>${d.n}</h3><p class="muted">${fmtD(m.d,{weekday:'long',day:'numeric',month:'long'})} · ${SLOTS.find(x=>x[0]===m.s)[1]}</p>
+   <div class="row" style="margin-bottom:8px"><span class="grow">Personnes</span><button class="btn sm sec2" onclick="S.pm.p=Math.max(1,S.pm.p-1);render()">−</button><b style="width:30px;text-align:center">${m.p}</b><button class="btn sm sec2" onclick="S.pm.p++;render()">＋</button></div>
+   ${ing.length?`<div class="sec">Ingrédients à acheter</div><p class="muted" style="margin-top:0">Décocher ce qui est encore en réserve.</p>${ing.map(([pid,q])=>{const off=m.skip.includes(pid);return `<div class="item" style="cursor:pointer" onclick="act.toggleSkip('${pid}')"><span class="chk ${off?'':'on'}">${off?'':'✓'}</span><span class="grow ${off?'muted':''}">${P[pid].n}</span>${off?'<span class="pill p-grey">en réserve</span>':q?`<span class="muted">${String(+(q*m.p/(d.portions||4)).toFixed(1)).replace('.',',')} ${P[pid].u}</span>`:''}</div>`}).join('')}`:'<p class="muted">Plat sans ingrédients détaillés : simple rappel dans la liste.</p>'}
+   <button class="btn full" style="margin-top:12px" onclick="act.pmOk()">${m.ix==null?(isMgr()?'Ajouter au menu':'Suggérer ce plat'):'Enregistrer'}</button>`;render()},
+ toggleSkip(pid){const s=S.pm.skip,i=s.indexOf(pid);i<0?s.push(pid):s.splice(i,1);render()},
+ pmOk(){const m=S.pm,isNew=m.ix==null,k=m.dish,d=m.d;
+  if(isNew)S.meals.push(isMgr()?{d,s:m.s,dish:k,p:m.p,skip:m.skip}:{d,s:m.s,dish:k,p:m.p,skip:m.skip,by:'Léa',sugg:'pending'});
+  else Object.assign(S.meals[m.ix],{p:m.p,skip:m.skip});
+  S.sheet=null;if(!isNew){act.toastMsg('Repas mis à jour · liste recalculée');return}
+  const l=dated().filter(l=>l.date<=d).at(-1);act.toastMsg(isMgr()?`${DISHES[k].n} ajouté · ingrédients fusionnés dans la liste du ${l?fmtD(l.date,{day:'numeric',month:'short'}):'?'}`:'Plat suggéré au gestionnaire')},
+ dish(k){act.editDish(k)},
+ editDish(k){const d=DISHES[k];S.ed={k,n:d.n,portions:d.portions||4,time:d.time||'',url:d.url||'',steps:(d.steps||[]).join('\n'),note:d.note||'',ing:d.ing.map(i=>[...i])};S.q2='';act.go('dishEdit')},
+ newDish(name){const k='d'+Date.now();S.ed={k,isNew:true,n:name||'',portions:4,time:'',url:'',steps:'',note:'',ing:[]};S.q2='';act.go('dishEdit')},
+ search2(v){S.q2=v;render();const q=$('#q2');q.focus();q.setSelectionRange(v.length,v.length)},
+ search3(v){S.q3=v;render();const q=$('#q3');q.focus();q.setSelectionRange(v.length,v.length)},
+ search4(v){S.q4=v;render();const q=$('#q4');q.focus();q.setSelectionRange(v.length,v.length)},
+ newProd(name,ctx){S.np={n:name,c:'ep',u:'pièce',base:false,ctx};S.sheet=()=>`<h3>Nouveau produit</h3><p class="muted">Ajouté au catalogue commun du foyer.</p>
+  <label class="muted">Nom</label><input class="txt" value="${S.np.n}" oninput="S.np.n=this.value">
+  <div class="row" style="gap:8px;margin-top:8px"><div class="grow"><label class="muted">Catégorie</label><select class="txt" onchange="S.np.c=this.value">${Object.entries(CATS).map(([k,t])=>`<option value="${k}" ${S.np.c===k?'selected':''}>${t}</option>`).join('')}</select></div>
+  <div class="grow"><label class="muted">Unité d'achat</label><select class="txt" onchange="S.np.u=this.value">${['pièce','kg','paquet','boîte','bouteille','sachet','barquette','pot'].map(u=>`<option>${u}</option>`).join('')}</select></div></div>
+  <label class="item" style="margin-top:6px"><input type="checkbox" onchange="S.np.base=this.checked"><span class="grow">Ingrédient de base (sel, huile, épices…)</span></label>
+  <p class="muted">Prix : inconnus pour l'instant, ils viendront des relevés (cochage, scan du ticket).</p>
+  <button class="btn full" onclick="act.newProdOk()">Créer et ajouter</button>`;render()},
+ newProdOk(){const n=S.np;if(!n.n.trim())return;const id='p'+Date.now();P[id]={id,n:n.n.trim(),c:n.c,u:n.u,price:{im:null,co:null},nb:0,rec:null,base:n.base};S.sheet=null;
+  if(n.ctx==='dish'){act.ingAdd(id)}else{const l=list(S.listId);if(isMgr())l.items.push({pid:id,q:1,o:'manual'});else l.items.push({pid:id,q:1,o:'suggestion',by:'Léa',sugg:'pending'});S.q=''}
+  act.toastMsg(P[id].n+' créé dans le catalogue')},
+ ingAdd(pid){S.ed.ing.push(P[pid].base?[pid]:[pid,1]);S.q2='';render()},
+ ingDel(i){S.ed.ing.splice(i,1);render()},
+ saveDish(){const e=S.ed;if(!e.n.trim()){act.toastMsg('Donner un nom au plat');return}
+  DISHES[e.k]={n:e.n.trim(),portions:e.portions,time:e.time,url:e.url.trim(),note:e.note.trim(),steps:e.steps.split('\n').map(s=>s.trim()).filter(Boolean),ing:e.ing};
+  act.go('dishes');act.toastMsg(e.isNew?'Plat créé':'Plat enregistré · listes recalculées')},
+ delDish(){const e=S.ed,used=S.meals.filter(m=>m.dish===e.k);
+  S.sheet=()=>`<h3>Supprimer « ${e.n} » ?</h3><p class="muted">${used.length?`Il est prévu dans ${used.length} repas (${used.map(m=>fmtD(m.d,{day:'numeric',month:'short'})).join(', ')}). Ces repas seront retirés du menu et leurs ingrédients des listes non clôturées.`:'Il n\'est prévu dans aucun repas.'} Les menus passés gardent son nom.</p><div class="row" style="gap:8px"><button class="btn sec2 grow" onclick="act.close()">Annuler</button><button class="btn grow" style="background:var(--im)" onclick="act.delDishOk()">Supprimer</button></div>`;render()},
+ delDishOk(){const k=S.ed.k;S.meals=S.meals.filter(m=>m.dish!==k);delete DISHES[k];S.sheet=null;act.go('dishes');act.toastMsg('Plat supprimé')},
+ recipe(k,p){const d=k===S.ed?.k&&S.view==='dishEdit'?{...DISHES[k]||{},n:S.ed.n,time:S.ed.time,url:S.ed.url,note:S.ed.note,steps:S.ed.steps.split('\n').filter(Boolean),ing:S.ed.ing}:DISHES[k];
+  S.sheet=()=>`<h3>📖 ${d.n}</h3>${recipeHtml(d,p)}<button class="btn sec2 full" style="margin-top:12px" onclick="act.close()">Fermer</button>`;render()},
+ meal(ix){const m=S.meals[ix],d=DISHES[m.dish],sl=SLOTS.find(s=>s[0]===m.s)[1];
+  S.sheet=()=>`<h3>${d.n}</h3><p class="muted">${fmtD(m.d,{weekday:'long',day:'numeric',month:'long'})} · ${sl}${m.sugg==='pending'?` · suggéré par ${m.by}`:''}</p>
+   <div class="row" style="margin-bottom:12px"><span class="grow">Personnes</span>${isMgr()?`<button class="btn sm sec2" onclick="act.mp(${ix},-1)">−</button><b style="width:30px;text-align:center">${m.p}</b><button class="btn sm sec2" onclick="act.mp(${ix},1)">＋</button>`:`<b>${m.p}</b>`}</div>
+   <button class="btn full" onclick="act.recipe('${m.dish}',${m.p})">📖 ${hasRecipe(d)?'Voir la recette':'Ingrédients (pas de recette)'}</button>
+   ${isMgr()&&d.ing.some(([p])=>!P[p].base)?`<button class="btn sec2 full" style="margin-top:8px" onclick="act.mealStock(${ix})">🥫 Ingrédients en réserve${m.skip&&m.skip.length?` (${m.skip.length})`:''}</button>`:''}
+   ${m.skip&&m.skip.length?`<p class="muted">Non achetés (en réserve) : ${m.skip.map(p=>P[p].n).join(', ')}</p>`:''}
+   ${isMgr()?`<div class="row" style="gap:8px;margin-top:8px"><button class="btn sec2 grow" onclick="S.meals.splice(${ix},1);act.addMeal('${m.d}','${m.s}')">Changer de plat</button><button class="btn sec2 grow" onclick="act.editDish('${m.dish}')">Modifier le plat</button></div>
+   <button class="btn sec2 full" style="margin-top:8px;color:var(--im)" onclick="S.meals.splice(${ix},1);act.close();act.toastMsg('Repas retiré · ingrédients retirés de la liste')">Retirer du menu</button>`:''}`;render()},
+ mp(ix,n){const m=S.meals[ix];m.p=Math.max(1,m.p+n);render()},
+ extra(){S.showExtra=!S.showExtra;render()},
+ promo(pid,sid){const l=list(S.listId),dl=l.type==='dated';sid=sid||STORES.find(s=>promoFor(pid,s.id))?.id||bestStore(pid);const ex=promoFor(pid,sid);
+  S.pf={pid,sid,price:ex?ex.price:'',scope:ex?(ex.list?'list':'until'):(dl?'list':'until'),until:ex?.until||addDays(dl?l.date:'2026-10-01',7),note:ex?.note||'',ex:!!ex};act.promoSheet()},
+ promoSheet(){const f=S.pf,l=list(S.listId),dl=l.type==='dated',avg=P[f.pid].price[f.sid];
+  S.sheet=()=>`<h3>🏷 Promo · ${P[f.pid].n}</h3><p class="muted">Rappel que ce produit devrait être moins cher. Le prix promo remplace la moyenne pour le conseil de magasin, sans entrer dans la moyenne.</p>
+   <div class="seg">${STORES.map(s=>`<button class="${f.sid===s.id?'on':''}" onclick="S.pf.sid='${s.id}';act.promoSheet()">${s.name}</button>`).join('')}</div>
+   <label class="muted">Prix promo (facultatif) — moyenne ${eur(avg)}</label><input class="txt" id="pfp" inputmode="decimal" value="${f.price}" placeholder="ex. ${avg?(avg*0.8).toFixed(2):'1.99'}" oninput="S.pf.price=this.value">
+   <div class="sec">Valable</div>
+   ${dl?`<label class="item"><input type="radio" name="sc" ${f.scope==='list'?'checked':''} onchange="S.pf.scope='list'"><span class="grow">Uniquement pour les courses du ${fmtD(l.date,{day:'numeric',month:'long'})}</span></label>`:''}
+   <label class="item"><input type="radio" name="sc" ${f.scope==='until'?'checked':''} onchange="S.pf.scope='until'"><span class="grow">Jusqu'au</span><input class="txt" type="date" style="width:auto" value="${f.until}" onchange="S.pf.until=this.value;S.pf.scope='until';act.promoSheet()"></label>
+   <label class="muted" style="display:block;margin-top:8px">Note</label><input class="txt" value="${f.note}" placeholder="ex. 2e à -50 %, dépliant" oninput="S.pf.note=this.value">
+   <button class="btn full" style="margin-top:12px" onclick="act.promoSave()">Enregistrer la promo</button>
+   ${f.ex?'<button class="btn sec2 full" style="margin-top:8px;color:var(--im)" onclick="act.promoDel()">Retirer la promo</button>':''}`;render()},
+ promoSave(){const f=S.pf,v=parseFloat(String(f.price).replace(',','.'));S.promos=S.promos.filter(p=>!(p.pid===f.pid&&p.sid===f.sid));
+  S.promos.push({pid:f.pid,sid:f.sid,price:isNaN(v)?null:v,note:f.note,...(f.scope==='list'?{list:S.listId}:{until:f.until})});S.sheet=null;act.toastMsg('Promo enregistrée · conseil de magasin recalculé')},
+ promoDel(){const f=S.pf;S.promos=S.promos.filter(p=>!(p.pid===f.pid&&p.sid===f.sid));S.sheet=null;act.toastMsg('Promo retirée')},
+ acc(id){S.acc[id]=!S.acc[id];render()},
+ catEdit(c,sid){const name=c?CATS[c]:'';S.sheet=()=>`<h3>${c?'Renommer le rayon':'Nouveau rayon'}</h3><input class="txt" id="cn" value="${name}" placeholder="ex. Boulangerie"><p class="muted">${c?'Le nom change pour tous les magasins et dans le catalogue.':`Ajouté à la fin du parcours de ${STORES.find(s=>s.id===sid).name} et des autres magasins ; à replacer avec ↑ ↓.`}</p><button class="btn full" onclick="act.catSave(${c?`'${c}'`:'null'})">Enregistrer</button>`;render()},
+ catSave(c){const v=$('#cn').value.trim();if(!v)return;if(c)CATS[c]=v;else{const k='c'+Date.now();CATS[k]=v;STORES.forEach(s=>ORDER[s.id].push(k))}S.sheet=null;act.toastMsg(c?'Rayon renommé':'Rayon ajouté')},
+ catDel(c){const prods=Object.values(P).filter(p=>p.c===c),others=Object.entries(CATS).filter(([k])=>k!==c);
+  S.sheet=()=>`<h3>Supprimer « ${CATS[c]} » ?</h3>${prods.length?`<p class="muted">${prods.length} produits sont rangés dans ce rayon (${prods.slice(0,3).map(p=>p.n).join(', ')}${prods.length>3?'…':''}). Les déplacer vers :</p><select class="txt" id="cto">${others.map(([k,t])=>`<option value="${k}">${t}</option>`).join('')}</select>`:'<p class="muted">Aucun produit dans ce rayon.</p>'}<p class="muted">Le rayon disparaît de tous les magasins.</p><div class="row" style="gap:8px;margin-top:10px"><button class="btn sec2 grow" onclick="act.close()">Annuler</button><button class="btn grow" style="background:var(--im)" onclick="act.catDelOk('${c}')">Supprimer</button></div>`;render()},
+ catDelOk(c){const to=$('#cto')?.value;Object.values(P).forEach(p=>{if(p.c===c)p.c=to});delete CATS[c];STORES.forEach(s=>ORDER[s.id]=ORDER[s.id].filter(x=>x!==c));S.sheet=null;act.toastMsg('Rayon supprimé')},
+ member(i){const m=S.members[i],mgrs=S.members.filter(x=>x.r==='manager').length,last=m.r==='manager'&&mgrs===1;
+  S.sheet=()=>`<h3>${m.n}</h3><label class="muted">Nom affiché</label><input class="txt" id="mn" value="${m.n}"><label class="muted" style="display:block;margin-top:8px">E-mail</label><input class="txt" id="me" value="${m.e}">
+   <div class="sec">Profil</div><div class="seg">${[['member','Membre'],['manager','Gestionnaire']].map(([k,t])=>`<button class="${m.r===k?'on':''}" ${last&&k==='member'?'disabled title="Dernier gestionnaire"':''} onclick="S.members[${i}].r='${k}';render()">${t}</button>`).join('')}</div>
+   <p class="muted">${m.r==='manager'?'Ajoute directement, valide les suggestions, gère plats, catalogue, magasins et membres.':'Consulte, coche en magasin, scanne les tickets et suggère articles et plats.'}${last?' Il faut au moins un gestionnaire dans le foyer.':''}</p>
+   <button class="btn full" onclick="S.members[${i}].n=$('#mn').value;S.members[${i}].e=$('#me').value;act.close();act.toastMsg('Membre mis à jour')">Enregistrer</button>
+   <button class="btn sec2 full" style="margin-top:8px;color:var(--im)" ${last?'disabled':''} onclick="act.memberDel(${i})">Retirer du foyer</button>`;render()},
+ memberDel(i){const m=S.members[i];S.sheet=()=>`<h3>Retirer ${m.n} du foyer ?</h3><p class="muted">Son compte n'est pas supprimé, il perd l'accès à ce foyer. Ses suggestions en attente sont refusées ; son nom reste dans l'historique.</p><div class="row" style="gap:8px"><button class="btn sec2 grow" onclick="act.close()">Annuler</button><button class="btn grow" style="background:var(--im)" onclick="S.members.splice(${i},1);act.close();act.toastMsg('${m.n} retiré du foyer')">Retirer</button></div>`;render()},
+ accAll(){const open=!Object.values(S.acc).some(Boolean);for(const k of ['sugg','mem','set',...STORES.map(s=>'st_'+s.id)])S.acc[k]=open;render()},
+ week(n){S.menuFrom=addDays(S.menuFrom,n);render()},
+ exportMenu(){act.go('printMenu')},
+ pr(k,v){S.pr[k]=v;render()},
+ prSlot(k){S.pr.slots[k]=!S.pr.slots[k];render()},
+ print(kind){$('#printArea').innerHTML=menuSheet();if(kind==='pdf')act.toastMsg('Choisir « Enregistrer au format PDF » comme imprimante');setTimeout(()=>window.print(),kind==='pdf'?600:0)},
+ product(id){S.pid=id;act.go('product')},
+ thr(v){S.threshold=+v;act.toastMsg('Seuil : '+eur(+v))},
+ mv(sid,i,dir){const o=ORDER[sid],j=i+dir;if(j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];render()},
+ toastMsg(m){S.toast=m;render();clearTimeout(tt);tt=setTimeout(()=>{S.toast='';render()},2200)}
+};
+render();
+</script>
+</body>
+</html>
