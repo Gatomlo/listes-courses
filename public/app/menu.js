@@ -9,8 +9,18 @@ const SLOTS = ['pdj', 'midi', 'soir', 'coll'];
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const extra = () => { try { return localStorage.getItem('cabas-menu-extra') === '1'; } catch { return false; } };
-const slotsShown = () => SLOTS.filter((s) => extra() || s === 'midi' || s === 'soir');
+// Repas affiches (choix de l'appareil) ; ancien reglage « p.-dej. / collation » repris.
+const SHOW_ORDER = ['pdj', 'midi', 'coll', 'soir'];
+function slotsShown() {
+  let v = null;
+  try { v = JSON.parse(localStorage.getItem('cabas-menu-slots')); } catch { /* ignore */ }
+  if (!Array.isArray(v) || !v.length) {
+    let extra = false;
+    try { extra = localStorage.getItem('cabas-menu-extra') === '1'; } catch { /* ignore */ }
+    v = extra ? SLOTS : ['midi', 'soir'];
+  }
+  return SHOW_ORDER.filter((s) => v.includes(s));
+}
 
 let menu = null; // { from, to, period: { id, start, end, saved }, meals, lists }
 export async function loadMenu() {
@@ -49,11 +59,13 @@ export function menuView() {
   }
   const range = `${esc(fmtDate(menu.from, { weekday: 'short', day: 'numeric', month: 'short' }))} → ${esc(fmtDate(menu.to, { weekday: 'short', day: 'numeric', month: 'short' }))}`;
   return {
-    title: 'Menu', sub: 'Les plats alimentent la liste de leur période', right: '<a class="btn sm sec2" href="#/menu/export">🖨 Exporter</a>',
+    title: 'Menu', sub: 'Les plats alimentent la liste de leur période',
+    // PC : actions dans la barre ; telephone : menu ☰.
+    right: isPc() ? menuActions().map(([a, t]) => `<button class="btn sm sec2" data-a="${a}">${t}</button>`).join('') : '<button class="btn sm sec2" data-a="menu-more" aria-label="Actions du menu">☰</button>',
     body: `<div class="row"><button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.from, -1)}" aria-label="Menu précédent">‹</button>
       <div class="grow c"><b>${range}</b><span class="muted small block">${days.length} jours · ${p.saved ? 'menu enregistré' : 'période proposée'}</span></div>
       <button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.to, 1)}" aria-label="Menu suivant">›</button></div>
-      <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}${mgr ? `<button class="btn sm sec2" data-a="menu-dates">📅 ${p.saved ? 'Modifier les dates' : 'Fixer les dates'}</button>` : ''}<button class="btn sm sec2" data-a="menu-extra">${extra() ? 'Masquer' : 'Afficher'} p.-déj. / collation</button></div>
+      <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}</div>
       ${body}<a class="btn sec2 full" style="margin-top:12px" href="#/plats">📖 Tous les plats</a>`,
   };
 }
@@ -181,7 +193,27 @@ async function moveMeal(id, date, slot) {
     afterChange();
   }
 }
-on('click', 'menu-extra', () => { try { localStorage.setItem('cabas-menu-extra', extra() ? '0' : '1'); } catch { /* ignore */ } render(); });
+function menuActions() {
+  return [
+    ...(isManager() ? [['menu-dates', `📅 ${menu.period.saved ? 'Modifier les dates' : 'Fixer les dates'}`]] : []),
+    ['menu-slots', '🍽 Repas affichés'],
+    ['menu-export', '🖨 Exporter'],
+  ];
+}
+on('click', 'menu-more', () => sheet(`<h3>Menu</h3><div class="opt">${menuActions().map(([a, t]) => `<button data-a="${a}">${t}</button>`).join('')}</div>`));
+on('click', 'menu-export', () => { closeSheet(); go('#/menu/export'); });
+on('click', 'menu-slots', () => {
+  const shown = slotsShown();
+  sheet(`<h3>Repas affichés</h3>${SHOW_ORDER.map((s) => `<label class="row line"><input type="checkbox" class="cb" data-slot="${s}" ${shown.includes(s) ? 'checked' : ''}><span class="grow">${SLOT[s]}</span></label>`).join('')}
+    <div class="row end"><button class="btn" data-a="menu-slots-ok">Appliquer</button></div>`);
+});
+on('click', 'menu-slots-ok', () => {
+  const v = [...document.querySelectorAll('.sheet [data-slot]')].filter((c) => c.checked).map((c) => c.dataset.slot);
+  if (!v.length) { toast('Cochez au moins un repas'); return; }
+  try { localStorage.setItem('cabas-menu-slots', JSON.stringify(v)); } catch { /* ignore */ }
+  closeSheet();
+  render();
+});
 
 // ---------- Ajouter un repas ----------
 let pm = null; // repas en preparation : { id?, date, slot, dish_id, persons, skip: [], options: [] }
@@ -391,7 +423,7 @@ export async function loadPublic(token) {
 export function publicView() {
   if (!pub || pub.error) return { noNav: true, title: 'Menu', body: `<div class="card error">${esc(pub ? pub.error : 'Chargement…')}</div>` };
   const saved = { ...ex };
-  Object.assign(ex, { slots: { midi: true, soir: true, pdj: extra(), coll: extra() }, persons: true, shop: true });
+  Object.assign(ex, { slots: Object.fromEntries(SLOTS.map((s) => [s, slotsShown().includes(s)])), persons: true, shop: true });
   const html = sheetHtml(pub, pub.household);
   Object.assign(ex, saved);
   return { noNav: true, wide: true, title: `Menu · ${pub.household}`, sub: 'Affichage en lecture seule · mis à jour toutes les 5 minutes', body: html };
