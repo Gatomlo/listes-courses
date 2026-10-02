@@ -188,7 +188,8 @@ export function listView() {
       ${tab === 'items' ? items : tab === 'meals' ? mealsPanel(l) : storesPanel(l)}`;
   }
   return {
-    cols: isPc() && l.status !== 'closed', title: listTitle(l), back: '#/listes',
+    // PC : colonnes, sauf pour l'onglet Repas (un seul panneau).
+    cols: isPc() && l.status !== 'closed' && (l.type === 'backlog' || (S.q.listTab || 'items') !== 'meals'), title: listTitle(l), back: '#/listes',
     sub: l.type === 'backlog' ? 'Liste permanente' : `${STATUS[l.status]}${open ? ` · ${done}/${l.items.filter((i) => !i.suggestion).length} coché${done > 1 ? 's' : ''} · ≈ ${eur(l.pricing.split)}` : ''}`,
     right: l.type === 'dated' && open && mgr ? '<button class="btn sm sec2" data-a="list-menu" title="Actions de la liste">⋯</button>' : '',
     body,

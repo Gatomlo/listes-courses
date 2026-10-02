@@ -223,7 +223,7 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
 @media (min-width:900px){
   .shell:not(.nonav){display:grid;grid-template-columns:220px 1fr;grid-template-rows:auto 1fr;min-height:100vh}
   .shell:not(.nonav) header.top{grid-column:2;grid-row:1;padding:16px 28px}
-  .shell:not(.nonav) main{grid-column:2;grid-row:2;padding:20px 28px 32px;width:100%;max-width:1280px}
+  .shell:not(.nonav) main{grid-column:2;grid-row:2;padding:20px 28px 32px;width:100%}
   .shell.nonav main{max-width:640px;margin:0 auto;width:100%}
   .shell.nonav.wide main{max-width:1280px}
   nav.tabs{position:sticky;top:0;height:100vh;grid-column:1;grid-row:1/3;flex-direction:column;border-top:0;border-right:1px solid var(--line);padding:14px 10px;gap:2px}
@@ -232,6 +232,7 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
   nav.tabs .badge{position:static;margin-left:auto}
   /* Colonnes « maconnerie » : chaque panneau se place sous le precedent, sans trou. */
   .cols{columns:2;column-gap:16px}
+  @media (min-width:1500px){.cols{columns:3}.cards3{columns:4}}
   .cols>.acc{break-inside:avoid;display:inline-block;width:100%;vertical-align:top}
   .cols>:not(.acc){column-span:all}
   .cards3{columns:3;column-gap:12px}
