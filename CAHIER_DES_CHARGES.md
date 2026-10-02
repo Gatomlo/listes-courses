@@ -18,6 +18,7 @@
 - **Deux affichages**, choisis automatiquement selon la largeur d'écran (une seule application responsive, mêmes données et mêmes droits) :
   - **Mobile** (< 900 px) : navigation par onglets en bas, un écran = une colonne, onglets Articles / Repas / Magasins dans une liste ; usage en magasin.
   - **PC** (≥ 900 px) : navigation dans une **barre latérale** à gauche (logo, foyer courant, onglets, badge des suggestions) ; contenu sur toute la largeur :
+    - écran Listes : panneaux (Prochaines courses, Historique) sur toute la largeur ;
     - liste : articles à gauche, et à droite l'économie, les scénarios, les listes par magasin et les repas (plus d'onglets) ;
     - menu : **grille semaine** (jours en colonnes × créneaux en lignes), 2 semaines visibles ;
     - plats : cartes sur 3 colonnes, même placement sans trou ;
