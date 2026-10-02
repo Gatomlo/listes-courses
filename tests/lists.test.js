@@ -9,7 +9,7 @@ before(async () => {
   ({ thomas, lea, h } = await household());
   const f = (await thomas.get(h)).data;
   const cat = f.categories[0].id;
-  for (const [k, name, rec] of [['lait', 'Lait', 1], ['cafe', 'Café', 2], ['pain', 'Pain', null], ['pq', 'Papier toilette', null], ['jus', 'Jus', null]]) {
+  for (const [k, name, rec] of [['lait', 'Lait', 1], ['cafe', 'Café', 2], ['pain', 'Pain', null], ['pq', 'Papier toilette', null], ['jus', 'Jus', null], ['savon', 'Savon', null]]) {
     P[k] = (await thomas.post(`${h}/products`, { name, category_id: cat, recurrence: rec })).data.id;
   }
 });
@@ -93,8 +93,21 @@ test('deplacer un article (cumul a destination)', async () => {
   assert.equal(item(await listOf(thomas, l2.id), P.pain).qty, 4);
 });
 
-test('suppression impossible si des articles sont coches', async () => {
-  assert.equal((await thomas.del(`${h}/lists/${l1.id}`)).status, 409);
+test('suppression avec articles coches (non achetes -> A prevoir) et liste cloturee', async () => {
+  const qtyIn = async (pid) => (item(await listOf(thomas, backlog), pid) || { qty: 0 }).qty;
+  const savon0 = await qtyIn(P.savon), pain0 = await qtyIn(P.pain);
+  let l = (await thomas.post(`${h}/lists`, { date: '2030-03-03', recurring: false })).data;
+  await thomas.post(`${h}/lists/${l.id}/items`, { product_id: P.savon, qty: 2 });
+  l = (await thomas.post(`${h}/lists/${l.id}/items`, { product_id: P.pain, qty: 1 })).data;
+  await thomas.patch(`${h}/items/${item(l, P.pain).id}`, { status: 'bought' });
+  assert.equal((await lea.del(`${h}/lists/${l.id}`)).status, 403);
+  assert.equal((await thomas.del(`${h}/lists/${l.id}`)).status, 200);
+  assert.equal(await qtyIn(P.savon), savon0 + 2);
+  assert.equal(await qtyIn(P.pain), pain0);
+  const c = (await thomas.post(`${h}/lists`, { date: '2030-03-10', recurring: false })).data;
+  await thomas.post(`${h}/lists/${c.id}/close`, { fates: {} });
+  assert.equal((await thomas.del(`${h}/lists/${c.id}`)).status, 200);
+  assert.equal((await thomas.get(`${h}/lists/${c.id}`)).status, 404);
 });
 
 test('cloture : report vers la suivante, A prevoir, ou abandon', async () => {

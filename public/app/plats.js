@@ -2,7 +2,7 @@
 // ingredients, recette facultative avec import depuis un lien, menu et historique).
 import { esc, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
 import { get, post, put, del, attempt } from './api.js';
-import { S, hp, isManager, render, go, loadProducts, catName, categoryOrder } from './state.js';
+import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder } from './state.js';
 import { matchLines } from './ticket.mjs';
 import { unitOptions, catOptions } from './catalogue.js';
 
@@ -14,23 +14,32 @@ const num = (v) => { const n = Number(String(v ?? '').replace(',', '.')); return
 const fmtQ = (q) => String(Math.round(q * 10) / 10).replace('.', ',');
 
 export async function loadDishes() { S.dishes = await get(hp('/dishes')); }
+// Tags connus : ceux du foyer (S.house.tags) et ceux des plats charges.
+export const allTags = () => [...new Set([...(S.house.tags || []).map((t) => t.name), ...(S.dishes || []).flatMap((d) => d.tags)])].sort((a, b) => a.localeCompare(b, 'fr'));
+// Pastilles de filtre par tag (action « act », tag actif « cur »).
+export const tagChips = (act, cur) => {
+  const ts = allTags();
+  return ts.length ? `<div class="opt tags">${ts.map((t) => `<button class="${cur === t ? 'on' : ''}" data-a="${act}" data-t="${esc(t)}">#${esc(t)}</button>`).join('')}</div>` : '';
+};
 
 // ---------- Liste des plats ----------
 export function platsView() {
-  const q = S.q.dish || '', f = S.q.dishFilter || 'all';
+  const q = S.q.dish || '', f = S.q.dishFilter || 'all', tg = S.q.dishTag || '';
   const n = norm(q).trim();
-  const list = S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.ingredient_names.some((x) => norm(x).includes(n)))
+  const list = S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)))
+    && (!tg || d.tags.includes(tg))
     && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients) || (f === 'planned' && d.next_date)));
   const card = (d) => {
     const hits = n && !norm(d.name).includes(n) ? d.ingredient_names.filter((x) => norm(x).includes(n)) : [];
     return `<a class="card click" href="#/plats/${d.id}"><h4>${esc(d.name)}${d.has_recipe ? ' <span class="pill p-plum">📖</span>' : ''}</h4>
       <div class="muted">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}${d.time_text ? ' · ⏱ ' + esc(d.time_text) : ''}` : 'Ingrédients connus par cœur'}</div>
-      <div class="pills">${d.next_date ? `<span class="pill p-leaf">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span>` : ''}<span class="pill p-grey">${d.last_date ? `dernière fois il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</span></div></a>`;
+      <div class="pills">${d.tags.map((t) => `<span class="pill p-grey">#${esc(t)}</span>`).join('')}${d.next_date ? `<span class="pill p-leaf">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span>` : ''}<span class="pill p-grey">${d.last_date ? `dernière fois il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</span></div></a>`;
   };
   return {
     title: 'Plats', sub: `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`,
     body: `<input class="txt" id="dish-q" placeholder="🔍 Rechercher un plat ou un ingrédient…" value="${esc(q)}" data-in="dish-q">
       <div class="opt">${[['all', 'Tous'], ['recipe', '📖 Avec recette'], ['memo', 'Sans détail'], ['planned', 'Au menu']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
+      ${tagChips('dish-tag', tg)}
       <div class="cards3">${list.map(card).join('')}</div>
       ${list.length ? '' : `<p class="muted">Aucun plat trouvé.</p>${isManager() && q ? `<button class="btn" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}`}
       ${isManager() ? '<a class="fab" href="#/plats/nouveau" title="Nouveau plat">＋</a>' : ''}`,
@@ -38,6 +47,7 @@ export function platsView() {
 }
 on('input', 'dish-q', (el) => { S.q.dish = el.value; render(); const i = document.getElementById('dish-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('click', 'dish-filter', (el) => { S.q.dishFilter = el.dataset.f; render(); });
+on('click', 'dish-tag', (el) => { S.q.dishTag = S.q.dishTag === el.dataset.t ? '' : el.dataset.t; render(); });
 on('click', 'dish-new-named', () => { pendingName = S.q.dish; go('#/plats/nouveau'); });
 
 // ---------- Fiche plat ----------
@@ -48,7 +58,7 @@ export function newDishFrom(name, ret) { pendingName = name || ''; S.dishReturn 
 export async function loadDish(id) {
   if (!S.products) await loadProducts();
   if (id === 'nouveau') {
-    ed = { id: null, name: pendingName || '', portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], groups: [], upcoming: [], past: [], times: 0 };
+    ed = { id: null, name: pendingName || '', portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], groups: [], tags: [], upcoming: [], past: [], times: 0 };
     pendingName = '';
   } else {
     S.dishReturn = null;
@@ -88,7 +98,11 @@ export function dishView() {
     body: `${acc('d_info', { icon: '📝', title: 'Informations', def: true, sum: ` · ${ed.portions} pers.${ed.time_text ? ' · ⏱ ' + esc(ed.time_text) : ''}`,
         body: `<div class="form"><label class="muted">Nom</label><input class="txt" value="${esc(ed.name)}" ${dis} data-ch="ed" data-f="name">
           <div class="row gap"><label class="grow"><span class="muted">Portions de référence</span><input class="txt" type="number" min="1" value="${ed.portions}" ${dis} data-ch="ed" data-f="portions"></label>
-          <label class="grow"><span class="muted">Temps</span><input class="txt" value="${esc(ed.time_text)}" placeholder="ex. 45 min" ${dis} data-ch="ed" data-f="time_text"></label></div></div>` })}
+          <label class="grow"><span class="muted">Temps</span><input class="txt" value="${esc(ed.time_text)}" placeholder="ex. 45 min" ${dis} data-ch="ed" data-f="time_text"></label></div>
+          <label class="muted">Tags</label>
+          <div class="pills">${ed.tags.map((t, k) => `<span class="pill p-grey">#${esc(t)}${ro ? '' : ` <button class="x" data-a="tag-rm" data-i="${k}" aria-label="Retirer">✕</button>`}</span>`).join('') || (ro ? '<span class="muted small">Aucun</span>' : '')}</div>
+          ${ro ? '' : `<div class="row gap"><input class="txt grow" id="tag-in" list="tag-dl" placeholder="ex. rapide, végé, hiver…" data-enter="tag-add"><button class="btn sm sec2" data-a="tag-add">＋</button></div>
+          <datalist id="tag-dl">${allTags().filter((t) => !ed.tags.includes(t)).map((t) => `<option value="${esc(t)}">`).join('')}</datalist>`}</div>` })}
       ${acc('d_ing', { icon: '🥕', title: 'Ingrédients', def: true, sum: ` · ${nIng || 'aucun'}`,
         body: `${ingRows('c', '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient du catalogue…')}${ro ? '' : `
           <p class="muted small">Quantités en emballages, facultatives, ajustées au nombre de personnes du repas.</p>`}` })}
@@ -163,7 +177,19 @@ on('click', 'ing-new-ok', async () => {
   render();
 });
 
+// Tags : ajout (Entree, virgules acceptees), retrait ; enregistres avec le plat.
+function takeTagInput() {
+  const i = document.getElementById('tag-in');
+  if (!i) return;
+  for (const t of i.value.split(',').map((x) => x.trim().replace(/^#/, '')).filter(Boolean)) {
+    if (!ed.tags.some((x) => norm(x) === norm(t))) ed.tags.push(allTags().find((x) => norm(x) === norm(t)) || t);
+  }
+  i.value = '';
+}
+on('click', 'tag-add', () => { takeTagInput(); render(); setTimeout(() => document.getElementById('tag-in')?.focus()); });
+on('click', 'tag-rm', (el) => { ed.tags.splice(Number(el.dataset.i), 1); render(); });
 on('click', 'dish-save', async () => {
+  takeTagInput();
   const ings = (list) => list.map((i) => ({ product_id: i.product_id, qty: i.qty, note: i.note }));
   const body = { ...ed, ingredients: ings(ed.ingredients),
     groups: ed.groups.map((g) => ({ name: g.name, options: g.options.map((o) => ({ id: o.id, name: o.name, ingredients: ings(o.ingredients) })) })) };
@@ -172,6 +198,7 @@ on('click', 'dish-save', async () => {
   const isNew = !ed.id;
   ed = { ...d, steps: d.steps || '', notes: d.notes || '', url: d.url || '', time_text: d.time_text || '' };
   S.dishes = null;
+  loadHouse().catch(() => {}); // tags du foyer (ecran Foyer)
   toast(isNew ? 'Plat créé' : 'Plat enregistré · listes recalculées');
   if (isNew && S.dishReturn) { S.dishReturn.dish_id = d.id; go('#/menu'); } else if (isNew) go(`#/plats/${d.id}`); else render();
 });

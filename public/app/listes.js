@@ -307,7 +307,7 @@ function closedBody(l) {
   const left = l.items.filter((i) => i.status !== 'bought');
   return `${acc('h_bought', { icon: '✅', title: 'Achetés', sum: ` · ${bought.length}`, def: true, body: bought.map((i) => itemRow(i, l)).join('') || '<p class="muted">Rien.</p>' })}
     ${acc('h_left', { icon: '↪', title: 'Non achetés', sum: ` · ${left.length}`, def: true, body: left.map((i) => itemRow(i, l)).join('') || '<p class="muted">Tout a été acheté.</p>' })}
-    <div class="row wrap">${isManager() && bought.length ? '<button class="btn sec2" data-a="list-copy">⧉ Copier les articles achetés dans « À prévoir »</button>' : ''}<button class="btn sec2" data-a="scan-start" data-lid="${l.id}">📷 Scanner un ticket</button></div>`;
+    <div class="row wrap">${isManager() && bought.length ? '<button class="btn sec2" data-a="list-copy">⧉ Copier les articles achetés dans « À prévoir »</button>' : ''}<button class="btn sec2" data-a="scan-start" data-lid="${l.id}">📷 Scanner un ticket</button>${isManager() ? '<button class="btn sec2 danger-t" data-a="list-del">Supprimer la liste</button>' : ''}</div>`;
 }
 
 // ---------- Ajout avec recherche dans le catalogue ----------
@@ -436,14 +436,13 @@ on('click', 'go-product', (el) => { closeSheet(); go(`#/catalogue/${el.dataset.p
 // ---------- Actions de la liste ----------
 on('click', 'list-menu', () => {
   const l = current;
-  const hasBought = l.items.some((i) => i.status === 'bought');
   sheet(`<h3>${esc(listTitle(l))}</h3>
     <label class="muted">Date des courses</label><input class="txt" type="date" name="date" value="${l.date}">
     <div class="row end"><button class="btn sec2" data-a="list-date">Changer la date</button></div>
     <div class="sec">Statut</div>
     <button class="btn sec2 full" data-a="list-status" data-s="${l.status === 'prep' ? 'shopping' : 'prep'}">${l.status === 'prep' ? '🛒 Commencer les courses' : '↩ Repasser en préparation'}</button>
     <button class="btn full" style="margin-top:8px" data-a="list-close">✔ Clôturer la liste</button>
-    <button class="btn sec2 full danger-t" style="margin-top:8px" data-a="list-del" ${hasBought ? 'disabled title="Des articles sont cochés : clôturer plutôt"' : ''}>Supprimer la liste</button>`);
+    <button class="btn sec2 full danger-t" style="margin-top:8px" data-a="list-del">Supprimer la liste</button>`);
 });
 on('click', 'list-date', async () => {
   const date = document.querySelector('.sheet [name=date]').value;
@@ -455,9 +454,12 @@ on('click', 'list-status', async (el) => {
   if (l) { closeSheet(); summary = null; refreshList(l); }
 });
 on('click', 'list-del', async () => {
-  const n = current.items.filter((i) => !i.suggestion && ['manual', 'carried'].includes(i.origin)).length;
+  const closed = current.status === 'closed';
+  const n = current.items.filter((i) => !i.suggestion && i.status !== 'bought' && ['manual', 'carried'].includes(i.origin)).length;
+  const b = current.items.filter((i) => i.status === 'bought').length;
   const ok = await confirmSheet({ title: 'Supprimer la liste ?', danger: true, ok: 'Supprimer',
-    text: `${n} article${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} à la main repart${n > 1 ? 'ent' : ''} dans « À prévoir ». Les récurrents et suggestions sont abandonnés.` });
+    text: closed ? 'Elle disparaît de l’historique. Les prix relevés restent.'
+      : `${n ? `${n} article${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} à la main et non acheté${n > 1 ? 's' : ''} repart${n > 1 ? 'ent' : ''} dans « À prévoir ». ` : ''}${b ? `${b} article${b > 1 ? 's' : ''} coché${b > 1 ? 's' : ''} ${b > 1 ? 'sont oubliés' : 'est oublié'} (les prix relevés restent). ` : ''}Les récurrents et suggestions sont abandonnés.` });
   if (ok && await attempt(() => del(hp(`/lists/${current.id}`)))) { summary = null; toast('Liste supprimée'); go('#/listes'); }
 });
 

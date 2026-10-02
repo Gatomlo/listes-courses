@@ -42,7 +42,11 @@ export function foyerView() {
           <label class="row"><span class="grow"><b>Premier jour d'un menu</b><span class="muted block">Quand aucun menu n'est enregistré avant</span></span><select class="txt w8" name="menu_start_dow" ${mgr ? '' : 'disabled'}>${[1, 2, 3, 4, 5, 6, 0].map((i) => `<option value="${i}" ${i === h.menu_start_dow ? 'selected' : ''}>${DOW[i]}</option>`).join('')}</select></label>
           ${mgr ? '<div class="row end"><button class="btn" data-a="settings-save">Enregistrer</button></div>' : ''}</div>` })}
       ${stores}
-      ${mgr ? '<button class="btn sec2 full" data-a="store-edit">＋ Ajouter un magasin</button>' : ''}`,
+      ${mgr ? '<button class="btn sec2 full" data-a="store-edit">＋ Ajouter un magasin</button>' : ''}
+      ${acc('tags', { icon: '🏷', title: 'Tags des plats', sum: ` · ${H.tags.length}`,
+        body: H.tags.map((t) => `<div class="ord"><span class="grow">#${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}</span></span>
+          ${mgr ? `<button class="ic" title="Renommer" data-a="tag-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="tag-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="tag-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
+          || '<p class="muted">Aucun tag : ajoutez-en depuis la fiche d’un plat.</p>' })}`,
   };
 }
 
@@ -167,6 +171,35 @@ on('click', 'cat-del-ok', async (el) => {
   if (await attempt(() => del(hp(`/categories/${el.dataset.id}${to ? `?moveTo=${to.value}` : ''}`)))) { closeSheet(); toast('Rayon supprimé'); S.products = null; await refresh(); }
 });
 on('click', 'close', () => closeSheet());
+
+// ---------- Tags des plats ----------
+const tagById = (id) => S.house.tags.find((t) => t.id === Number(id));
+const tagsDone = async (msg) => { closeSheet(); toast(msg); S.dishes = null; await refresh(); };
+on('click', 'tag-rename', (el) => {
+  const t = tagById(el.dataset.id);
+  sheet(`<h3>Renommer #${esc(t.name)}</h3><input class="txt" name="name" value="${esc(t.name)}" data-enter="tag-rename-ok" data-id="${t.id}">
+    <p class="muted small">Le nom d’un tag existant fusionne les deux.</p><div class="row end"><button class="btn" data-a="tag-rename-ok" data-id="${t.id}">Enregistrer</button></div>`);
+});
+on('click', 'tag-rename-ok', async (el) => {
+  const name = document.querySelector('.sheet [name=name]').value;
+  if (await attempt(() => patch(hp(`/tags/${el.dataset.id}`), { name }))) await tagsDone('Tag renommé');
+});
+on('click', 'tag-merge', (el) => {
+  const t = tagById(el.dataset.id), others = S.house.tags.filter((x) => x.id !== t.id);
+  if (!others.length) { toast('Aucun autre tag'); return; }
+  sheet(`<h3>Fusionner #${esc(t.name)}</h3><p class="muted">${t.dishes > 1 ? `Ses ${t.dishes} plats reçoivent` : t.dishes ? 'Son plat reçoit' : 'Aucun plat ne reçoit'} le tag choisi, puis #${esc(t.name)} disparaît.</p>
+    <select class="txt" name="into">${others.map((o) => `<option value="${o.id}">#${esc(o.name)}</option>`).join('')}</select>
+    <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="tag-merge-ok" data-id="${t.id}">Fusionner</button></div>`);
+});
+on('click', 'tag-merge-ok', async (el) => {
+  const into = document.querySelector('.sheet [name=into]').value;
+  if (await attempt(() => post(hp(`/tags/${el.dataset.id}/merge`), { into }))) await tagsDone('Tags fusionnés');
+});
+on('click', 'tag-del', async (el) => {
+  const t = tagById(el.dataset.id);
+  if (!(await confirmSheet({ title: `Supprimer #${t.name} ?`, text: `Il est retiré de ${t.dishes} plat${t.dishes > 1 ? 's' : ''}.`, ok: 'Supprimer', danger: true }))) return;
+  if (await attempt(() => del(hp(`/tags/${t.id}`)))) await tagsDone('Tag supprimé');
+});
 
 // Lien de reinitialisation du mot de passe (48 h), a transmettre au membre.
 on('click', 'member-reset', async (el) => {
