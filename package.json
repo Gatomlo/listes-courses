@@ -1,0 +1,19 @@
+{
+  "name": "cabas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Le Cabas : listes de courses partagées du foyer, prix par magasin, menus. Node.js + SQLite, montable dans node-gateway.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "nodemailer": "^6.9.14"
+  }
+}

@@ -1,0 +1,124 @@
+/* Le Cabas — styles. Mobile d'abord ; >= 900 px : barre laterale et colonnes. */
+:root{
+  --bg:#f3f5f0; --surface:#fff; --sunk:#e9ede4; --ink:#1c2418; --muted:#66705f; --line:#dde3d6;
+  --leaf:#2f7d4f; --leaf-soft:#dcefe2; --carrot:#d9772b; --carrot-soft:#fbe9d8; --plum:#5b4bb7; --plum-soft:#e7e3fa;
+  --danger:#c8313b;
+  --display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --body:"Nunito Sans","Segoe UI",system-ui,sans-serif; --r:14px;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#121610; --surface:#1b2118; --sunk:#242b20; --ink:#eef2ea; --muted:#a3ad9b; --line:#2f382a;
+  --leaf:#5cc488; --leaf-soft:#173322; --carrot:#f0a05c; --carrot-soft:#3a2917; --plum:#a597ff; --plum-soft:#2a2550;
+  --danger:#ff6f78; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--body)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--leaf)}
+.boot{padding:40px;text-align:center;color:var(--muted)}
+
+/* ---------- Cadre ---------- */
+.shell{min-height:100vh;display:flex;flex-direction:column}
+header.top{position:sticky;top:0;z-index:3;padding:12px 16px 10px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+header.top .back{display:grid;place-items:center;text-decoration:none;color:var(--ink);background:var(--sunk);border-radius:10px;width:34px;height:34px;font-size:20px;flex:none}
+header.top h2{font:800 20px/1.15 var(--display);margin:0;flex:1;min-width:0}
+header.top small{display:block;font:400 12px var(--body);color:var(--muted)}
+main{flex:1;padding:14px 16px 96px;max-width:100%}
+.shell.nonav main{padding-bottom:24px}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:3;display:flex;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs a{flex:1;padding:8px 0 10px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none}
+nav.tabs a.on{color:var(--leaf);font-weight:700}
+nav.tabs svg{width:22px;height:22px}
+.brand{font:800 20px var(--display);padding:6px 12px 16px;color:var(--leaf)}
+.brand small{display:block;font:400 12px var(--body);color:var(--muted)}
+
+/* ---------- Elements ---------- */
+.card{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;color:inherit}
+.card.click{cursor:pointer}
+.card h4{margin:0 0 4px;font:600 16px var(--display)}
+.card.narrow{max-width:520px}
+.card.error{color:var(--danger)}
+.row{display:flex;align-items:center;gap:8px}
+.row.gap{gap:10px}
+.row.end{justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.row.line{padding:5px 0}
+.grow{flex:1;min-width:0}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.block{display:block;font-size:13px;font-weight:400}
+.sec{font:600 12px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
+.pad{padding:8px 0}
+.pills{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+.pill{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:1px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.p-leaf{background:var(--leaf-soft);color:var(--leaf)}.p-carrot{background:var(--carrot-soft);color:var(--carrot)}
+.p-plum{background:var(--plum-soft);color:var(--plum)}.p-grey{background:var(--sunk);color:var(--muted)}
+.st{--c:var(--plum);border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap;background:color-mix(in srgb,var(--c) 16%,transparent);color:var(--c)}
+.dot{width:12px;height:12px;border-radius:99px;display:inline-block}
+.price{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.btn{border:0;border-radius:12px;padding:10px 14px;font-weight:700;background:var(--leaf);color:#fff;text-decoration:none;display:inline-block}
+.btn.sec2{background:var(--sunk);color:var(--ink)}
+.btn.danger{background:var(--danger);color:#fff}
+.btn.danger-t{color:var(--danger)}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:9px}
+.btn.full{width:100%}
+.btn:disabled{opacity:.5;cursor:default}
+.ic{border:0;background:var(--sunk);border-radius:7px;min-width:28px;height:28px;padding:0 6px}
+.item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item.click{cursor:pointer}
+.item .nm{font-weight:600}
+.ord{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}
+.ord .n{width:18px}
+input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:10px 12px}
+input.txt:disabled,select.txt:disabled{background:var(--sunk);opacity:.8}
+.w5,.txt.w5{width:84px;flex:none}.w12,.txt.w12{width:180px;flex:none}
+input.cb{width:22px;height:22px;flex:none;accent-color:var(--leaf)}
+.form label{display:block;margin-top:8px}
+.form label.row{display:flex;margin-top:12px}
+.opt{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.opt button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:5px 11px;font-size:13px;font-weight:600}
+.opt button.on{background:var(--leaf);border-color:var(--leaf);color:#fff}
+.seg{display:flex;background:var(--sunk);border-radius:12px;padding:3px;margin-bottom:8px}
+.seg button{flex:1;border:0;background:none;border-radius:9px;padding:7px 0;font-weight:600;font-size:13px;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px #0002}
+.swatches{display:flex;gap:8px}
+.swatches input{position:absolute;opacity:0}
+.swatches span{display:block;width:34px;height:34px;border-radius:10px;border:3px solid transparent;cursor:pointer}
+.swatches input:checked+span{border-color:var(--ink)}
+.hero{text-align:center;margin:28px 0 18px}
+.hero .logo{font-size:56px}
+.hero h1{font:800 30px var(--display);margin:6px 0}
+
+/* ---------- Accordeons ---------- */
+.acc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.acc-h{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:12px 14px;text-align:left}
+.acc-h .muted{font-size:13px}
+.acc-i{width:32px;height:32px;border-radius:10px;background:var(--sunk);display:grid;place-items:center;flex:none}
+.acc-c{font-size:22px;color:var(--muted);transition:transform .2s}
+.acc.open .acc-c{transform:rotate(90deg)}
+.acc-b{padding:0 14px;border-top:1px solid var(--line)}
+
+/* ---------- Panneau et message ---------- */
+.sheet-bg{position:fixed;inset:0;z-index:10;background:#0006;display:flex;align-items:flex-end}
+.sheet{background:var(--surface);width:100%;border-radius:22px 22px 0 0;padding:16px 16px calc(22px + env(safe-area-inset-bottom));max-height:88vh;overflow-y:auto}
+.sheet h3{font:800 19px var(--display);margin:0 0 10px}
+.toast{position:fixed;left:16px;right:16px;bottom:84px;z-index:20;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px;font-size:14px}
+.toast.err{background:var(--danger);color:#fff}
+
+/* ---------- PC ---------- */
+@media (min-width:900px){
+  .shell:not(.nonav){display:grid;grid-template-columns:220px 1fr;grid-template-rows:auto 1fr;min-height:100vh}
+  .shell:not(.nonav) header.top{grid-column:2;grid-row:1;padding:16px 28px}
+  .shell:not(.nonav) main{grid-column:2;grid-row:2;padding:20px 28px 32px;width:100%;max-width:1280px}
+  .shell.nonav main{max-width:640px;margin:0 auto;width:100%}
+  nav.tabs{position:sticky;top:0;height:100vh;grid-column:1;grid-row:1/3;flex-direction:column;border-top:0;border-right:1px solid var(--line);padding:14px 10px;gap:2px}
+  nav.tabs a{flex:none;flex-direction:row;gap:10px;font-size:14px;padding:10px 12px;border-radius:10px;color:var(--ink)}
+  nav.tabs a.on{background:var(--leaf-soft);color:var(--leaf)}
+  /* Colonnes « maconnerie » : chaque panneau se place sous le precedent, sans trou. */
+  .cols{columns:2;column-gap:16px}
+  .cols>.acc{break-inside:avoid;display:inline-block;width:100%;vertical-align:top}
+  .cols>:not(.acc){column-span:all}
+  .sheet-bg{align-items:center;justify-content:center}
+  .sheet{width:520px;border-radius:18px;max-height:80vh}
+  .toast{left:auto;right:24px;bottom:24px;width:380px}
+}

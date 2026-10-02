@@ -22,8 +22,8 @@
     - liste : articles à gauche, et à droite l'économie, les scénarios, les listes par magasin et les repas (plus d'onglets) ;
     - menu : **grille semaine** (jours en colonnes × créneaux en lignes), 2 semaines visibles ;
     - plats : cartes sur 3 colonnes, même placement sans trou ;
-    - fiche plat : panneaux les uns sous les autres, en pleine largeur ;
-    - catalogue, fiche produit, Foyer, historique : accordéons répartis sur 2 colonnes en « maçonnerie » (chaque panneau se place sous le précédent de sa colonne, sans trou) ;
+    - fiche plat et Foyer : panneaux les uns sous les autres, en pleine largeur ;
+    - catalogue, fiche produit, historique : accordéons répartis sur 2 colonnes en « maçonnerie » (chaque panneau se place sous le précédent de sa colonne, sans trou) ;
     - fenêtres ponctuelles en boîte de dialogue centrée ; messages en bas à droite.
   - Le mode courses reste pensé pour le téléphone (il s'affiche aussi sur PC).
   - Sur PC, **tous les accordéons sont ouverts par défaut** (on peut toujours les replier) ; l'état ouvert/replié est mémorisé séparément pour le mobile et le PC.
@@ -207,16 +207,16 @@ Pour afficher le menu (frigo, cuisine) ou le partager.
 
 ## 10. Proposition technique
 
-- **SvelteKit** (adapter-node) + **SQLite / Drizzle**, PWA (manifest + service worker), même socle que La Hotte.
+- **Express 4 + SQLite intégré à Node (`node:sqlite`, Node ≥ 22.5)**, interface en modules JavaScript sans framework ni compilation, PWA (manifest + service worker) : même socle que les autres outils de la passerelle (MyLittleLibrary, budget-foyer…), aucun module natif à compiler chez l'hébergeur.
 - Déploiement dans **node-gateway** (pas de sous-domaine) : dossier `apps/cabas` → servi sur `<domaine de la passerelle>/cabas/`, avec sa tuile « Cabas » sur le portail d'accueil de la passerelle. Le module exporte l'app Express (`module.exports = app`) ; aucun `app.listen` / `process.on` / `setInterval` hors `require.main === module`.
 - Contraintes du montage sous `/cabas` :
-  - SvelteKit avec `paths.base = '/cabas'` ; la passerelle retirant le préfixe (`app.use('/cabas', …)`), l'entrée Express remet `req.url = req.originalUrl` avant le handler SvelteKit ;
+  - la passerelle retire le préfixe (`app.use('/cabas', …)`) : les routes internes restent `/api/...` ; la page pose `<base href="/cabas/">` (chemin de montage lu dans `req.app.mountpath`) ;
   - aucun chemin absolu `/…` côté navigateur (liens, `fetch`, images) ;
   - icône du portail : `manifest.json` à la racine du dossier (ou `public/manifest.json`), premier élément de `icons` ;
   - même domaine que les autres outils : cookie de session avec `Path=/cabas` et nom propre, service worker limité au scope `/cabas/`, bases IndexedDB préfixées `cabas-`, manifest PWA avec `start_url` et `scope` = `/cabas/`.
 - Temps réel : **Server-Sent Events** par foyer (process unique → diffusion en mémoire suffit).
-- Hors-ligne : IndexedDB (via Dexie) pour les données locales et la file d'opérations ; chaque opération porte un `op_id` unique (table `AppliedOp` côté serveur pour l'idempotence) ; endpoint `GET /sync?since=<version>` pour rattraper les changements.
-- Import de recette : extraction JSON-LD/microdonnées côté serveur (parseur HTML léger, ex. `cheerio`), analyse des lignes d'ingrédients par règles (quantités, fractions, unités françaises).
+- Hors-ligne : IndexedDB (API native) pour les données locales et la file d'opérations ; chaque opération porte un `op_id` unique (table `AppliedOp` côté serveur pour l'idempotence) ; endpoint `GET /sync?since=<version>` pour rattraper les changements.
+- Import de recette : extraction JSON-LD/microdonnées côté serveur (lecture des blocs JSON-LD sans dépendance), analyse des lignes d'ingrédients par règles (quantités, fractions, unités françaises).
 - Authentification : lien magique e-mail (comme La Hotte), session cookie.
 - Pas de sous-domaine : URL = domaine de la passerelle + `/cabas/`.
 
@@ -250,7 +250,7 @@ PlannedMealSkip(planned_meal, product)                     -- ingrédients en r�
 
 ## 11. Étapes
 
-1. Socle : auth, foyer, rôles, catalogue, magasins, déploiement node-gateway.
+1. ✅ Socle : auth, foyer, rôles, catalogue, magasins, déploiement node-gateway.
 2. Listes (À prévoir + datées), suggestions, clôture/report, récurrents.
 3. Prix : relevés, moyennes, conseil, scénarios et économie, listes par magasin triées.
 4. Mode courses : cochage, saisie prix, temps réel (SSE), hors-ligne complet (stockage local, file d'opérations, synchronisation à la reprise).
