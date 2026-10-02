@@ -21,7 +21,7 @@ Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/cabas.db`), nodemaile
 - `server.js` : exporte `app` (listen seulement si lancé directement), page `index.html` avec `{{ROOT}}` → `<base href>`, API sur `/api`.
 - `lib/db.js` : connexion, `tx`, `normalize`, migrations (`MIGRATIONS`, `PRAGMA user_version` ; ne jamais modifier une entrée déployée).
 - `lib/auth.js` : mots de passe (scrypt, limiteur d'échecs), liens de réinitialisation, lien de connexion par e-mail (optionnel), sessions 90 j (cookie `cabas_session`, `Path=<montage>/`), gardes `householdMember` / `manager`.
-- `lib/api.js` : toutes les routes ; `lib/households.js` (foyer, membres, invitations) ; `lib/catalog.js` (magasins, rayons, produits, relevés, prix moyens) ; `lib/lists.js` (listes, articles, suggestions, clôture, récurrents, promos) ; `lib/pricing.js` (prix effectifs, magasin retenu, scénarios) ; `lib/sync.js` (rejeu d'opérations, conflits) ; `lib/events.js` (SSE, présence, diffusion après chaque modification) ; `lib/receipts.js` (tickets, correspondances `store_aliases`) ; `lib/meals.js` (plats, repas, recalcul des ingrédients `syncMealItems`, lien d'affichage) ; `lib/recipes.js` (import de recette, garde-fous SSRF) ; `lib/mailer.js` ; `lib/security.js` (CSP, `jsonOnly`).
+- `lib/api.js` : toutes les routes ; `lib/households.js` (foyer, membres, invitations) ; `lib/catalog.js` (magasins, rayons, produits, relevés, prix moyens) ; `lib/lists.js` (listes, articles, suggestions, clôture, récurrents, promos) ; `lib/pricing.js` (prix effectifs, magasin retenu, scénarios) ; `lib/sync.js` (rejeu d'opérations, conflits) ; `lib/events.js` (SSE, présence, diffusion après chaque modification) ; `lib/receipts.js` (tickets, correspondances `store_aliases`) ; `lib/meals.js` (plats, repas, recalcul des ingrédients `syncMealItems`, lien d'affichage) ; `lib/recipes.js` (import de recette, garde-fous SSRF) ; `lib/csvimport.js` (import CSV de produits + relevés : en-têtes nom;rayon;emballage;contenance;magasin;prix;promo;prix normal;date, aperçu `dry` en transaction annulée, relevé identique ignoré) ; `lib/mailer.js` ; `lib/security.js` (CSP, `jsonOnly`).
 - `public/app/` : `main.js` (démarrage, routes, cadre), `ui.js` (esc, accordéons, panneau, toast, actions), `api.js`, `state.js`, un fichier par écran (`connexion.js`, `foyer.js`, `catalogue.js`, `listes.js`, `scan.js`, `plats.js`, `menu.js`) ; `ticket.mjs` (analyse du texte et rapprochement, sans dépendance, testé par node).
 
 ## Règles non évidentes
@@ -38,7 +38,7 @@ Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/cabas.db`), nodemaile
 
 ## Commandes
 - CSP : `script-src 'self' 'wasm-unsafe-eval'` (Tesseract) ; tout reste servi par l'app (aucun CDN pour l'OCR).
-- Import d'un panier transcrit (produits + relevés) : `CABAS_URL=… CABAS_EMAIL=… CABAS_PASSWORD=… node scripts/import-prices.js scripts/<magasin>-<date>.json [--dry]` (format : voir `scripts/colruyt-2026-10-02.json` ; relancer ne double rien).
+- Paniers transcrits à importer : `imports/*.csv` (Catalogue → ⇪ Importer).
 - `npm test` (API sur base temporaire, e-mails en mémoire ; `tests/helpers.js` : clients, foyer gestionnaire + membre).
 - Essai local : `CABAS_DATA_DIR=<dossier temp> CABAS_MAIL=log PORT=3101 node server.js` → le lien de connexion s'affiche dans la console. Ne jamais essayer sur `data/`.
 - Passerelle locale : jonction `node-gateway/apps/cabas` → ce dossier (créée), servie sur `http://localhost:3000/cabas/`.

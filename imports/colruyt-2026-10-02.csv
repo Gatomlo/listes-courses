@@ -1,0 +1,80 @@
+﻿nom;rayon;emballage;contenance;magasin;prix;promo;prix normal;date
+Chocolat noir;Épicerie;paquet;200 g;Colruyt;1,65;;;2026-10-02
+Chocolat noir 70 % Côte d'Or;Épicerie;paquet;100 g;Colruyt;3,59;;;2026-10-02
+Gaufrettes au sirop;Épicerie;paquet;10 x 40 g;Colruyt;1,84;;;2026-10-02
+Gaufres de Liège chocolat;Épicerie;paquet;8 x 42 g;Colruyt;2,32;;;2026-10-02
+Madeleines;Épicerie;paquet;12 x 25 g;Colruyt;1,83;;;2026-10-02
+Compote pomme sans sucre bio;Épicerie;pot;350 g;Colruyt;1,29;;;2026-10-02
+Double concentré de tomates;Épicerie;boîte;70 g;Colruyt;0,39;;;2026-10-02
+Tomates concassées;Épicerie;boîte;400 g;Colruyt;0,84;;;2026-10-02
+Passata rustica;Épicerie;bouteille;690 g;Colruyt;1,69;;;2026-10-02
+Compotes à boire pomme-banane;Épicerie;pack;4 x 90 g;Colruyt;1,55;;;2026-10-02
+Houmous nature;Frais;pot;200 g;Colruyt;0,89;;;2026-10-02
+Cacahuètes grillées salées;Épicerie;sachet;500 g;Colruyt;1,69;;;2026-10-02
+Chips tortilla nature;Épicerie;sachet;300 g;Colruyt;0,92;;;2026-10-02
+Doritos nacho cheese;Épicerie;sachet;170 g;Colruyt;1,25;oui;1,56;2026-10-02
+Doritos sweet chili;Épicerie;sachet;170 g;Colruyt;1,27;oui;1,59;2026-10-02
+Chips Croky paprika;Épicerie;sachet;200 g;Colruyt;1,83;;;2026-10-02
+Chips Lay's Grills;Épicerie;sachet;125 g;Colruyt;0,93;oui;1,39;2026-10-02
+Chips Lay's Mama Mia's;Épicerie;sachet;125 g;Colruyt;1,19;oui;1,79;2026-10-02
+Lay's Bugles cheese;Épicerie;sachet;170 g;Colruyt;1,31;oui;1,97;2026-10-02
+Pâte feuilletée;Frais;pièce;230 g;Colruyt;0,59;;;2026-10-02
+Yaourt vanille sans lactose bio;Frais;pot;200 g;Colruyt;1,75;;;2026-10-02
+Crème entière 35 %;Frais;brique;25 cl;Colruyt;1,01;oui;;2026-10-02
+Yaourts aux fruits mixés;Frais;pack;8 x 125 g;Colruyt;2,59;;;2026-10-02
+Brie Saint Benoît;Frais;pièce;200 g;Colruyt;1,53;;;2026-10-02
+Feta;Frais;barquette;200 g;Colruyt;2,47;;;2026-10-02
+Gouda jeune en tranches;Frais;paquet;500 g;Colruyt;3,19;;;2026-10-02
+Comté 15 mois;Frais;pièce;200 g;Colruyt;5,81;;;2026-10-02
+Mascarpone;Frais;pot;500 g;Colruyt;2,69;;;2026-10-02
+Beurre doux;Frais;pièce;250 g;Colruyt;1,89;;;2026-10-02
+Parmesan râpé;Frais;sachet;100 g;Colruyt;2,79;;;2026-10-02
+Yaourt nature sans lactose bio;Frais;pot;450 g;Colruyt;2,35;;;2026-10-02
+Feta sans lactose bio;Frais;barquette;150 g;Colruyt;2,69;;;2026-10-02
+Beurre demi-sel;Frais;pièce;250 g;Colruyt;3,45;;;2026-10-02
+Fromage de chèvre pyramide;Frais;pièce;150 g;Colruyt;2,99;;;2026-10-02
+Fécule de maïs;Épicerie;paquet;400 g;Colruyt;1,29;;;2026-10-02
+Sauce tartare;Épicerie;pot;300 ml;Colruyt;3,45;;;2026-10-02
+Huile de friture;Épicerie;bouteille;2 L;Colruyt;4,99;;;2026-10-02
+Pommes de terre mi-fermes;Fruits & légumes;kg;;Colruyt;1,36;oui;1,48;2026-10-02
+Pommes Jonagold;Fruits & légumes;sachet;6 pièces;Colruyt;1,65;;;2026-10-02
+Pois chiches bio;Épicerie;paquet;500 g;Colruyt;2,49;;;2026-10-02
+Persil;Fruits & légumes;botte;;Colruyt;1,34;;;2026-10-02
+Menthe fraîche;Fruits & légumes;barquette;20 g;Colruyt;0,75;;;2026-10-02
+Céleri vert;Fruits & légumes;pièce;;Colruyt;1,39;;;2026-10-02
+Citron;Fruits & légumes;pièce;;Colruyt;0,41;;;2026-10-02
+Pommes Pink Lady;Fruits & légumes;barquette;6 pièces;Colruyt;2,84;;;2026-10-02
+Ail bio;Fruits & légumes;sachet;250 g;Colruyt;2,73;;;2026-10-02
+Bananes;Fruits & légumes;pièce;±1 kg;Colruyt;1,13;;;2026-10-02
+Champignons;Fruits & légumes;barquette;500 g;Colruyt;1,69;;;2026-10-02
+Chicons;Fruits & légumes;kg;;Colruyt;1,84;;;2026-10-02
+Carottes;Fruits & légumes;sachet;1,5 kg;Colruyt;2,01;;;2026-10-02
+Cœurs de laitue romaine;Fruits & légumes;sachet;;Colruyt;1,49;;;2026-10-02
+Buns bio;Boulangerie;paquet;4 x 50 g;Colruyt;2,99;;;2026-10-02
+Sucre vanilliné;Épicerie;paquet;15 x 8 g;Colruyt;0,60;;;2026-10-02
+Pain blanc en tranches;Boulangerie;pièce;800 g;Colruyt;0,89;;;2026-10-02
+Pains au chocolat;Boulangerie;paquet;8 x 45 g;Colruyt;1,99;;;2026-10-02
+Capellini;Épicerie;paquet;500 g;Colruyt;0,79;;;2026-10-02
+Penne complètes;Épicerie;paquet;500 g;Colruyt;1,19;;;2026-10-02
+Fusilli;Épicerie;paquet;500 g;Colruyt;1,14;;;2026-10-02
+Macaroni;Épicerie;paquet;500 g;Colruyt;1,09;;;2026-10-02
+Nems au porc;Frais;barquette;280 g;Colruyt;3,54;;;2026-10-02
+Mouchoirs (boîte);Hygiène;boîte;110 pièces;Colruyt;1,09;;;2026-10-02
+Bâtonnets de poisson;Surgelés;boîte;15 x 30 g;Colruyt;1,99;;;2026-10-02
+Purée pommes de terre épinards;Surgelés;sachet;1 kg;Colruyt;2,87;;;2026-10-02
+Brocolis en fleurettes surgelés;Surgelés;sachet;1 kg;Colruyt;1,99;;;2026-10-02
+Mini-viennoiseries surgelées;Surgelés;boîte;24 pièces;Colruyt;4,25;;;2026-10-02
+Pommes de terre rissolées;Surgelés;sachet;1 kg;Colruyt;2,09;;;2026-10-02
+Confiture fraise-rhubarbe;Épicerie;pot;370 g;Colruyt;1,96;;;2026-10-02
+Pâte de spéculoos crunchy;Épicerie;pot;400 g;Colruyt;1,63;;;2026-10-02
+Cheddar en tranches;Frais;paquet;250 g;Colruyt;1,74;;;2026-10-02
+Confiture de myrtilles;Épicerie;pot;370 g;Colruyt;2,46;;;2026-10-02
+Filet de poulet rôti en morceaux;Boucherie;barquette;150 g;Colruyt;2,69;;;2026-10-02
+Knacki;Boucherie;paquet;10 pièces;Colruyt;1,99;oui;2,66;2026-10-02
+Lard petit-déjeuner fumé;Boucherie;barquette;100 g;Colruyt;1,33;oui;1,77;2026-10-02
+Haché porc-bœuf;Boucherie;kg;;Colruyt;6,99;oui;;2026-10-02
+Chipolata de porc;Boucherie;kg;;Colruyt;6,59;;;2026-10-02
+Jambon grillé;Boucherie;barquette;200 g;Colruyt;3,45;;;2026-10-02
+Lardons fumés (allumettes);Boucherie;barquette;2 x 100 g;Colruyt;1,86;oui;2,48;2026-10-02
+Chorizo doux;Boucherie;paquet;225 g;Colruyt;2,29;;;2026-10-02
+Allumettes de jambon;Boucherie;barquette;200 g;Colruyt;2,99;;;2026-10-02

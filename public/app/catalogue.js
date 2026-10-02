@@ -23,7 +23,7 @@ export function catalogueView() {
     ${p.best_store_id ? stTag(p.best_store_id) : '<span class="muted small">prix ?</span>'}</div>`;
   return {
     cols: true, title: 'Catalogue', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer`,
-    right: '<button class="btn sm" data-a="prod-new">＋ Produit</button>',
+    right: `${isManager() ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button> ' : ''}<button class="btn sm" data-a="prod-new">＋ Produit</button>`,
     body: `<input class="txt" id="cat-q" placeholder="🔍 Rechercher un produit…" value="${esc(q)}" data-in="cat-q">
       <div class="opt">${[['all', 'Tous'], ['rec', '🔁 Récurrents'], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
       ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: ps.map(row).join('') })).join('')
@@ -56,6 +56,50 @@ on('click', 'prod-create', async () => {
   const f = formData(document.querySelector('.sheet'));
   const p = await attempt(() => post(hp('/products'), f));
   if (p) { closeSheet(); await Promise.all([loadProducts(), loadHouse()]); S.q.cat = ''; toast(`${p.name} ajouté au catalogue`); go(`#/catalogue/${p.id}`); }
+});
+
+// ---------- Import CSV (gestionnaire) : apercu puis import ----------
+const CSV_HEAD = 'nom;rayon;emballage;contenance;magasin;prix;promo;prix normal;date';
+let csvText = '';
+on('click', 'csv-open', () => {
+  csvText = '';
+  sheet(`<h3>⇪ Importer des produits</h3>
+    <p class="muted small">Fichier CSV (séparateur « ; » ou « , »), une ligne d'en-tête puis un produit par ligne :<br><code>${CSV_HEAD}</code></p>
+    <p class="muted small">Seul <b>nom</b> est obligatoire. Produit déjà au catalogue : seuls ses prix sont ajoutés. Rayon inconnu : créé. Prix : par emballage, avec le magasin ; <b>promo</b> = oui (hors moyenne) ; <b>prix normal</b> = prix hors promo s'il est connu ; date AAAA-MM-JJ ou JJ/MM/AAAA (défaut : aujourd'hui). Réimporter le même fichier ne double rien.</p>
+    <button class="btn sec2 sm" data-a="csv-model">Télécharger un modèle</button>
+    <label class="muted" style="display:block;margin-top:10px">Fichier</label><input class="txt" type="file" accept=".csv,text/csv,text/plain" data-ch="csv-file">
+    <div id="csv-res"></div>`);
+});
+on('click', 'csv-model', () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF' + CSV_HEAD + '\r\nBeurre doux;Frais;pièce;250 g;Colruyt;1,89;;;\r\nChips paprika;Épicerie;sachet;125 g;Colruyt;0,93;oui;1,39;\r\n'], { type: 'text/csv' }));
+  a.download = 'modele-produits.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+const csvSummary = (r) => `<div class="card" style="margin-top:10px">
+  <p><b>${r.created.length}</b> produit${r.created.length > 1 ? 's' : ''} ${r.dry ? 'à créer' : 'créé' + (r.created.length > 1 ? 's' : '')} · <b>${r.existing}</b> déjà au catalogue · <b>${r.records}</b> relevé${r.records > 1 ? 's' : ''} de prix${r.skipped ? ` · ${r.skipped} déjà connu${r.skipped > 1 ? 's' : ''}` : ''}</p>
+  ${r.categories.length ? `<p class="small">Nouveaux rayons : ${r.categories.map(esc).join(', ')}</p>` : ''}
+  ${r.created.length ? `<p class="muted small">${r.created.map(esc).join(' · ')}</p>` : ''}
+  ${r.errors.length ? `<p class="small" style="color:var(--danger)">${r.errors.length} ligne${r.errors.length > 1 ? 's' : ''} ignorée${r.errors.length > 1 ? 's' : ''} :<br>${r.errors.map((e) => `ligne ${e.line} : ${esc(e.msg)}`).join('<br>')}</p>` : ''}</div>`;
+on('change', 'csv-file', async (el) => {
+  const file = el.files && el.files[0];
+  const box = document.getElementById('csv-res');
+  if (!file) return;
+  csvText = await file.text();
+  const r = await attempt(() => post(hp('/products/import'), { csv: csvText, dry: true }));
+  if (!r) return;
+  box.innerHTML = csvSummary(r) + (r.created.length || r.records
+    ? '<div class="row end" style="margin-top:10px"><button class="btn" data-a="csv-go">Importer</button></div>'
+    : '<p class="muted small">Rien à importer.</p>');
+});
+on('click', 'csv-go', async () => {
+  const r = await attempt(() => post(hp('/products/import'), { csv: csvText }));
+  if (!r) return;
+  await Promise.all([loadProducts(), loadHouse()]);
+  render();
+  document.getElementById('csv-res').innerHTML = csvSummary(r);
+  toast(`${r.created.length} produit${r.created.length > 1 ? 's' : ''} importé${r.created.length > 1 ? 's' : ''}, ${r.records} relevé${r.records > 1 ? 's' : ''}`);
 });
 
 // ---------- Fiche produit ----------

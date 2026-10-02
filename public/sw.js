@@ -2,7 +2,7 @@
 // Portee = dossier de l'app (/cabas/ dans la passerelle). L'API n'est jamais mise en
 // cache ici : les donnees hors-ligne sont gerees par l'app (public/app/api.js).
 // Changer VERSION quand la liste des fichiers change.
-const VERSION = 'cabas-v6';
+const VERSION = 'cabas-v7';
 const FILES = [
   './', 'style.css', 'manifest.json', 'icon.svg',
   'app/main.js', 'app/ui.js', 'app/api.js', 'app/state.js', 'app/connexion.js',
