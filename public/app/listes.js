@@ -51,9 +51,10 @@ export function listesView() {
     body: `<a class="card click row" href="#/listes/${s.backlog.id}"><div class="grow"><h4>À prévoir</h4><div class="muted">${s.backlog.items} article${s.backlog.items > 1 ? 's' : ''}${s.backlog.estimate != null && s.backlog.items ? ` · ≈ ${eur(s.backlog.estimate)}` : ''} en attente d'une sortie${s.backlog.pending ? ` · ${s.backlog.pending} suggestion${s.backlog.pending > 1 ? 's' : ''}` : ''}</div></div><span class="pill p-grey">permanente</span></a>
       ${S.house.pending || (S.suggestions || []).length ? acc('sugg', { icon: '💡', title: 'Suggestions en attente', sum: ` <span class="badge">${S.house.pending}</span>`, def: true, body: suggestionsHtml() }) : ''}
       ${acc('l_next', { icon: '🛒', title: 'Prochaines courses', sum: ` · ${s.upcoming.length} liste${s.upcoming.length > 1 ? 's' : ''}`, def: true,
-        body: `<div class="pad">${s.upcoming.map(card).join('') || '<p class="muted">Aucune liste prévue.</p>'}${mgr ? '<button class="btn sec2 full" data-a="list-new">＋ Nouvelle liste datée</button>' : ''}</div>` })}
+        body: `<div class="pad">${s.upcoming.map(card).join('') || '<p class="muted">Aucune liste prévue.</p>'}</div>` })}
       ${acc('l_old', { icon: '🕓', title: 'Historique', sum: ` · ${s.closed.length} liste${s.closed.length > 1 ? 's' : ''} clôturée${s.closed.length > 1 ? 's' : ''}`,
-        body: `<div class="pad">${s.closed.map(card).join('') || '<p class="muted">Aucune liste clôturée.</p>'}</div>` })}`,
+        body: `<div class="pad">${s.closed.map(card).join('') || '<p class="muted">Aucune liste clôturée.</p>'}</div>` })}
+      ${mgr ? '<button class="fab" data-a="list-new" title="Nouvelle liste datée">＋</button>' : ''}`,
   };
 }
 
