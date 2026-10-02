@@ -133,7 +133,7 @@ on('click', 'prod-merge-ok', async () => {
   if (p) { current = p; S.products = null; await loadHouse(); closeSheet(); toast(`« ${name} » fusionné dans « ${p.name} »`); go(`#/catalogue/${p.id}`); }
 });
 on('click', 'prod-del', async () => {
-  const ok = await confirmSheet({ title: `Supprimer « ${current.name} » ?`, text: 'Ses relevés de prix sont supprimés.', ok: 'Supprimer', danger: true });
+  const ok = await confirmSheet({ title: `Supprimer « ${current.name} » ?`, text: 'Il est retiré des listes en cours et ses relevés de prix sont supprimés. Les listes clôturées gardent son nom, barré.', ok: 'Supprimer', danger: true });
   if (!ok) return;
   if (await attempt(() => del(hp(`/products/${current.id}`)))) { S.products = null; await loadHouse(); toast('Produit supprimé'); go('#/catalogue'); }
 });

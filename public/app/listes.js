@@ -68,6 +68,7 @@ function itemRow(i, l) {
     i.origin === 'recurring' ? '<span class="pill p-leaf">🔁 récurrent</span>' : '',
     i.origin === 'carried' ? '<span class="pill p-grey">reporté</span>' : '',
     i.status === 'unavailable' ? '<span class="pill p-grey">indisponible</span>' : '',
+    i.deleted ? '<span class="pill p-grey">retiré du catalogue</span>' : '',
   ].join('');
   const check = dated && open && !i.suggestion
     ? `<button class="chk${i.status === 'bought' ? ' on' : ''}" data-a="item-check" data-id="${i.id}" aria-label="Acheté">${i.status === 'bought' ? '✓' : ''}</button>` : '';
@@ -75,7 +76,7 @@ function itemRow(i, l) {
     ? (mgr ? `<button class="btn sm" data-a="sugg-ok" data-id="${i.id}" title="Accepter">✓</button><button class="btn sm sec2" data-a="sugg-no" data-id="${i.id}" title="Refuser">✕</button>`
       : mine ? `<button class="btn sm sec2" data-a="item-del" data-id="${i.id}">Retirer</button>` : '')
     : '';
-  return `<div class="item${i.suggestion ? ' pending' : ''}${i.status === 'bought' ? ' done' : ''}">${check}
+  return `<div class="item${i.suggestion ? ' pending' : ''}${i.status === 'bought' && open ? ' done' : ''}${i.deleted ? ' gone' : ''}">${check}
     <div class="grow${open && !i.suggestion ? ' click' : ''}" ${open && !i.suggestion ? `data-a="item" data-id="${i.id}"` : ''}><div class="nm">${qtyText(i.qty)} × ${esc(i.name)}${i.note ? ` <span class="muted fw4">· ${esc(i.note)}</span>` : ''}</div>
     ${pills ? `<div class="pills">${pills}</div>` : ''}${i.carried_label ? `<div class="muted small">→ reporté : ${i.carried_label === 'À prévoir' ? 'À prévoir' : 'liste du ' + fmtDate(i.carried_label)}</div>` : ''}</div>${right}</div>`;
 }

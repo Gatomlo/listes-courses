@@ -24,7 +24,7 @@ Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/cabas.db`), nodemaile
 - Prix en **centimes** entiers. Prix moyen = N derniers relevés hors promo < 6 mois (`catalog.averages`, fenêtre SQL).
 - Droits : toute route `/api/h/:hid/...` passe par `householdMember` ; gestion → `manager` sur la route. Les membres peuvent créer un produit et ajouter un relevé.
 - Au moins un gestionnaire par foyer, au moins un magasin actif. Nouveau rayon = fin de parcours de tous les magasins.
-- Listes : un article par produit et par liste (ajout = quantités cumulées) ; membre : ajoute en suggestion, coche, modifie quantité/note ; gestionnaire : le reste. Récurrence n = absent des n−1 listes datées précédentes. Clôture : non achetés → liste suivante (défaut) / À prévoir / abandon (`carried_to`), suggestions en attente abandonnées. Suppression d'un produit = retiré aussi des listes clôturées (pas d'instantané du nom).
+- Listes : un article par produit et par liste (ajout = quantités cumulées) ; membre : ajoute en suggestion, coche, modifie quantité/note ; gestionnaire : le reste. Récurrence n = absent des n−1 listes datées précédentes. Clôture : non achetés → liste suivante (défaut) / À prévoir / abandon (`carried_to`), suggestions en attente abandonnées. Suppression d'un produit : retiré des listes en cours, relevés supprimés ; s'il figure dans une liste clôturée il est seulement marqué `deleted_at` (exclu partout, affiché barré dans l'historique, nom de nouveau libre).
 - une liste datée couvre les repas jusqu'à la veille de la suivante ; split conseillé si économie ≥ seuil.
 - Accordéons : état en `localStorage`, séparé mobile/PC ; sur PC ouverts par défaut.
 

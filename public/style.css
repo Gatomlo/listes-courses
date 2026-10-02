@@ -96,6 +96,8 @@ input.cb{width:22px;height:22px;flex:none;accent-color:var(--leaf)}
 .item.pending{opacity:.7}
 .item.pending .nm{font-style:italic}
 .fw4{font-weight:400}
+/* Produit supprime du catalogue, garde dans l'historique */
+.item.gone .nm{text-decoration:line-through;color:var(--muted)}
 .txt.c{text-align:center}
 .addbox{position:relative;margin-bottom:12px}
 .ac{background:var(--surface);border:1px solid var(--line);border-radius:11px;margin-top:4px;overflow:hidden}

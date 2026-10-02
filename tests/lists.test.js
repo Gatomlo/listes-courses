@@ -135,3 +135,19 @@ test('fusion de produits : les articles suivent', async () => {
   assert.equal(l.items.filter((i) => i.product_id === P.pain).length, 1);
   assert.equal(item(l, P.pain).qty, 5);
 });
+
+test('produit supprime : retire des listes en cours, garde barre dans l historique', async () => {
+  const lait = item(await listOf(thomas, l1.id), P.lait); // l1 cloturee, lait achete
+  assert.ok(lait);
+  assert.ok(item(await listOf(thomas, l2.id), P.lait));
+  assert.equal((await thomas.del(`${h}/products/${P.lait}`)).status, 200);
+  assert.ok(!item(await listOf(thomas, l2.id), P.lait), 'retire de la liste en cours');
+  const hist = item(await listOf(thomas, l1.id), P.lait);
+  assert.equal(hist.name, 'Lait');
+  assert.equal(hist.deleted, 1);
+  assert.equal((await thomas.get(`${h}/products/${P.lait}`)).status, 404);
+  assert.ok(!(await thomas.get(`${h}/products`)).data.some((p) => p.id === P.lait));
+  assert.equal((await thomas.get(`${h}/lists/new?date=2030-06-01`)).data.recurring.some((p) => p.name === 'Lait'), false);
+  const again = await thomas.post(`${h}/products`, { name: 'Lait', category_id: (await thomas.get(h)).data.categories[0].id });
+  assert.equal(again.status, 201, 'le nom est de nouveau libre');
+});
