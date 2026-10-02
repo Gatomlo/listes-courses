@@ -5,6 +5,7 @@ import { get, post, ApiError, net, outbox, onNetChange, onFlushed, flush } from 
 import { S, setRenderer, render, loadHouse, loadProducts, go } from './state.js';
 import { loginView, foyersView, setInvite, setReset, loadOptions, loadInvitation, acceptPending, resetPending } from './connexion.js';
 import { foyerView } from './foyer.js';
+import './install.js'; // tot : retient l'invite d'installation du navigateur
 import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
 import { platsView, dishView, loadDishes, loadDish } from './plats.js';

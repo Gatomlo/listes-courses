@@ -171,6 +171,8 @@ table.wk button.meal,table.wk button.add{width:100%;font-size:13px}
 table.wk .off{background:var(--sunk);border-color:transparent}
 table.wk td.drop-on{outline:2px dashed var(--leaf);outline-offset:-3px;background:var(--leaf-soft)}
 button.meal[draggable]{cursor:grab}
+button.card.install{width:100%;text-align:left;font:inherit;color:inherit;gap:12px}
+button.card.install img{border-radius:10px;flex:none}
 button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .slot.drop-on{outline:2px dashed var(--leaf);outline-offset:1px;background:var(--leaf-soft);border-radius:9px}
 .drag-src{opacity:.35}

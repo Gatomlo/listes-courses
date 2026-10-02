@@ -2,6 +2,7 @@
 import { esc, eur, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
 import { patch, post, put, del, attempt } from './api.js';
 import { S, hp, isManager, render, loadHouse } from './state.js';
+import { installCard } from './install.js';
 
 const DOW = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 
@@ -29,7 +30,7 @@ export function foyerView() {
   return {
     title: h.name, sub: mgr ? 'Vous êtes gestionnaire' : 'Vous êtes membre',
     right: '<button class="btn sm sec2" data-a="go" data-to="#/foyers">Mes foyers</button>',
-    body: `${acc('mem', { icon: '👥', title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
+    body: `${installCard()}${acc('mem', { icon: '👥', title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
         body: members + (mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="invite">＋ Inviter un membre</button>' : '') })}
       ${acc('set', { icon: '⚙️', title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, ${h.avg_records} relevés, courses ${h.rhythm_days} j, menu ${h.menu_days} j dès le ${DOW[h.menu_start_dow]}`,
         body: `<div class="form">
