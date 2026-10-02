@@ -21,7 +21,7 @@ const mealAt = (d, s) => menu.meals.find((m) => m.date === d && m.slot === s && 
 const shopDay = (d) => menu.lists.some((l) => l.date === d);
 
 function mealBtn(m) {
-  const drag = isPc() && isManager() && !m.suggestion ? ` draggable="true" data-drag="${m.id}"` : '';
+  const drag = isManager() && !m.suggestion ? `${isPc() ? ' draggable="true"' : ''} data-drag="${m.id}"` : '';
   return `<button class="meal${m.suggestion ? ' pending' : ''}"${drag} data-a="meal-open" data-id="${m.id}" data-date="${m.date}">${m.has_recipe ? '📖 ' : ''}${esc(m.dish)}${m.persons !== 4 ? ` · ${m.persons} p.` : ''}${m.suggestion ? ' <span class="pill p-carrot">suggéré</span>' : ''}</button>`;
 }
 const addBtn = (d, s) => `<button class="add" data-a="meal-add" data-date="${d}" data-slot="${s}" aria-label="Ajouter un plat">＋</button>`;
@@ -40,7 +40,8 @@ export function menuView() {
   } else {
     body = days.map((d) => `${shopDay(d) ? `<div class="sec">🛒 Courses du ${esc(fmtDate(d, { day: 'numeric', month: 'long' }))}</div>` : ''}
       <div class="day${d === today() ? ' today' : ''}"><div class="d"><span>${esc(fmtDate(d, { weekday: 'short' }))}</span><b>${new Date(d + 'T12:00').getDate()}</b></div>
-      <div class="grow">${slots.map((s) => { const m = mealAt(d, s); return `<div class="slot"><span class="lbl">${SLOT[s]}</span>${m ? mealBtn(m) : addBtn(d, s)}</div>`; }).join('')}</div></div>`).join('');
+      <div class="grow">${slots.map((s) => { const m = mealAt(d, s); return `<div class="slot" data-drop="${d}" data-slot="${s}"><span class="lbl">${SLOT[s]}</span>${m ? mealBtn(m) : addBtn(d, s)}</div>`; }).join('')}</div></div>`).join('');
+    if (mgr) body = '<p class="muted small">Appui long sur un repas, puis glissez-le vers un autre créneau (si la case est occupée, les deux repas s’échangent).</p>' + body;
   }
   const range = `${esc(fmtDate(menu.from, { weekday: 'short', day: 'numeric', month: 'short' }))} → ${esc(fmtDate(menu.to, { weekday: 'short', day: 'numeric', month: 'short' }))}`;
   return {
@@ -106,6 +107,69 @@ document.addEventListener('drop', async (e) => {
   const m = menu.meals.find((x) => x.id === Number(id));
   if (m && (m.date !== td.dataset.drop || m.slot !== td.dataset.slot)) await moveMeal(id, td.dataset.drop, td.dataset.slot);
 });
+// Telephone : appui long sur un repas, puis glisser du doigt vers un autre creneau.
+// Le repas suit le doigt ; la page defile pres des bords ; lacher hors creneau annule.
+const touch = { timer: null, id: null, ghost: null, target: null, y: 0, x0: 0, y0: 0, raf: 0, swallow: false };
+function touchEnd() {
+  clearTimeout(touch.timer); touch.timer = null;
+  cancelAnimationFrame(touch.raf);
+  if (touch.ghost) touch.ghost.remove();
+  document.querySelectorAll('.drag-src').forEach((x) => x.classList.remove('drag-src'));
+  clearDrop();
+  touch.ghost = null; touch.target = null; touch.id = null;
+}
+function touchScroll() {
+  const edge = 70, h = window.innerHeight;
+  const v = touch.y < edge ? -(edge - touch.y) / 4 : touch.y > h - edge ? (touch.y - (h - edge)) / 4 : 0;
+  if (v) window.scrollBy(0, v);
+  touch.raf = requestAnimationFrame(touchScroll);
+}
+document.addEventListener('touchstart', (e) => {
+  const b = e.target.closest && e.target.closest('[data-drag]');
+  if (!b || isPc() || e.touches.length > 1) return;
+  const t = e.touches[0];
+  touch.x0 = t.clientX; touch.y0 = t.clientY;
+  touch.timer = setTimeout(() => {
+    touch.timer = null; touch.id = b.dataset.drag; touch.y = touch.y0; touch.swallow = true;
+    const r = b.getBoundingClientRect();
+    touch.ghost = b.cloneNode(true);
+    touch.ghost.className += ' drag-ghost';
+    Object.assign(touch.ghost.style, { width: `${r.width}px`, left: `${r.left}px`, top: `${r.top}px` });
+    touch.ghost.dataset.dx = touch.x0 - r.left; touch.ghost.dataset.dy = touch.y0 - r.top;
+    document.body.appendChild(touch.ghost);
+    b.classList.add('drag-src');
+    if (navigator.vibrate) navigator.vibrate(30);
+    touch.raf = requestAnimationFrame(touchScroll);
+  }, 400);
+}, { passive: true });
+document.addEventListener('touchmove', (e) => {
+  const t = e.touches[0];
+  if (touch.timer) {
+    // Le doigt bouge avant l'appui long : c'est un defilement.
+    if (Math.abs(t.clientX - touch.x0) > 8 || Math.abs(t.clientY - touch.y0) > 8) touchEnd();
+    return;
+  }
+  if (!touch.ghost) return;
+  e.preventDefault();
+  touch.y = t.clientY;
+  touch.ghost.style.left = `${t.clientX - touch.ghost.dataset.dx}px`;
+  touch.ghost.style.top = `${t.clientY - touch.ghost.dataset.dy}px`;
+  const under = document.elementFromPoint(t.clientX, t.clientY);
+  const cell = under && under.closest('[data-drop]');
+  if (cell !== touch.target) { clearDrop(); if (cell) cell.classList.add('drop-on'); touch.target = cell; }
+}, { passive: false });
+document.addEventListener('touchend', async () => {
+  const id = touch.id, cell = touch.target;
+  touchEnd();
+  if (!id || !cell) return;
+  const m = menu.meals.find((x) => x.id === Number(id));
+  if (m && (m.date !== cell.dataset.drop || m.slot !== cell.dataset.slot)) await moveMeal(id, cell.dataset.drop, cell.dataset.slot);
+});
+document.addEventListener('touchcancel', touchEnd);
+// Apres un glisser, le « clic » qui suit le lacher n'ouvre pas la fiche du repas.
+document.addEventListener('click', (e) => { if (touch.swallow) { touch.swallow = false; e.stopPropagation(); e.preventDefault(); } }, true);
+document.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('[data-drag]') && !isPc()) e.preventDefault(); });
+
 async function moveMeal(id, date, slot) {
   const other = menu && date >= menu.from && date <= menu.to ? menu.meals.find((x) => x.date === date && x.slot === slot && !x.suggestion && x.id !== Number(id)) : null;
   if (await attempt(() => patch(hp(`/meals/${id}`), { date, slot }))) {

@@ -40,6 +40,7 @@ Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/cabas.db`), nodemaile
 ## Commandes
 - CSP : `script-src 'self' 'wasm-unsafe-eval'` (Tesseract) ; tout reste servi par l'app (aucun CDN pour l'OCR).
 - Paniers transcrits à importer : `imports/*.csv` (Catalogue → ⇪ Importer).
+- Icônes d'installation (PNG iPhone/Android, dont `maskable`) : `python scripts/make-icons.py` (Pillow) les régénère depuis le dessin de `public/icon.svg`.
 - `npm test` (API sur base temporaire, e-mails en mémoire ; `tests/helpers.js` : clients, foyer gestionnaire + membre).
 - Essai local : `CABAS_DATA_DIR=<dossier temp> CABAS_MAIL=log PORT=3101 node server.js` → le lien de connexion s'affiche dans la console. Ne jamais essayer sur `data/`.
 - Passerelle locale : jonction `node-gateway/apps/cabas` → ce dossier (créée), servie sur `http://localhost:3000/cabas/`.

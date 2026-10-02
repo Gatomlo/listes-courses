@@ -171,6 +171,10 @@ table.wk button.meal,table.wk button.add{width:100%;font-size:13px}
 table.wk .off{background:var(--sunk);border-color:transparent}
 table.wk td.drop-on{outline:2px dashed var(--leaf);outline-offset:-3px;background:var(--leaf-soft)}
 button.meal[draggable]{cursor:grab}
+button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.slot.drop-on{outline:2px dashed var(--leaf);outline-offset:1px;background:var(--leaf-soft);border-radius:9px}
+.drag-src{opacity:.35}
+.drag-ghost{position:fixed;z-index:60;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.35);transform:scale(1.04);opacity:.95}
 /* Menu imprimable (apercu, impression, affichage public) */
 .pm{background:#fff;color:#1c2418;border-radius:10px;padding:14px;overflow-x:auto}
 .pm h1{font:800 20px var(--display);margin:0;color:#2f7d4f}
