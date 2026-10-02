@@ -146,7 +146,7 @@ b.up{color:var(--danger)} b.down{color:var(--leaf)}
 pre.ocr{white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;background:var(--sunk);padding:10px;border-radius:10px}
 
 /* ---------- Plats et menu ---------- */
-.w3{width:34px;flex:none}.w8{width:96px;flex:none}
+.w3,.txt.w3{width:34px;flex:none}.w8,.txt.w8{width:96px;flex:none}
 .c{text-align:center}
 .row.line.top{align-items:flex-start}
 ol.steps{padding-left:20px;margin:0}ol.steps li{margin-bottom:6px}
