@@ -111,7 +111,7 @@ window.addEventListener('hashchange', () => { route().then(() => window.scrollTo
 // Passage mobile <-> PC : la mise en page et l'etat des accordeons changent.
 window.matchMedia('(min-width: 900px)').addEventListener('change', () => render());
 
-on('click', 'acc', (el) => { toggleAcc(el.dataset.id, !!el.dataset.def); render(); });
+on('click', 'acc', (el) => { toggleAcc(el.dataset.id, el.dataset.def === 'closed' ? 'closed' : !!el.dataset.def); render(); });
 
 // ---------- Temps reel (SSE) ----------
 let es = null, esKey = '', reloadTimer = null;

@@ -36,7 +36,8 @@ const accKey = () => (isPc() ? 'cabas-acc-pc' : 'cabas-acc');
 function accState() {
   try { return JSON.parse(localStorage.getItem(accKey()) || '{}'); } catch { return {}; }
 }
-export const isOpen = (id, def = false) => accState()[id] ?? (isPc() || def);
+// def : true = ouvert par defaut partout, 'closed' = ferme par defaut meme sur PC.
+export const isOpen = (id, def = false) => accState()[id] ?? (def === 'closed' ? false : isPc() || !!def);
 export function toggleAcc(id, def) {
   const st = accState();
   st[id] = !isOpen(id, def);
@@ -44,7 +45,7 @@ export function toggleAcc(id, def) {
 }
 export function acc(id, { icon = '', title, sum = '', body, def = false }) {
   const o = isOpen(id, def);
-  return `<section class="acc${o ? ' open' : ''}"><button class="acc-h" data-a="acc" data-id="${esc(id)}" data-def="${def ? 1 : ''}" aria-expanded="${o}">
+  return `<section class="acc${o ? ' open' : ''}"><button class="acc-h" data-a="acc" data-id="${esc(id)}" data-def="${def === 'closed' ? 'closed' : def ? 1 : ''}" aria-expanded="${o}">
     ${icon ? `<span class="acc-i">${icon}</span>` : ''}<span class="grow"><b>${esc(title)}</b><span class="muted">${sum}</span></span><span class="acc-c">›</span></button>
     ${o ? `<div class="acc-b">${body}</div>` : ''}</section>`;
 }

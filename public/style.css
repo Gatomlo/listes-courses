@@ -69,6 +69,12 @@ a.card{text-decoration:none}
 .item:last-child{border-bottom:0}
 .item.click{cursor:pointer}
 .item .nm{font-weight:600}
+/* Article de liste sur une seule ligne (nom tronque) */
+.item.line1{gap:6px}
+.item.line1 .nm{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item.line1>:not(.nm){flex:none}
+.flag{font-size:13px}
+.ic.on{background:color-mix(in srgb,var(--carrot) 22%,transparent)}
 .ord{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line)}
 .ord .n{width:18px}
 input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:10px 12px}
@@ -102,6 +108,8 @@ input.cb{width:22px;height:22px;flex:none;accent-color:var(--leaf)}
 .item.gone .nm{text-decoration:line-through;color:var(--muted)}
 .txt.c{text-align:center}
 .addbox{position:relative;margin-bottom:12px}
+/* Bouton flottant (ajout d'article), au-dessus de la barre d'onglets */
+.fab{position:fixed;right:18px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:4;width:56px;height:56px;border-radius:50%;border:0;background:var(--leaf);color:#fff;font-size:28px;line-height:1;box-shadow:0 4px 14px #0004;cursor:pointer}
 .ac{background:var(--surface);border:1px solid var(--line);border-radius:11px;margin-top:4px;overflow:hidden}
 .ac button{display:flex;width:100%;border:0;background:none;padding:10px 12px;text-align:left;gap:8px;border-bottom:1px solid var(--line)}
 .ac button:last-child{border-bottom:0}
@@ -235,6 +243,7 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
   @media (min-width:1500px){.cols{columns:3}.cards3{columns:4}}
   .cols>.acc{break-inside:avoid;display:inline-block;width:100%;vertical-align:top}
   .cols>:not(.acc){column-span:all}
+  .fab{bottom:28px;right:32px}
   .cards3{columns:3;column-gap:12px}
   .cards3>.card{break-inside:avoid;display:inline-block;width:100%}
   .sheet-bg{align-items:center;justify-content:center}
