@@ -34,8 +34,9 @@
 - **Gestionnaire** : crée/clôture les listes, ajoute directement articles et plats, valide les suggestions, gère catalogue, magasins et paramètres. Plusieurs gestionnaires possibles par foyer.
 - **Membre** : consulte tout, coche en magasin, saisit des prix, et **suggère** des articles ou des plats. Une suggestion reste « en attente » (visible, grisée) jusqu'à acceptation ou refus par un gestionnaire.
 - Invitation par lien/e-mail émis par un gestionnaire.
+- Les **suggestions en attente** s'affichent dans un accordéon en haut de l'écran **Listes** (badge sur l'onglet Listes pour les gestionnaires), avec Accepter / Refuser.
 - **Gestion des membres** (gestionnaire) : modifier le nom affiché et l'e-mail, **changer le profil** Membre ↔ Gestionnaire, **retirer du foyer** (le compte n'est pas supprimé ; ses suggestions en attente sont refusées ; son nom reste dans l'historique). Le foyer garde toujours au moins un gestionnaire : le dernier ne peut être ni rétrogradé ni retiré.
-- Écran **Foyer** organisé en **accordéons** (en-tête avec résumé : nombre, valeurs clés) : Suggestions en attente (ouvert par défaut s'il y en a), Membres, Réglages, puis un accordéon par magasin (ordre des rayons). Bouton « Tout ouvrir / Tout replier » ; état mémorisé par appareil.
+- Écran **Foyer** organisé en **accordéons** (en-tête avec résumé : nombre, valeurs clés) : Membres, Réglages, puis un accordéon par magasin (ordre des rayons). Bouton « Tout ouvrir / Tout replier » ; état mémorisé par appareil.
 - **Accès** :
   - **Connexion** par lien magique : saisie de l'e-mail, lien valable 15 min et à usage unique, session de 90 jours sur l'appareil ; déconnexion depuis « Mes foyers ».
   - **Invitation** (gestionnaire) : par e-mail ou lien copiable, avec le profil proposé (membre ou gestionnaire), valable 7 jours ; l'invité voit qui l'invite, dans quel foyer et avec quel rôle, puis rejoint ou refuse.
@@ -252,7 +253,7 @@ PlannedMealSkip(planned_meal, product)                     -- ingrédients en r�
 
 1. ✅ Socle : auth, foyer, rôles, catalogue, magasins, déploiement node-gateway.
 2. ✅ Listes (À prévoir + datées), suggestions, clôture/report, récurrents.
-3. Prix : relevés, moyennes, conseil, scénarios et économie, listes par magasin triées.
+3. ✅ Prix : relevés, moyennes, conseil, scénarios et économie, listes par magasin triées, promos.
 4. Mode courses : cochage, saisie prix, temps réel (SSE), hors-ligne complet (stockage local, file d'opérations, synchronisation à la reprise).
 5. Scan du ticket (Tesseract.js) : lecture, rapprochement, alias par magasin, mise à jour des prix.
 6. Plats (écran dédié, recherche, recettes avec import depuis un lien), planning avec ingrédients en réserve, génération et fusion des ingrédients, export du menu.

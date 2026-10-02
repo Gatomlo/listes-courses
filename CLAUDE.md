@@ -6,7 +6,8 @@ Outil privé du foyer : listes de courses partagées (« À prévoir » + listes
 ## État (au 2026-10-02)
 - **Étape 1 (socle) codée** : connexion par lien e-mail, foyers, membres et invitations, rôles, réglages, magasins (couleur, actif), rayons et leur ordre par magasin, catalogue (fiche, relevés, prix moyens, magasin conseillé/imposé, fusion, suppression). Interface mobile + PC (barre latérale, accordéons, colonnes en maçonnerie).
 - **Étape 2 (listes) codée** : « À prévoir » (créée à la demande), listes datées (une par date, date proposée = dernière + rythme), import des récurrents dus et d'articles « À prévoir », ajout avec recherche/création de produit, quantités cumulées, coche « acheté », fiche article (quantité, note, indisponible, déplacer, récurrent, retirer), suggestions des membres (validation dans la liste ou Foyer, badge), menu ⋯ (date, statut, clôture avec report par article, suppression), historique en lecture seule + copie vers « À prévoir ».
-- Écrans Menu / Plats : « bientôt ». Prochaine étape : 3 (prix : magasin conseillé par article, scénarios, économie, listes par magasin, promos).
+- **Étape 3 (prix) codée** : prix effectif par article et magasin (promo valable sinon moyenne), magasin conseillé (imposé > moins cher), choix manuel par article (étiquette cliquable, tout membre ; retour au conseil), « tout chez X » (gestionnaire), scénarios + économie vs seuil, liste par magasin (`#/listes/:id/magasin/:sid`, ordre des rayons du magasin), promos (sortie ou date, prix facultatif, une par produit × magasin, tout membre). Suggestions en attente : accordéon en haut de l'écran Listes + badge onglet Listes.
+- Écrans Menu / Plats : « bientôt ». Prochaine étape : 4 (mode courses en magasin, temps réel SSE, hors-ligne).
 - Décisions : nom « Le Cabas », seuil 5 €, prix comparés par emballage (contenance facultative), OCR Tesseract.js, pas de total ticket ni lien budget-foyer, pas de sous-domaine (`/cabas` sur le domaine de la passerelle). Point ouvert : coût fixe 2e magasin (défaut : non).
 
 ## Stack
@@ -16,7 +17,7 @@ Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/cabas.db`), nodemaile
 - `server.js` : exporte `app` (listen seulement si lancé directement), page `index.html` avec `{{ROOT}}` → `<base href>`, API sur `/api`.
 - `lib/db.js` : connexion, `tx`, `normalize`, migrations (`MIGRATIONS`, `PRAGMA user_version` ; ne jamais modifier une entrée déployée).
 - `lib/auth.js` : lien de connexion (15 min, usage unique), sessions 90 j (cookie `cabas_session`, `Path=<montage>/`), gardes `householdMember` / `manager`.
-- `lib/api.js` : toutes les routes ; `lib/households.js` (foyer, membres, invitations) ; `lib/catalog.js` (magasins, rayons, produits, relevés, prix moyens) ; `lib/lists.js` (listes, articles, suggestions, clôture, récurrents) ; `lib/mailer.js` ; `lib/security.js` (CSP, `jsonOnly`).
+- `lib/api.js` : toutes les routes ; `lib/households.js` (foyer, membres, invitations) ; `lib/catalog.js` (magasins, rayons, produits, relevés, prix moyens) ; `lib/lists.js` (listes, articles, suggestions, clôture, récurrents, promos) ; `lib/pricing.js` (prix effectifs, magasin retenu, scénarios) ; `lib/mailer.js` ; `lib/security.js` (CSP, `jsonOnly`).
 - `public/app/` : `main.js` (démarrage, routes, cadre), `ui.js` (esc, accordéons, panneau, toast, actions), `api.js`, `state.js`, un fichier par écran (`connexion.js`, `foyer.js`, `catalogue.js`, `listes.js`).
 
 ## Règles non évidentes
@@ -26,6 +27,7 @@ Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/cabas.db`), nodemaile
 - Au moins un gestionnaire par foyer, au moins un magasin actif. Nouveau rayon = fin de parcours de tous les magasins.
 - Listes : un article par produit et par liste (ajout = quantités cumulées) ; membre : ajoute en suggestion, coche, modifie quantité/note ; gestionnaire : le reste. Récurrence n = absent des n−1 listes datées précédentes. Clôture : non achetés → liste suivante (défaut) / À prévoir / abandon (`carried_to`), suggestions en attente abandonnées. Suppression d'un produit : retiré des listes en cours, relevés supprimés ; s'il figure dans une liste clôturée il est seulement marqué `deleted_at` (exclu partout, affiché barré dans l'historique, nom de nouveau libre).
 - une liste datée couvre les repas jusqu'à la veille de la suivante ; split conseillé si économie ≥ seuil.
+- Magasin retenu d'un article = `store_id` manuel s'il est actif, sinon conseil, sinon 1er magasin actif. Scénarios : prix inconnu dans un magasin → meilleur prix connu ailleurs, compté « non estimé » ; hors suggestions, indisponibles, supprimés. Split conseillé si ≥ 2 magasins utilisés et économie ≥ seuil.
 - Accordéons : état en `localStorage`, séparé mobile/PC ; sur PC ouverts par défaut.
 
 ## Commandes

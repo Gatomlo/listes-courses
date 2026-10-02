@@ -2,7 +2,6 @@
 import { esc, eur, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
 import { patch, post, put, del, attempt } from './api.js';
 import { S, hp, isManager, render, loadHouse } from './state.js';
-import { suggestionsHtml } from './listes.js';
 
 const COLORS = ['#c8313b', '#e08a12', '#2f7d4f', '#5b4bb7', '#1f6fb2', '#8a5a2b'];
 const roleLabel = (r) => (r === 'manager' ? 'Gestionnaire' : 'Membre');
@@ -28,8 +27,7 @@ export function foyerView() {
   return {
     title: h.name, sub: mgr ? 'Vous êtes gestionnaire' : 'Vous êtes membre',
     right: '<button class="btn sm sec2" data-a="go" data-to="#/foyers">Mes foyers</button>',
-    body: `${acc('sugg', { icon: '💡', title: 'Suggestions en attente', sum: H.pending ? ` <span class="badge">${H.pending}</span>` : ' · rien en attente', def: !!H.pending, body: suggestionsHtml() })}
-      ${acc('mem', { icon: '👥', title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
+    body: `${acc('mem', { icon: '👥', title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
         body: members + (mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="invite">＋ Inviter un membre</button>' : '') })}
       ${acc('set', { icon: '⚙️', title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, ${h.avg_records} relevés, ${h.rhythm_days} jours`,
         body: `<div class="form">

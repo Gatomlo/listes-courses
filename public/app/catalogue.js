@@ -73,7 +73,8 @@ export function productView() {
         body: `<div class="pad">${stores.map((s) => {
           const pr = p.prices[s.id];
           return `<div class="row line">${stTag(s.id)}<span class="grow muted">${pr ? `${pr.n} relevé${pr.n > 1 ? 's' : ''} · dernier le ${fmtDate(pr.last)}` : 'aucun relevé'}</span><span class="price">${eur(pr && pr.avg)}</span>${p.best_store_id === s.id ? `<span class="pill p-leaf">${p.forced_store_id ? 'imposé' : 'conseillé'}</span>` : ''}</div>`;
-        }).join('')}<p class="muted small">Moyenne hors promotions, relevés de moins de 6 mois.</p></div>` })}
+        }).join('')}<p class="muted small">Moyenne hors promotions, relevés de moins de 6 mois.</p>
+        ${p.promos.length ? `<div class="pills">${p.promos.map((x) => `<span class="pill p-carrot">🏷 ${esc((storeById(x.store_id) || {}).name || '')} ${x.price_cents != null ? eur(x.price_cents) : 'promo'} · ${x.list_id ? `courses du ${esc(fmtDate(x.list_date))}` : `jusqu'au ${esc(fmtDate(x.valid_until))}`}${x.note ? ' · ' + esc(x.note) : ''}</span>`).join('')}</div>` : ''}</div>` })}
       ${acc('p_fiche', { icon: '🏷', title: 'Caractéristiques', sum: ` · ${esc(catName(p.category_id))}, ${esc(p.unit)}${p.recurrence ? ', 🔁 ' + REC[p.recurrence] : ''}`,
         body: `<div class="form" id="prod-form">
           <label class="muted">Nom</label><input class="txt" name="name" value="${esc(p.name)}" ${dis}>

@@ -6,7 +6,7 @@ import { S, setRenderer, render, loadHouse, loadProducts, go } from './state.js'
 import { loginView, foyersView, setInvite, loadInvitation, acceptPending } from './connexion.js';
 import { foyerView } from './foyer.js';
 import { catalogueView, productView, loadProduct } from './catalogue.js';
-import { listesView, listView, loadSummary, loadList, loadSuggestions, listNeedsLoad } from './listes.js';
+import { listesView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad } from './listes.js';
 
 const app = document.getElementById('app');
 
@@ -28,6 +28,7 @@ const soon = (title, what) => () => ({
 const ROUTES = {
   listes: listesView,
   liste: listView,
+  magasin: () => storeListView(S.route[2]),
   menu: soon('Menu', 'Planning des repas par créneau, ingrédients ajoutés à la liste de la période, export et impression.'),
   plats: soon('Plats', 'Plats et recettes (import depuis un lien), historique des planifications.'),
   catalogue: catalogueView,
@@ -37,10 +38,10 @@ const ROUTES = {
 };
 
 function shell(v) {
-  const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes' }[S.route[0]] || S.route[0];
+  const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes', magasin: 'listes' }[S.route[0]] || S.route[0];
   const badge = S.house && S.house.role === 'manager' && S.house.pending ? `<span class="badge">${S.house.pending}</span>` : '';
   const nav = v.noNav ? '' : `<nav class="tabs">${isPc() ? `<div class="brand">🧺 Le Cabas<small>${esc(S.house ? S.house.household.name : '')}</small></div>` : ''}
-    ${NAV.map(([k, t, svg]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg><span>${t}</span>${k === 'foyer' ? badge : ''}</a>`).join('')}</nav>`;
+    ${NAV.map(([k, t, svg]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg><span>${t}</span>${k === 'listes' ? badge : ''}</a>`).join('')}</nav>`;
   app.className = 'shell' + (v.noNav ? ' nonav' : '');
   app.innerHTML = `<header class="top">${v.back ? `<a class="back" href="${v.back}" aria-label="Retour">‹</a>` : ''}<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>${v.right || ''}</header>
     <main><div class="${v.cols ? 'cols' : ''}">${v.body}</div></main>${nav}`;
@@ -52,16 +53,15 @@ async function route() {
   if (!S.me.householdId) { S.route = ['foyers']; shell(foyersView()); return; }
   let [name, arg] = parts;
   if (name === 'catalogue' && arg) name = 'produit';
-  if (name === 'listes' && arg) name = 'liste';
+  if (name === 'listes' && arg) name = parts[2] === 'magasin' ? 'magasin' : 'liste';
   if (!ROUTES[name]) { go('#/listes'); return; }
-  S.route = [name, arg];
+  S.route = [name, arg, parts[3]];
   try {
     if (!S.house) await loadHouse();
     if (name === 'catalogue' && !S.products) await loadProducts();
     if (name === 'produit') await loadProduct(arg);
-    if (name === 'listes') await loadSummary();
-    if (name === 'liste') await loadList(arg);
-    if (name === 'foyer') await loadSuggestions();
+    if (name === 'listes') await Promise.all([loadSummary(), loadSuggestions()]);
+    if (name === 'liste' || name === 'magasin') await loadList(arg);
     shell(ROUTES[name]());
   } catch (e) {
     if (e instanceof ApiError && e.status === 404 && name === 'produit') { go('#/catalogue'); return; }
