@@ -179,8 +179,8 @@ Pour afficher le menu (frigo, cuisine) ou le partager.
 - **Mise en page** : grille A4 paysage, jours en colonnes × créneaux en lignes, une semaine par tableau, texte lisible de loin, noir et blanc acceptable.
 - **Formats** :
   - **Impression** directe (feuille de style `@media print`).
-  - **PDF** généré côté serveur (téléchargeable, partageable).
-  - **Image PNG** (fond d'écran, envoi par messagerie).
+  - **PDF** : via l'impression du navigateur (« Enregistrer au format PDF ») ; génération côté serveur : plus tard si besoin.
+  - **Image PNG** (fond d'écran, envoi par messagerie) : plus tard.
   - **Lien d'affichage** en lecture seule, sans connexion, révocable, qui se met à jour (tablette de cuisine).
 
 ## 8. Mode courses (en magasin)
@@ -256,7 +256,7 @@ PlannedMealSkip(planned_meal, product)                     -- ingrédients en r�
 3. ✅ Prix : relevés, moyennes, conseil, scénarios et économie, listes par magasin triées, promos.
 4. ✅ Mode courses : cochage, saisie prix, temps réel (SSE), hors-ligne complet (stockage local, file d'opérations, synchronisation à la reprise).
 5. ✅ Scan du ticket (Tesseract.js) : lecture, rapprochement, alias par magasin, mise à jour des prix.
-6. Plats (écran dédié, recherche, recettes avec import depuis un lien), planning avec ingrédients en réserve, génération et fusion des ingrédients, export du menu.
+6. ✅ Plats (écran dédié, recherche, recettes avec import depuis un lien), planning avec ingrédients en réserve, génération et fusion des ingrédients, export du menu.
 7. Plus tard : photo/PDF de recette.
 
 ## 12. Points ouverts

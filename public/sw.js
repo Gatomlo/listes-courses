@@ -2,11 +2,11 @@
 // Portee = dossier de l'app (/cabas/ dans la passerelle). L'API n'est jamais mise en
 // cache ici : les donnees hors-ligne sont gerees par l'app (public/app/api.js).
 // Changer VERSION quand la liste des fichiers change.
-const VERSION = 'cabas-v5';
+const VERSION = 'cabas-v6';
 const FILES = [
   './', 'style.css', 'manifest.json', 'icon.svg',
   'app/main.js', 'app/ui.js', 'app/api.js', 'app/state.js', 'app/connexion.js',
-  'app/foyer.js', 'app/catalogue.js', 'app/listes.js', 'app/scan.js', 'app/ticket.mjs',
+  'app/foyer.js', 'app/catalogue.js', 'app/listes.js', 'app/scan.js', 'app/ticket.mjs', 'app/plats.js', 'app/menu.js',
 ];
 // Le lecteur de tickets (vendor/, ~ 6 Mo) est garde a sa premiere utilisation.
 

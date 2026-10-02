@@ -1,0 +1,215 @@
+// Plats : liste (recherche par nom ou ingredient, filtres), fiche (informations,
+// ingredients, recette facultative avec import depuis un lien, menu et historique).
+import { esc, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
+import { get, post, put, del, attempt } from './api.js';
+import { S, hp, isManager, render, go, loadProducts, catName, categoryOrder } from './state.js';
+import { matchLines } from './ticket.mjs';
+import { unitOptions, catOptions } from './catalogue.js';
+
+const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const today = () => new Date().toISOString().slice(0, 10);
+const daysAgo = (d) => Math.round((Date.parse(today()) - Date.parse(d)) / 864e5);
+export const SLOT = { pdj: 'P.-déj.', midi: 'Midi', soir: 'Soir', coll: 'Collation' };
+const num = (v) => { const n = Number(String(v ?? '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
+const fmtQ = (q) => String(Math.round(q * 10) / 10).replace('.', ',');
+
+export async function loadDishes() { S.dishes = await get(hp('/dishes')); }
+
+// ---------- Liste des plats ----------
+export function platsView() {
+  const q = S.q.dish || '', f = S.q.dishFilter || 'all';
+  const n = norm(q).trim();
+  const list = S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.ingredient_names.some((x) => norm(x).includes(n)))
+    && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients) || (f === 'planned' && d.next_date)));
+  const card = (d) => {
+    const hits = n && !norm(d.name).includes(n) ? d.ingredient_names.filter((x) => norm(x).includes(n)) : [];
+    return `<a class="card click" href="#/plats/${d.id}"><h4>${esc(d.name)}${d.has_recipe ? ' <span class="pill p-plum">📖</span>' : ''}</h4>
+      <div class="muted">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}${d.time_text ? ' · ⏱ ' + esc(d.time_text) : ''}` : 'Ingrédients connus par cœur'}</div>
+      <div class="pills">${d.next_date ? `<span class="pill p-leaf">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span>` : ''}${d.last_date ? `<span class="pill p-grey">dernière fois il y a ${daysAgo(d.last_date)} j</span>` : ''}</div></a>`;
+  };
+  return {
+    title: 'Plats', sub: `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`,
+    right: isManager() ? '<a class="btn sm" href="#/plats/nouveau">＋ Plat</a>' : '',
+    body: `<input class="txt" id="dish-q" placeholder="🔍 Rechercher un plat ou un ingrédient…" value="${esc(q)}" data-in="dish-q">
+      <div class="opt">${[['all', 'Tous'], ['recipe', '📖 Avec recette'], ['memo', 'Sans détail'], ['planned', 'Au menu']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
+      <div class="cards3">${list.map(card).join('')}</div>
+      ${list.length ? '' : `<p class="muted">Aucun plat trouvé.</p>${isManager() && q ? `<button class="btn" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}`}`,
+  };
+}
+on('input', 'dish-q', (el) => { S.q.dish = el.value; render(); const i = document.getElementById('dish-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
+on('click', 'dish-filter', (el) => { S.q.dishFilter = el.dataset.f; render(); });
+on('click', 'dish-new-named', () => { pendingName = S.q.dish; go('#/plats/nouveau'); });
+
+// ---------- Fiche plat ----------
+let ed = null;          // plat en cours d'edition
+let pendingName = '';
+export async function loadDish(id) {
+  if (!S.products) await loadProducts();
+  if (id === 'nouveau') {
+    ed = { id: null, name: pendingName || '', portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], upcoming: [], past: [], times: 0 };
+    pendingName = '';
+  } else {
+    const d = await get(hp(`/dishes/${id}`));
+    ed = { ...d, steps: d.steps || '', notes: d.notes || '', url: d.url || '', time_text: d.time_text || '' };
+  }
+}
+export const currentDish = () => ed;
+
+export function dishView() {
+  const ro = !isManager(), dis = ro ? 'disabled' : '';
+  const nIng = ed.ingredients.length;
+  const ingRows = ed.ingredients.map((i, k) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>
+    ${i.is_base ? '<span class="pill p-grey">de base</span>' : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" ${dis} data-ch="ing-qty" data-k="${k}"><span class="muted small w5">${esc(i.unit)}</span>`}
+    ${ro ? '' : `<button class="ic" data-a="ing-del" data-k="${k}" title="Retirer">✕</button>`}</div>`).join('') || '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>';
+  const plan = ed.id ? acc('d_menu', {
+    icon: '📅', title: 'Au menu', def: true,
+    sum: `${ed.upcoming.length ? ` · prévu ${esc(fmtDate(ed.upcoming[0].date, { weekday: 'short', day: 'numeric', month: 'short' }))}` : ' · rien de prévu'}${ed.times ? ` · ${ed.times} fois` : ''}`,
+    body: `<div class="muted small" style="margin-top:8px">À venir</div>
+      ${ed.upcoming.map((m) => mealRow(m)).join('') || '<p class="muted">Pas encore prévu au menu.</p>'}
+      <button class="btn sec2 sm" style="margin:6px 0" data-a="plan-dish" data-id="${ed.id}">📅 ${ro ? 'Suggérer au menu' : 'Ajouter au menu'}</button>
+      <div class="muted small" style="margin-top:8px">Historique${ed.times > 5 ? ' · 5 dernières fois' : ''}</div>
+      ${ed.times ? `<div class="pills"><span class="pill p-leaf">${ed.times} fois planifié</span><span class="pill p-grey">dernière il y a ${daysAgo(ed.past[0].date)} j</span>${ed.times > 1 ? `<span class="pill p-grey">en moyenne tous les ${Math.round(daysAgo(ed.first_date) / (ed.times - 1))} j</span>` : ''}</div>${ed.past.map((m) => mealRow(m)).join('')}` : '<p class="muted">Jamais planifié pour l’instant.</p>'}`,
+  }) : '';
+  return {
+    title: ed.id ? ed.name : 'Nouveau plat', sub: ro ? 'Lecture seule (membre)' : ed.id ? 'Plat du foyer' : '', back: '#/plats',
+    body: `${acc('d_info', { icon: '📝', title: 'Informations', def: true, sum: ` · ${ed.portions} pers.${ed.time_text ? ' · ⏱ ' + esc(ed.time_text) : ''}`,
+        body: `<div class="form"><label class="muted">Nom</label><input class="txt" value="${esc(ed.name)}" ${dis} data-ch="ed" data-f="name">
+          <div class="row gap"><label class="grow"><span class="muted">Portions de référence</span><input class="txt" type="number" min="1" value="${ed.portions}" ${dis} data-ch="ed" data-f="portions"></label>
+          <label class="grow"><span class="muted">Temps</span><input class="txt" value="${esc(ed.time_text)}" placeholder="ex. 45 min" ${dis} data-ch="ed" data-f="time_text"></label></div></div>` })}
+      ${acc('d_ing', { icon: '🥕', title: 'Ingrédients', def: true, sum: ` · ${nIng || 'aucun'}`,
+        body: `${ingRows}${ro ? '' : `<div class="addbox" style="margin:8px 0"><input class="txt" id="ing-q" autocomplete="off" placeholder="＋ Ajouter un ingrédient du catalogue…" data-in="ing-q" data-enter="ing-first"><div id="ing-ac"></div></div>
+          <p class="muted small">Quantités en emballages, facultatives, ajustées au nombre de personnes du repas.</p>`}` })}
+      ${acc('d_rec', { icon: '📖', title: 'Recette', sum: ed.url || ed.steps || ed.notes ? ' · renseignée' : ' · facultative, vide',
+        body: `<div class="form"><label class="muted">Lien vers une recette en ligne</label><div class="row gap"><input class="txt grow" value="${esc(ed.url)}" placeholder="https://…" ${dis} data-ch="ed" data-f="url">${ro ? '' : '<button class="btn sm" data-a="rec-import">⤓ Importer</button>'}</div>
+          ${ro ? '' : '<p class="muted small">Importer lit nom, portions, temps, ingrédients et étapes quand le site les publie.</p>'}
+          <label class="muted">Étapes (une par ligne)</label><textarea class="txt" rows="6" ${dis} data-ch="ed" data-f="steps">${esc(ed.steps)}</textarea>
+          <label class="muted">Notes</label><textarea class="txt" rows="2" ${dis} data-ch="ed" data-f="notes">${esc(ed.notes)}</textarea>
+          ${ed.id ? `<button class="btn sec2 sm" style="margin-top:8px" data-a="recipe-view" data-id="${ed.id}">📖 ${ro ? 'Voir' : 'Aperçu de'} la recette</button>` : ''}</div>` })}
+      ${plan}
+      ${ro ? '' : `<div class="row end">${ed.id ? '<button class="btn sec2 danger-t" data-a="dish-del">Supprimer</button>' : ''}<button class="btn" data-a="dish-save">Enregistrer</button></div>`}`,
+  };
+}
+const mealRow = (m) => `<div class="item click" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted w8">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span><span class="grow">${SLOT[m.slot]} · ${m.persons} pers.</span><span class="muted">›</span></div>`;
+
+on('change', 'ed', (el) => { ed[el.dataset.f] = el.dataset.f === 'portions' ? Math.max(1, parseInt(el.value, 10) || 4) : el.value; });
+on('change', 'ing-qty', (el) => { ed.ingredients[Number(el.dataset.k)].qty = num(el.value); });
+on('click', 'ing-del', (el) => { ed.ingredients.splice(Number(el.dataset.k), 1); render(); });
+
+function ingMatches(q) {
+  const n = norm(q).trim();
+  return n ? S.products.filter((p) => norm(p.name).includes(n) && !ed.ingredients.some((i) => i.product_id === p.id)).slice(0, 6) : [];
+}
+on('input', 'ing-q', (el) => {
+  const q = el.value.trim(), ms = ingMatches(q);
+  document.getElementById('ing-ac').innerHTML = q ? `<div class="ac">${ms.map((p) => `<button data-a="ing-add" data-id="${p.id}"><span class="grow">${esc(p.name)}</span><span class="muted">${esc(catName(p.category_id))}</span></button>`).join('')}
+    ${S.products.some((p) => norm(p.name) === norm(q)) ? '' : `<button data-a="ing-new"><b>＋ Créer « ${esc(q)} » dans le catalogue</b></button>`}</div>` : '';
+});
+const addIng = (p, qty = 1, note = null) => {
+  ed.ingredients.push({ product_id: p.id, name: p.name, unit: p.unit, is_base: !!p.is_base, qty: p.is_base ? null : qty, note });
+};
+on('click', 'ing-add', (el) => { addIng(S.products.find((p) => p.id === Number(el.dataset.id))); render(); document.getElementById('ing-q')?.focus(); });
+on('click', 'ing-first', () => { const ms = ingMatches(document.getElementById('ing-q').value); if (ms.length) { addIng(ms[0]); render(); document.getElementById('ing-q')?.focus(); } });
+on('click', 'ing-new', () => {
+  const q = document.getElementById('ing-q').value.trim();
+  sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté au catalogue commun, puis au plat.</p>
+    <label class="muted">Nom</label><input class="txt" name="name" value="${esc(q.charAt(0).toUpperCase() + q.slice(1))}">
+    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions()}</select></label>
+    <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
+    <label class="row line"><input type="checkbox" class="cb" name="is_base"><span class="grow">Ingrédient de base (sel, huile, épices…)</span></label>
+    <div class="row end"><button class="btn" data-a="ing-new-ok">Créer et ajouter</button></div>`);
+});
+on('click', 'ing-new-ok', async () => {
+  const p = await attempt(() => post(hp('/products'), formData(document.querySelector('.sheet'))));
+  if (!p) return;
+  closeSheet();
+  await loadProducts();
+  addIng(p);
+  render();
+});
+
+on('click', 'dish-save', async () => {
+  const body = { ...ed, ingredients: ed.ingredients.map((i) => ({ product_id: i.product_id, qty: i.qty, note: i.note })) };
+  const d = await attempt(() => (ed.id ? put(hp(`/dishes/${ed.id}`), body) : post(hp('/dishes'), body)));
+  if (!d) return;
+  const isNew = !ed.id;
+  ed = { ...d, steps: d.steps || '', notes: d.notes || '', url: d.url || '', time_text: d.time_text || '' };
+  S.dishes = null;
+  toast(isNew ? 'Plat créé' : 'Plat enregistré · listes recalculées');
+  if (isNew) go(`#/plats/${d.id}`); else render();
+});
+on('click', 'dish-del', async () => {
+  const n = ed.upcoming.length;
+  const ok = await confirmSheet({ title: `Supprimer « ${ed.name} » ?`, ok: 'Supprimer', danger: true,
+    text: `${n ? `Il est prévu dans ${n} repas à venir (${ed.upcoming.map((m) => esc(fmtDate(m.date))).join(', ')}) : ces repas seront retirés du menu et leurs ingrédients des listes.` : 'Il n’est prévu dans aucun repas à venir.'} Les menus passés gardent son nom.` });
+  if (ok && await attempt(() => del(hp(`/dishes/${ed.id}`)))) { S.dishes = null; toast('Plat supprimé'); go('#/plats'); }
+});
+
+// ---------- Recette (lecture, quantites ajustees) ----------
+export async function recipeSheet(dishId, persons) {
+  const d = ed && ed.id === dishId ? ed : await attempt(() => get(hp(`/dishes/${dishId}`)));
+  if (!d) return;
+  const p = persons || d.portions, f = p / d.portions;
+  const steps = String(d.steps || '').split('\n').map((s) => s.trim()).filter(Boolean);
+  sheet(`<h3>📖 ${esc(d.name)}</h3><p class="muted">${d.time_text ? '⏱ ' + esc(d.time_text) + ' · ' : ''}pour ${p} personne${p > 1 ? 's' : ''}</p>
+    ${d.ingredients.length ? `<div class="sec">Ingrédients</div>${d.ingredients.map((i) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>${i.is_base || i.qty == null ? '<span class="pill p-grey">selon goût</span>' : `<b class="price">${fmtQ(i.qty * f)} ${esc(i.unit)}</b>`}</div>`).join('')}` : ''}
+    ${steps.length ? `<div class="sec">Préparation</div><ol class="steps">${steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}
+    ${d.notes ? `<div class="sec">Notes</div><p>${esc(d.notes)}</p>` : ''}
+    ${d.url ? `<a class="btn sec2 full" href="${esc(d.url)}" target="_blank" rel="noopener">🔗 Ouvrir la recette en ligne</a>` : ''}
+    ${!d.ingredients.length && !steps.length && !d.notes && !d.url ? '<p class="muted">Aucune recette renseignée pour ce plat.</p>' : ''}
+    <div class="row end"><button class="btn sec2" data-a="close">Fermer</button></div>`);
+}
+on('click', 'recipe-view', (el) => recipeSheet(Number(el.dataset.id)));
+
+// ---------- Import d'une recette depuis un lien ----------
+let imp = null;
+on('click', 'rec-import', async () => {
+  const url = (ed.url || '').trim();
+  if (!url) { toast('Collez d’abord le lien de la recette.', true); return; }
+  sheet('<h3>Chargement de la recette…</h3><p class="muted">Lecture des données de la page (schema.org/Recipe).</p>');
+  const r = await attempt(() => post(hp('/recipe-import'), { url }));
+  if (!r) { closeSheet(); return; }
+  if (!S.products) await loadProducts();
+  const matched = matchLines(r.ingredients.map((g) => ({ ...g, label: g.name })), { products: S.products });
+  imp = {
+    ...r, f: { name: !ed.name, portions: !!r.portions, time: !!r.time, steps: r.steps.length > 0 },
+    ing: matched.map((g) => ({ ...g, on: true, create: g.product_id ? null : { name: g.name.charAt(0).toUpperCase() + g.name.slice(1), category_id: categoryOrder()[0], unit: 'paquet', is_base: g.base } })),
+  };
+  importSheet();
+});
+function importSheet() {
+  const m = imp;
+  const prod = (id) => S.products.find((p) => p.id === id);
+  sheet(`<h3>📖 ${esc(m.name || 'Recette')}</h3><p class="muted small">Trouvé sur la page : cocher ce qu'il faut reprendre.</p>
+    ${[['name', 'Nom', m.name], ['portions', 'Portions', m.portions && `${m.portions} personnes`], ['time', 'Temps', m.time], ['steps', 'Étapes', m.steps.length && `${m.steps.length} étapes`]]
+      .filter(([, , v]) => v).map(([k, t, v]) => `<label class="row line"><input type="checkbox" class="cb" data-ch="imp-f" data-k="${k}" ${m.f[k] ? 'checked' : ''}><span class="grow"><b>${t}</b> · ${esc(v)}</span></label>`).join('')}
+    <div class="sec">Ingrédients (${m.ing.length})</div>
+    ${m.ing.map((g, i) => `<label class="row line top"><input type="checkbox" class="cb" data-ch="imp-ing" data-i="${i}" ${g.on ? 'checked' : ''}><span class="grow"><span class="muted small">« ${esc(g.raw)} »</span><br>
+      ${g.product_id ? `→ ${esc(prod(g.product_id).name)}` : `→ <span class="pill p-carrot">＋ créer</span> ${esc(g.create.name)} <span class="muted small">(${esc(catName(g.create.category_id))})</span>`}${g.base ? ' <span class="pill p-grey">de base</span>' : ''}</span></label>`).join('')}
+    <p class="muted small">Les produits manquants seront créés dans le catalogue (rayon modifiable ensuite). Quantités en emballages : « 400 g » = 1 emballage, gardé en note.</p>
+    <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="imp-ok">Appliquer au plat</button></div>`);
+}
+on('change', 'imp-f', (el) => { imp.f[el.dataset.k] = el.checked; });
+on('change', 'imp-ing', (el) => { imp.ing[Number(el.dataset.i)].on = el.checked; });
+on('click', 'imp-ok', async () => {
+  const m = imp;
+  if (m.f.name && m.name) ed.name = m.name;
+  if (m.f.portions && m.portions) ed.portions = m.portions;
+  if (m.f.time && m.time) ed.time_text = m.time;
+  if (m.f.steps) ed.steps = m.steps.join('\n');
+  let created = 0;
+  for (const g of m.ing.filter((x) => x.on)) {
+    let p = g.product_id ? S.products.find((x) => x.id === g.product_id) : null;
+    if (!p) {
+      p = await attempt(() => post(hp('/products'), g.create));
+      if (!p) continue;
+      S.products.push(p);
+      created++;
+    }
+    if (ed.ingredients.some((i) => i.product_id === p.id)) continue;
+    addIng(p, g.packages || 1, g.unit && /^(k?g|gr|grammes?|mg|l|litres?|cl|ml|dl)$/i.test(g.unit) ? `${String(g.qty).replace('.', ',')} ${g.unit}` : null);
+  }
+  closeSheet();
+  await loadProducts();
+  toast(`Recette importée${created ? ` · ${created} produit${created > 1 ? 's' : ''} créé${created > 1 ? 's' : ''}` : ''} · enregistrer pour garder`);
+  render();
+});

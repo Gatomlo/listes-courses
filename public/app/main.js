@@ -7,6 +7,8 @@ import { loginView, foyersView, setInvite, loadInvitation, acceptPending } from 
 import { foyerView } from './foyer.js';
 import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
+import { platsView, dishView, loadDishes, loadDish } from './plats.js';
+import { menuView, exportView, publicView, loadMenu, loadExport, loadPublic } from './menu.js';
 import { listesView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList } from './listes.js';
 
 const app = document.getElementById('app');
@@ -19,19 +21,14 @@ const NAV = [
   ['foyer', 'Foyer', '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.8c1.9.7 3 2.4 3.5 5.2"/>'],
 ];
 
-// Ecrans des etapes suivantes.
-const soon = (title, what) => () => ({
-  title, sub: 'Bientôt disponible',
-  body: `<div class="card"><h4>🚧 ${esc(title)} arrive à la prochaine étape</h4><p class="muted">${what}</p>
-    <p class="muted">En attendant, préparez le <a href="#/catalogue">catalogue</a> et les <a href="#/foyer">magasins et rayons</a> du foyer.</p></div>`,
-});
-
 const ROUTES = {
   listes: listesView,
   liste: listView,
   magasin: () => storeListView(S.route[2]),
-  menu: soon('Menu', 'Planning des repas par créneau, ingrédients ajoutés à la liste de la période, export et impression.'),
-  plats: soon('Plats', 'Plats et recettes (import depuis un lien), historique des planifications.'),
+  menu: menuView,
+  menuexport: exportView,
+  plats: platsView,
+  plat: dishView,
   catalogue: catalogueView,
   produit: productView,
   foyer: foyerView,
@@ -40,11 +37,11 @@ const ROUTES = {
 };
 
 function shell(v) {
-  const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes', magasin: 'listes', scan: 'listes' }[S.route[0]] || S.route[0];
+  const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes', magasin: 'listes', scan: 'listes', plat: 'plats', menuexport: 'menu' }[S.route[0]] || S.route[0];
   const badge = S.house && S.house.role === 'manager' && S.house.pending ? `<span class="badge">${S.house.pending}</span>` : '';
   const nav = v.noNav ? '' : `<nav class="tabs">${isPc() ? `<div class="brand">🧺 Le Cabas<small>${esc(S.house ? S.house.household.name : '')}</small></div>` : ''}
     ${NAV.map(([k, t, svg]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg><span>${t}</span>${k === 'listes' ? badge : ''}</a>`).join('')}</nav>`;
-  app.className = 'shell' + (v.noNav ? ' nonav' : '');
+  app.className = 'shell' + (v.noNav ? ' nonav' : '') + (v.wide ? ' wide' : '');
   const pending = S.me ? outbox().length : 0;
   const hhmm = (t) => new Date(t).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
   const banner = !S.me ? '' : !net.online
@@ -56,11 +53,20 @@ function shell(v) {
 
 async function route() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  // Affichage public du menu : sans connexion.
+  if (parts[0] === 'affichage' && parts[1]) {
+    S.route = ['affichage', parts[1]];
+    await loadPublic(parts[1]);
+    shell(publicView());
+    return;
+  }
   if (!S.me) { S.route = ['login']; shell(loginView()); return; }
   if (!S.me.householdId) { S.route = ['foyers']; shell(foyersView()); return; }
   let [name, arg] = parts;
   if (name === 'catalogue' && arg) name = 'produit';
   if (name === 'listes' && arg) name = parts[2] === 'magasin' ? 'magasin' : 'liste';
+  if (name === 'plats' && arg) name = 'plat';
+  if (name === 'menu' && arg === 'export') name = 'menuexport';
   if (!ROUTES[name]) { go('#/listes'); return; }
   S.route = [name, arg, parts[3]];
   connectEvents();
@@ -70,10 +76,15 @@ async function route() {
     if (name === 'produit') await loadProduct(arg);
     if (name === 'listes') await Promise.all([loadSummary(), loadSuggestions()]);
     if (name === 'liste' || name === 'magasin') await loadList(arg);
+    if (name === 'plats') await loadDishes();
+    if (name === 'plat') await loadDish(arg);
+    if (name === 'menu') await loadMenu();
+    if (name === 'menuexport') await loadExport();
     shell(ROUTES[name]());
   } catch (e) {
     if (e instanceof ApiError && e.status === 404 && name === 'produit') { go('#/catalogue'); return; }
     if (e instanceof ApiError && e.status === 404 && name === 'liste') { go('#/listes'); return; }
+    if (e instanceof ApiError && e.status === 404 && name === 'plat') { go('#/plats'); return; }
     if (e instanceof ApiError && e.status === 401) { location.href = './'; return; }
     if (e instanceof ApiError && e.status === 0) {
       shell({ title: 'Hors-ligne', back: '#/listes', body: '<div class="card"><h4>📴 Pas de réseau</h4><p class="muted">Cette page n’a pas encore été ouverte avec du réseau sur cet appareil. Les listes à venir, elles, sont gardées dès l’ouverture de l’app.</p></div>' });
@@ -89,7 +100,8 @@ setRenderer(() => {
   const [name, arg] = S.route;
   if (!S.me) shell(loginView());
   else if (!S.me.householdId) shell(foyersView());
-  else if ((name === 'catalogue' && !S.products) || (name === 'listes' && listNeedsLoad())) { route(); return; }
+  else if (name === 'affichage') shell(publicView());
+  else if ((name === 'catalogue' && !S.products) || (name === 'listes' && listNeedsLoad()) || (name === 'plats' && !S.dishes)) { route(); return; }
   else if (ROUTES[name]) shell(ROUTES[name](arg));
   window.scrollTo(0, y);
 });
