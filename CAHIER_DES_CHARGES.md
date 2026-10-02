@@ -15,6 +15,15 @@
 
 - **Accordéons partout** pour la lisibilité : chaque écran est découpé en sections repliables, avec un en-tête qui résume le contenu (nombre d'éléments, valeur clé). Ouverts par défaut : ce qui sert tout de suite (rayons d'une liste et du mode courses, prix d'un produit, informations et ingrédients d'un plat) ; repliés : le reste (historiques, caddie, relevés, réglages). État mémorisé par appareil.
 - Les fenêtres ponctuelles (ajout, confirmation) restent des panneaux glissants depuis le bas.
+- **Deux affichages**, choisis automatiquement selon la largeur d'écran (une seule application responsive, mêmes données et mêmes droits) :
+  - **Mobile** (< 900 px) : navigation par onglets en bas, un écran = une colonne, onglets Articles / Repas / Magasins dans une liste ; usage en magasin.
+  - **PC** (≥ 900 px) : navigation dans une **barre latérale** à gauche (logo, foyer courant, onglets, badge des suggestions) ; contenu sur toute la largeur :
+    - liste : articles à gauche, et à droite l'économie, les scénarios, les listes par magasin et les repas (plus d'onglets) ;
+    - menu : **grille semaine** (jours en colonnes × créneaux en lignes), 2 semaines visibles ;
+    - plats : cartes en grille de 3 colonnes ;
+    - catalogue, fiche produit, fiche plat, Foyer, historique : accordéons répartis sur 2 colonnes ;
+    - fenêtres ponctuelles en boîte de dialogue centrée ; messages en bas à droite.
+  - Le mode courses reste pensé pour le téléphone (il s'affiche aussi sur PC).
 
 ## 2 bis. Foyer et rôles
 
