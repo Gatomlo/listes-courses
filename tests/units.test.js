@@ -56,3 +56,13 @@ test('quantites en g / pieces converties en emballages, sommees avant arrondi', 
   assert.equal((await it('oign')).qty, 1, '4 x 150 g = 600 g -> 1 filet de 1 kg');
   assert.equal((await thomas.get(`${h}/dishes/${d.data.id}`)).data.ingredients.find((i) => i.product_id === P.oign).conv, true);
 });
+
+test('contenance saisie en nombre + unite ; ancienne valeur gardee si non ressaisie', async () => {
+  let r = await thomas.post(`${h}/products`, { name: 'Lait', category_id: (await thomas.get(h)).data.categories[0].id, cont_n: '1,5', cont_u: 'L' });
+  assert.equal(r.data.contenance, '1,5 L');
+  assert.deepEqual(r.data.size, { n: 1500, u: 'ml' });
+  r = await thomas.patch(`${h}/products/${r.data.id}`, { cont_n: '', cont_u: 'g', contenance: 'grand format' });
+  assert.equal(r.data.contenance, 'grand format');
+  r = await thomas.patch(`${h}/products/${r.data.id}`, { cont_n: '', cont_u: 'g' });
+  assert.equal(r.data.contenance, null);
+});

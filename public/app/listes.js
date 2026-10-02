@@ -3,7 +3,7 @@
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc } from './ui.js';
 import { get, post, patch, del, attempt, sync, newOp, setCached } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
-import { unitOptions, catOptions } from './catalogue.js';
+import { unitOptions, catOptions, contField } from './catalogue.js';
 import { SLOT } from './plats.js';
 
 const STATUS = { prep: 'En préparation', shopping: 'En courses', closed: 'Clôturée' };
@@ -348,6 +348,7 @@ on('click', 'add-new', () => {
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(q)}">
     <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions()}</select></label>
     <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
+    ${contField()}
     <div class="row end"><button class="btn" data-a="add-new-ok">Créer et ajouter</button></div>`);
 });
 on('click', 'add-new-ok', async () => {

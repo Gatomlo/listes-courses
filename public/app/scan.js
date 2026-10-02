@@ -5,7 +5,7 @@ import { esc, eur, on, acc, sheet, closeSheet, toast, formData } from './ui.js';
 import { get, sync, newOp, attempt } from './api.js';
 import { S, hp, render, go, loadProducts, activeStores, storeById, catName, categoryOrder } from './state.js';
 import { parseTicket, detectStore, matchLines } from './ticket.mjs';
-import { unitOptions, catOptions } from './catalogue.js';
+import { unitOptions, catOptions, contField } from './catalogue.js';
 
 const abs = (p) => new URL(p, document.baseURI).href;
 let scan = null; // { listId, storeId, date, status, progress, text, lines: [...] }
@@ -192,6 +192,7 @@ function createSheet(i) {
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(pretty(l.label))}">
     <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions(categoryOrder()[0])}</select></label>
     <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
+    ${contField()}
     <p class="muted small">Créé à la validation du ticket.</p>
     <div class="row end"><button class="btn sec2" data-a="scan-create-cancel">Annuler</button><button class="btn" data-a="scan-create-ok" data-i="${i}">OK</button></div>`);
 }
@@ -200,7 +201,7 @@ on('click', 'scan-create-ok', (el) => {
   const f = formData(document.querySelector('.sheet'));
   if (!f.name.trim()) return;
   const l = scan.lines[Number(el.dataset.i)];
-  l.create = { name: f.name.trim(), category_id: Number(f.category_id), unit: f.unit };
+  l.create = { name: f.name.trim(), category_id: Number(f.category_id), unit: f.unit, cont_n: f.cont_n, cont_u: f.cont_u };
   l.product_id = null;
   closeSheet();
   render();

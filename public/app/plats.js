@@ -4,7 +4,7 @@ import { esc, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData
 import { get, post, put, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder } from './state.js';
 import { matchLines } from './ticket.mjs';
-import { unitOptions, catOptions } from './catalogue.js';
+import { unitOptions, catOptions, contField } from './catalogue.js';
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const today = () => new Date().toISOString().slice(0, 10);
@@ -180,6 +180,7 @@ on('click', 'ing-new', () => {
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(q.charAt(0).toUpperCase() + q.slice(1))}">
     <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions()}</select></label>
     <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
+    ${contField()}
     <label class="row line"><input type="checkbox" class="cb" name="is_base"><span class="grow">Ingrédient de base (sel, huile, épices…)</span></label>
     <div class="row end"><button class="btn" data-a="ing-new-ok">Créer et ajouter</button></div>`);
 });

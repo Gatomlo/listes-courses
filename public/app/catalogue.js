@@ -48,6 +48,19 @@ on('click', 'cat-filter', (el) => { S.q.catFilter = el.dataset.f; render(); });
 
 // ---------- Creation ----------
 export const unitOptions = (cur) => S.house.units.map((u) => `<option ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('');
+// Contenance : nombre + unite ; une ancienne valeur en texte libre est gardee (champ
+// cache) tant qu'elle n'est pas ressaisie.
+const CONT_UNITS = ['g', 'kg', 'ml', 'cl', 'L', 'pièces'];
+export function contField(cur = '', dis = '') {
+  const c = String(cur || '').trim();
+  let m = c.match(/^(\d+(?:[.,]\d+)?)\s*(g|kg|ml|cl|l|pi[eè]ces?)$/i);
+  if (!m && /^[x×]\s*\d+$/i.test(c)) m = [c, c.replace(/\D/g, ''), 'pièces'];
+  const u = m ? CONT_UNITS.find((x) => x.toLowerCase() === m[2].toLowerCase().replace(/^pi[eè]ce$/, 'pièces')) || 'pièces' : 'g';
+  return `<label class="muted">Contenance d'un emballage (facultatif)</label>
+    <div class="row gap"><input class="txt w5 c" name="cont_n" inputmode="decimal" value="${m ? esc(m[1]) : ''}" placeholder="ex. 500" ${dis}>
+    <select class="txt w6" name="cont_u" ${dis}>${CONT_UNITS.map((x) => `<option ${x === u ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+    ${!m && c ? `<input type="hidden" name="contenance" value="${esc(c)}"><p class="muted small">⚠ Ancienne valeur « ${esc(c)} » : à ressaisir en nombre + unité.</p>` : ''}`;
+}
 export const catOptions = (cur) => categoryOrder().map((cid) => `<option value="${cid}" ${cid === cur ? 'selected' : ''}>${esc(catName(cid))}</option>`).join('');
 
 on('click', 'prod-new', (el) => {
@@ -55,6 +68,7 @@ on('click', 'prod-new', (el) => {
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(el.dataset.name || '')}" placeholder="ex. Beurre doux 250 g">
     <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions()}</select></label>
     <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
+    ${contField()}
     <label class="row" style="margin-top:8px"><input type="checkbox" class="cb" name="is_base"><span class="grow">Ingrédient de base (sel, huile, épices…)</span></label>
     <p class="muted small">Prix inconnus jusqu'aux premiers relevés.</p>
     <div class="row end"><button class="btn" data-a="prod-create">Créer</button></div>`);
@@ -62,7 +76,7 @@ on('click', 'prod-new', (el) => {
 on('click', 'prod-create', async () => {
   const f = formData(document.querySelector('.sheet'));
   const p = await attempt(() => post(hp('/products'), f));
-  if (p) { closeSheet(); await Promise.all([loadProducts(), loadHouse()]); S.q.cat = ''; toast(`${p.name} ajouté au catalogue`); go(`#/catalogue/${p.id}`); }
+  if (p) { closeSheet(); await Promise.all([loadProducts(), loadHouse()]); S.q.cat = ''; toast(`${p.name} ajouté aux produits`); go(`#/catalogue/${p.id}`); }
 });
 
 // ---------- Import CSV (gestionnaire) : apercu puis import ----------
@@ -131,8 +145,8 @@ export function productView() {
           <label class="muted">Nom</label><input class="txt" name="name" value="${esc(p.name)}" ${dis}>
           <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id" ${dis}>${catOptions(p.category_id)}</select></label>
           <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit" ${dis}>${unitOptions(p.unit)}</select></label></div>
-          <label class="muted">Contenance (facultatif)</label><input class="txt" name="contenance" value="${esc(p.contenance || '')}" placeholder="ex. 1 L, 500 g, x12" ${dis}>
-          <p class="muted small">${p.size ? `Reconnue : 1 ${esc(p.unit)} = <b>${esc(sizeText(p.size))}</b>. ` : p.contenance ? '⚠ Contenance non reconnue (écrire par ex. « 500 g », « 1 L », « 6 x 33 cl », « x12 »). ' : ''}Sert à convertir les quantités des recettes (g, ml, pièces) en emballages.</p>
+          ${contField(p.contenance, dis)}
+          <p class="muted small">${p.size ? `1 ${esc(p.unit)} = <b>${esc(sizeText(p.size))}</b>. ` : ''}Sert à convertir les quantités des recettes (g, ml, pièces) en emballages.</p>
           <label class="row"><span class="grow"><b>Poids d'une pièce</b><span class="muted block">Facultatif, en g (ou ml) : relie « 2 oignons » à un filet au kg</span></span><input class="txt w5 c" name="piece_qty" inputmode="decimal" value="${p.piece_qty != null ? String(p.piece_qty).replace('.', ',') : ''}" placeholder="g" ${dis}></label>
           <label class="row"><span class="grow"><b>🔁 Récurrent</b><span class="muted block">Ajouté aux nouvelles listes datées</span></span><select class="txt w12" name="recurrence" ${dis}>
             <option value="">non</option>${[1, 2, 3].map((n) => `<option value="${n}" ${p.recurrence === n ? 'selected' : ''}>${REC[n]}</option>`).join('')}</select></label>
