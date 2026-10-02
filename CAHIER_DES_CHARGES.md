@@ -120,6 +120,11 @@ Produit du catalogue (ou texte libre non rattaché), quantité, note, **origine*
 - Un plat peut n'avoir **aucun ingrédient détaillé** (« je connais par cœur ») : il apparaît alors comme simple **rappel** dans la liste.
 - Ajustement des quantités au nombre de personnes du repas.
 - **Recette facultative** : temps de préparation, lien vers une recette en ligne, étapes (texte), notes ; plus tard photo/PDF (page de livre).
+- **Import automatique depuis un lien** : en collant l'URL d'une recette, le serveur charge la page et en extrait, quand le site les publie, les données structurées `schema.org/Recipe` (JSON-LD ou microdonnées — Marmiton, 750g, Cuisine AZ, CuisineActuelle, Jow, sites WordPress de blogs culinaires…) : nom, photo, portions, temps, ingrédients, étapes.
+  - **Ingrédients analysés** (« 2 oignons », « 400 g de tomates concassées ») → quantité, unité, produit, rapprochés du catalogue ; ceux qui manquent sont proposés à la création ; « sel, poivre… » proposés comme ingrédients de base.
+  - **Aperçu avant application** : chaque élément importé est cochable ; l'existant du plat n'est remplacé qu'après validation. Quantités ramenées aux portions du plat.
+  - Échec (site sans données structurées, page protégée) : le lien est simplement conservé, message « Import impossible, renseigner à la main ».
+  - Chargement **côté serveur** (contourne les restrictions CORS) avec garde-fous : http/https uniquement, adresses internes refusées (anti-SSRF), délai 8 s, page max 2 Mo, résultat mis en cache par URL.
 - **Créer, modifier, supprimer** un plat (gestionnaire ; les membres le consultent). Modifier un plat recalcule les ingrédients des listes non clôturées. Supprimer un plat prévu dans des repas futurs : confirmation listant ces repas, qui sont retirés du menu ; les menus passés gardent le nom du plat (archivage logique).
 
 ### 7.2 Planning
@@ -149,8 +154,20 @@ Pour afficher le menu (frigo, cuisine) ou le partager.
 
 - Vue d'un magasin, grosse typographie, cases à cocher, tri par rayon, articles cochés repliés en bas.
 - **Synchronisation en temps réel** entre membres (un coche, l'autre le voit).
-- **Hors-ligne** : actions mises en file et rejouées au retour du réseau.
 - Fin de courses : **scan du ticket** (4.4) ou « Terminer sans scanner », articles non trouvés → « indisponible » (reportés à la clôture).
+
+### 8.1 Fonctionnement hors-ligne (magasins sans réseau)
+- **Stockage local automatique** : dès qu'une liste est ouverte, l'app enregistre sur l'appareil (IndexedDB) la liste, ses repas, les produits concernés avec leurs prix moyens et promos, et l'ordre des rayons des magasins. Les listes « En préparation » et « En courses » du foyer sont aussi pré-chargées à l'ouverture de l'app tant qu'il y a du réseau.
+- **Application disponible sans réseau** : PWA installable, interface mise en cache par le service worker, ainsi que le moteur et le modèle OCR (Tesseract.js `fra`) pour pouvoir scanner le ticket hors réseau.
+- **Tout fonctionne hors-ligne** sur les données locales : cocher/décocher, saisir un prix, ajouter/modifier un article, déplacer un article de magasin, poser une promo, scanner et valider un ticket.
+- **File d'attente (outbox)** : chaque modification est enregistrée localement comme une opération horodatée (identifiant unique, appareil, utilisateur), appliquée tout de suite à l'écran.
+- **Reprise du réseau** : envoi automatique de la file, dans l'ordre (événement `online`, retour au premier plan de l'app, Background Sync quand le navigateur le permet — Android ; sur iPhone, au prochain affichage de l'app). Ensuite récupération des changements faits par les autres depuis la dernière version connue, puis reconnexion au temps réel (SSE).
+- **Conflits** :
+  - opérations idempotentes (rejouer deux fois ne double rien) ;
+  - cocher un article : « acheté » l'emporte (deux personnes peuvent cocher le même) ;
+  - modification d'un même champ : la plus récente gagne ; les relevés de prix ne sont jamais en conflit (ajouts) ;
+  - article supprimé par l'un et modifié par l'autre : suppression conservée, notification « 1 modification ignorée ».
+- **Indicateurs** : bandeau « Hors-ligne — N modifications en attente », puis « Synchronisé à 10:42 » ; pastille par liste « disponible hors-ligne ». Données locales des listes clôturées purgées après 30 jours.
 
 ## 9. Hors périmètre V1 / pistes
 - Récupération automatique des promotions.
@@ -161,6 +178,8 @@ Pour afficher le menu (frigo, cuisine) ou le partager.
 - **SvelteKit** (adapter-node) + **SQLite / Drizzle**, PWA (manifest + service worker), même socle que La Hotte.
 - Déploiement derrière **node-gateway** : monté sur `/courses` (`paths.base = '/courses'`), le module exporte un handler Express ; aucun `app.listen` / `process.on` / `setInterval` hors `require.main === module`.
 - Temps réel : **Server-Sent Events** par foyer (process unique → diffusion en mémoire suffit).
+- Hors-ligne : IndexedDB (via Dexie) pour les données locales et la file d'opérations ; chaque opération porte un `op_id` unique (table `AppliedOp` côté serveur pour l'idempotence) ; endpoint `GET /sync?since=<version>` pour rattraper les changements.
+- Import de recette : extraction JSON-LD/microdonnées côté serveur (parseur HTML léger, ex. `cheerio`), analyse des lignes d'ingrédients par règles (quantités, fractions, unités françaises).
 - Authentification : lien magique e-mail (comme La Hotte), session cookie.
 - Sous-domaine envisagé : `courses.ranchduphoenix.be` (à router vers la passerelle).
 
@@ -197,9 +216,9 @@ PlannedMealSkip(planned_meal, product)                     -- ingrédients en r�
 1. Socle : auth, foyer, rôles, catalogue, magasins, déploiement node-gateway.
 2. Listes (À prévoir + datées), suggestions, clôture/report, récurrents.
 3. Prix : relevés, moyennes, conseil, scénarios et économie, listes par magasin triées.
-4. Mode courses : cochage, saisie prix, temps réel (SSE), hors-ligne.
+4. Mode courses : cochage, saisie prix, temps réel (SSE), hors-ligne complet (stockage local, file d'opérations, synchronisation à la reprise).
 5. Scan du ticket (Tesseract.js) : lecture, rapprochement, alias par magasin, mise à jour des prix.
-6. Plats (écran dédié, recherche, recettes), planning avec ingrédients en réserve, génération et fusion des ingrédients, export du menu.
+6. Plats (écran dédié, recherche, recettes avec import depuis un lien), planning avec ingrédients en réserve, génération et fusion des ingrédients, export du menu.
 7. Plus tard : photo/PDF de recette.
 
 ## 12. Points ouverts

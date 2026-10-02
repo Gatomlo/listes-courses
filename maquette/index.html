@@ -103,6 +103,8 @@ input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);backgr
 .role button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 10px;font-weight:600}
 .role button.on{background:var(--leaf);color:#fff;border-color:var(--leaf)}
 .ord{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.net{border-radius:12px;padding:9px 12px;margin-bottom:12px;font-size:13px}
+.net.off{background:var(--carrot-soft);color:var(--carrot)}
 .acc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
 .acc-h{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:12px 14px;text-align:left}
 .acc-h .muted{font-size:13px}
@@ -147,6 +149,9 @@ input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);backgr
     <p>Maquette cliquable (données fictives, rien n'est enregistré).</p>
     <h3>Rôle simulé</h3>
     <div class="role" id="roleSw"></div>
+    <h3>Réseau simulé</h3>
+    <div class="role" id="netSw"></div>
+    <p>Coupe le réseau, coche des articles en mode courses, puis rétablis-le.</p>
     <p>En <b>membre</b>, les ajouts deviennent des suggestions à valider.</p>
     <h3>À essayer</h3>
     <ul>
@@ -158,6 +163,8 @@ input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);backgr
       <li><b>Plats</b> : recherche (nom ou ingrédient), filtres, édition ; ingrédient absent → création dans le catalogue.</li>
       <li><b>Faire les courses → Terminer → Scanner le ticket</b> : mise à jour des prix du magasin.</li>
       <li><b>Menu → Exporter</b> : aperçu A4, impression, PDF, lien d'affichage.</li>
+      <li><b>Plats → ＋ Plat → ⤓ Importer</b> : import d'une recette depuis un lien.</li>
+      <li><b>Réseau simulé</b> : hors-ligne, file d'attente, synchronisation.</li>
       <li><b>🏷 sur un article</b> : promo avec prix pour ces courses ou jusqu'à une date.</li>
       <li><b>Foyer</b> : suggestions, ordre des rayons, seuil.</li>
     </ul>
@@ -214,6 +221,7 @@ const S={
   pr:{range:'week',slots:{midi:true,soir:true},persons:false,shop:true},
   members:[{n:'Thomas',e:'thomas@exemple.be',r:'manager'},{n:'Léa',e:'lea@exemple.be',r:'member'},{n:'Noah',e:'noah@exemple.be',r:'member'}],
   promos:[{pid:'hache',sid:'co',price:3.49,list:'l2',note:'Dépliant Colruyt'},{pid:'cafe',sid:'im',price:4.99,until:'2026-10-10',note:'2e à -50 %'}],
+  offline:false,outbox:[],syncAt:'2 oct. 08:12',local:{l2:true},
   q2:'',q3:'',q4:'',dfilter:'all',acc:{sugg:true}, threshold:5, nbAvg:5, showExtra:false, sheet:null, toast:'', q:'',
   lists:[
     {id:'back',type:'backlog',title:'À prévoir',items:[
@@ -234,6 +242,7 @@ const S={
   baseOn:{}, assign:{}, checked:{}, prices:{}
 };
 // ---------- Utilitaires ----------
+const q_=l=>{if(S.offline)S.outbox.push(l)};
 const $=s=>document.querySelector(s);
 const eur=v=>v==null?'—':v.toFixed(2).replace('.',',')+' €';
 const D=s=>new Date(s+'T12:00');
@@ -293,11 +302,12 @@ const ICON={
 };
 function pendingCount(){return S.lists.reduce((n,l)=>n+l.items.filter(i=>i.sugg==='pending').length,0)+S.meals.filter(m=>m.sugg==='pending').length}
 function render(){
+  $('#netSw').innerHTML=[[false,'📶 En ligne'],[true,'📴 Hors-ligne']].map(([k,t])=>`<button class="${S.offline===k?'on':''}" onclick="act.net(${k})">${t}</button>`).join('');
   $('#roleSw').innerHTML=[['manager','Gestionnaire (Thomas)'],['member','Membre (Léa)']].map(([k,t])=>`<button class="${S.role===k?'on':''}" onclick="act.role('${k}')">${t}</button>`).join('');
   const v=VIEWS[S.view](); const tab=S.view==='list'||S.view==='shop'?'home':S.view==='product'?'cat':S.view==='printMenu'?'menu':S.view==='dishEdit'?'dishes':S.view==='scan'?'home':S.view;
   const pc=pendingCount();
   $('#phone').innerHTML=`<header class="top">${v.back?`<button class="back" onclick="act.go('${v.back}')">‹</button>`:''}<h2>${v.title}${v.sub?`<small>${v.sub}</small>`:''}</h2>${v.right||''}</header>
-  <main>${v.body}</main>
+  <main>${S.offline?`<div class="net off">📴 <b>Hors-ligne</b> · données locales du ${S.syncAt}<br>${S.outbox.length?`${S.outbox.length} modification${S.outbox.length>1?'s':''} en attente d'envoi`:'Aucune modification en attente'}</div>`:''}${v.body}</main>
   <nav class="tabs">${[['home','Listes','list'],['menu','Menu','menu'],['dishes','Plats','book'],['cat','Catalogue','cat'],['foyer','Foyer','home']].map(([k,t,i])=>`<button class="${tab===k?'on':''}" onclick="act.go('${k}')"><svg viewBox="0 0 24 24" fill="none">${ICON[i]}</svg>${t}${k==='foyer'&&pc&&isMgr()?`<span class="badge">${pc}</span>`:''}</button>`).join('')}</nav>
   ${S.sheet?`<div class="sheet-bg" onclick="if(event.target===this)act.close()"><div class="sheet">${S.sheet()}</div></div>`:''}
   ${S.toast?`<div class="toast">${S.toast}</div>`:''}`;
@@ -336,8 +346,8 @@ function menuSheet(){
 const VIEWS={
  home(){
   const ds=dated(),cur=ds.filter(l=>l.status!=='Clôturée'),old=ds.filter(l=>l.status==='Clôturée'),bk=list('back');
-  const card=l=>{const L=lines(l),sc=scenarios(L.items),n=mealsOf(l).filter(m=>m.sugg!=='pending').length;return `<div class="card click" onclick="act.open('${l.id}')"><div class="row"><div class="grow"><h4>Courses du ${fmtD(l.date,{weekday:'long',day:'numeric',month:'long'})}</h4><div class="muted">${L.items.length} articles · ${n} repas · ≈ ${eur(sc.split)}</div></div><span class="pill ${l.status==='En préparation'?'p-leaf':'p-grey'}">${l.status}</span></div></div>`};
-  return {title:'Listes',sub:'Foyer Phoenix',body:`
+  const card=l=>{const L=lines(l),sc=scenarios(L.items),n=mealsOf(l).filter(m=>m.sugg!=='pending').length;return `<div class="card click" onclick="act.open('${l.id}')"><div class="row"><div class="grow"><h4>Courses du ${fmtD(l.date,{weekday:'long',day:'numeric',month:'long'})}</h4><div class="muted">${L.items.length} articles · ${n} repas · ≈ ${eur(sc.split)}</div></div><div style="text-align:right"><span class="pill ${l.status==='En préparation'?'p-leaf':'p-grey'}">${l.status}</span>${S.local[l.id]?'<div class="muted" style="font-size:11px;margin-top:3px">📥 hors-ligne</div>':''}</div></div></div>`};
+  return {title:'Listes',sub:S.offline?'Foyer Phoenix · hors-ligne':'Foyer Phoenix · synchronisé à '+S.syncAt.split(' ').pop(),right:`<button class="btn sm sec2" title="Simuler le réseau" onclick="act.net(${!S.offline})">${S.offline?'📴':'📶'}</button>`,body:`
    <div class="card click" onclick="act.open('back')"><div class="row"><div class="grow"><h4>À prévoir</h4><div class="muted">${bk.items.length} articles en attente d'une sortie</div></div><span class="pill p-grey">permanente</span></div></div>
    <div class="sec">Prochaines courses</div>${cur.map(card).join('')}
    <button class="btn sec2 full" onclick="act.newList()">＋ Nouvelle liste datée</button>
@@ -432,7 +442,7 @@ const VIEWS={
    <div class="sec">Ingrédients</div><div class="card" style="padding:2px 14px">${e.ing.map(([pid,q],i)=>`<div class="item"><span class="grow">${P[pid].n}</span>${P[pid].base?'<span class="pill p-grey">de base</span>':`<input class="txt" style="width:62px;padding:5px 8px" type="number" step="0.5" value="${q??''}" placeholder="—" ${ro?'disabled':''} oninput="S.ed.ing[${i}][1]=this.value?+this.value:undefined"><span class="muted" style="width:62px">${P[pid].u}</span>`}${ro?'':`<button class="btn sm sec2" onclick="act.ingDel(${i})">✕</button>`}</div>`).join('')||'<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>'}</div>
    ${ro?'':`<input class="txt" placeholder="Ajouter un ingrédient du catalogue…" value="${S.q2}" oninput="act.search2(this.value)" id="q2">${S.q2?`<div class="ac">${res.map(p=>`<button onclick="act.ingAdd('${p.id}')"><span class="grow">${p.n}</span><span class="muted">${CATS[p.c]}</span></button>`).join('')}${Object.values(P).some(p=>p.n.toLowerCase()===S.q2.toLowerCase().trim())?'':`<button onclick="act.newProd(S.q2,'dish')"><b>＋ Créer « ${S.q2} » dans le catalogue</b></button>`}</div>`:''}<p class="muted">Quantités facultatives, ajustées au nombre de personnes du repas.</p>`}
    <div class="sec">Recette (facultatif)</div><div class="card">
-    <label class="muted">Lien vers une recette en ligne</label><input class="txt" value="${e.url}" placeholder="https://…" ${ro?'disabled':''} oninput="S.ed.url=this.value">
+    <label class="muted">Lien vers une recette en ligne</label><div class="row" style="gap:6px"><input class="txt grow" value="${e.url}" placeholder="https://…" ${ro?'disabled':''} oninput="S.ed.url=this.value">${ro?'':'<button class="btn sm" onclick="act.importRecipe()">⤓ Importer</button>'}</div><p class="muted" style="margin:4px 0 0">Coller un lien charge automatiquement nom, portions, temps, ingrédients et étapes quand le site les publie.</p>
     <label class="muted" style="display:block;margin-top:8px">Étapes (une par ligne)</label><textarea class="txt" rows="5" ${ro?'disabled':''} oninput="S.ed.steps=this.value">${e.steps}</textarea>
     <label class="muted" style="display:block;margin-top:8px">Notes</label><textarea class="txt" rows="2" ${ro?'disabled':''} oninput="S.ed.note=this.value">${e.note}</textarea>
     <p class="muted" style="margin-bottom:0">📎 Photo ou PDF de la recette (ex. page de livre) : prévu.</p></div>
@@ -485,22 +495,22 @@ let tt;
 const act={
  role(r){S.role=r;S.q='';render()},
  go(v){S.view=v;S.sheet=null;S.q='';render();$('main').scrollTop=0},
- open(id){S.listId=id;S.listTab='items';act.go('list')},
+ open(id){S.local[id]=true;S.listId=id;S.listTab='items';act.go('list')},
  tab(t){S.listTab=t;render()},
  search(v){S.q=v;render();const q=$('#q');q.focus();q.setSelectionRange(v.length,v.length)},
- add(pid){const l=list(S.listId),ex=l.items.find(i=>i.pid===pid&&!i.sugg);
+ add(pid){q_('ajout '+P[pid].n);const l=list(S.listId),ex=l.items.find(i=>i.pid===pid&&!i.sugg);
   if(isMgr()){ex?ex.q++:l.items.push({pid,q:1,o:'manual'});S.q='';act.toastMsg(P[pid].n+' ajouté')}
   else{l.items.push({pid,q:1,o:'suggestion',by:'Léa',sugg:'pending'});S.q='';act.toastMsg('Suggestion envoyée au gestionnaire')}},
  sugg(lid,pid,st){const i=list(lid).items.find(i=>i.pid===pid&&i.sugg==='pending');i.sugg=st;act.toastMsg(st==='ok'?'Suggestion acceptée':'Suggestion refusée')},
  msugg(ix,st){if(st==='ok')S.meals[ix].sugg='ok';else S.meals.splice(ix,1);act.toastMsg(st==='ok'?'Plat ajouté au menu':'Plat refusé')},
- swap(key,cur){const n=STORES[(STORES.findIndex(s=>s.id===cur)+1)%STORES.length].id;const pid=key.split(':')[1];S.assign[key]=n===bestStore(pid)?undefined:n;render()},
+ swap(key,cur){q_('changement de magasin');const n=STORES[(STORES.findIndex(s=>s.id===cur)+1)%STORES.length].id;const pid=key.split(':')[1];S.assign[key]=n===bestStore(pid)?undefined:n;render()},
  allTo(sid){const L=lines(list(S.listId));for(const x of L.items)S.assign[x.key]=sid&&sid!==bestStore(x.pid)?sid:undefined;render()},
  base(k){S.baseOn[k]=!S.baseOn[k];render()},
  shop(sid){S.shopStore=sid;S.view='shop';render()},
- check(key,pid){if(S.checked[key]){delete S.checked[key];delete S.prices[key];render();return}
+ check(key,pid){q_((S.checked[key]?'décoché ':'coché ')+P[pid].n);if(S.checked[key]){delete S.checked[key];delete S.prices[key];render();return}
   S.checked[key]=true;const avg=effPrice(pid)[S.shopStore];
   S.sheet=()=>`<h3>${P[pid].n}</h3><p class="muted">Prix payé (facultatif) — moyenne ${eur(avg)}</p><input class="txt" id="pp" inputmode="decimal" placeholder="${avg!=null?avg.toFixed(2):'0,00'}"><div class="row" style="margin-top:12px;gap:8px"><button class="btn sec2 grow" onclick="act.close()">Passer</button><button class="btn grow" onclick="act.savePrice('${key}')">Enregistrer le prix</button></div>`;render();},
- savePrice(key){const v=parseFloat(($('#pp').value||'').replace(',','.'));if(v)S.prices[key]=v;S.sheet=null;act.toastMsg(v?'Relevé enregistré · moyenne mise à jour':'Coché')},
+ savePrice(key){q_('prix saisi');const v=parseFloat(($('#pp').value||'').replace(',','.'));if(v)S.prices[key]=v;S.sheet=null;act.toastMsg(v?'Relevé enregistré · moyenne mise à jour':'Coché')},
  ticket(sid){const n=STORES.find(s=>s.id===sid).name;S.sheet=()=>`<h3>Terminer chez ${n}</h3><button class="btn full" onclick="act.scan('${sid}')">📷 Scanner le ticket</button><p class="muted">Lit chaque ligne, met à jour les prix ${n}, coche les articles achetés.</p><button class="btn sec2 full" onclick="act.close();act.toastMsg('Courses terminées sans scan')">Terminer sans scanner</button>`;render()},
  scan(sid){const L=lines(list(S.listId)),its=L.items.filter(x=>x.store===sid&&(!x.sugg||x.sugg==='ok'));
   const abbr=n=>n.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9 ]/g,'').split(' ').map(w=>w.slice(0,5)).join(' ').slice(0,22);
@@ -508,7 +518,7 @@ const act={
   lines_.push({raw:'CHIPS PAPRIK 200G',pid:null,qty:1,unit:1.89,ok:true});
   S.scanD={sid,lines:lines_};S.sheet=null;act.go('scan')},
  scanMap(i,v){const l=S.scanD.lines[i];if(v==='_ign'){l.ok=false;l.pid=null}else if(v==='_new'){act.toastMsg('Le produit serait créé dans le catalogue');l.pid='_new'}else{l.pid=v;l.ok=true;l.avg=P[v].price[S.scanD.sid];l.alias=true}render()},
- scanOk(){const {sid,lines:ls}=S.scanD;let n=0;
+ scanOk(){q_('ticket validé');const {sid,lines:ls}=S.scanD;let n=0;
   for(const l of ls){if(!l.ok||!l.pid||l.pid==='_new')continue;const p=P[l.pid],old=p.price[sid],k=Math.min(p.nb,S.nbAvg);
    p.price[sid]=old==null?l.unit:+((old*k+l.unit)/(k+1)).toFixed(2);if(l.key){S.checked[l.key]=true;S.prices[l.key]=l.unit}n++}
   S.view='shop';S.shopStore=sid;act.toastMsg(`${n} prix ${STORES.find(s=>s.id===sid).name} mis à jour · articles cochés`)},
@@ -584,9 +594,30 @@ const act={
    <label class="muted" style="display:block;margin-top:8px">Note</label><input class="txt" value="${f.note}" placeholder="ex. 2e à -50 %, dépliant" oninput="S.pf.note=this.value">
    <button class="btn full" style="margin-top:12px" onclick="act.promoSave()">Enregistrer la promo</button>
    ${f.ex?'<button class="btn sec2 full" style="margin-top:8px;color:var(--im)" onclick="act.promoDel()">Retirer la promo</button>':''}`;render()},
- promoSave(){const f=S.pf,v=parseFloat(String(f.price).replace(',','.'));S.promos=S.promos.filter(p=>!(p.pid===f.pid&&p.sid===f.sid));
+ promoSave(){q_('promo');const f=S.pf,v=parseFloat(String(f.price).replace(',','.'));S.promos=S.promos.filter(p=>!(p.pid===f.pid&&p.sid===f.sid));
   S.promos.push({pid:f.pid,sid:f.sid,price:isNaN(v)?null:v,note:f.note,...(f.scope==='list'?{list:S.listId}:{until:f.until})});S.sheet=null;act.toastMsg('Promo enregistrée · conseil de magasin recalculé')},
  promoDel(){const f=S.pf;S.promos=S.promos.filter(p=>!(p.pid===f.pid&&p.sid===f.sid));S.sheet=null;act.toastMsg('Promo retirée')},
+ net(off){if(off){S.offline=true;S.outbox=[];act.toastMsg('Réseau coupé · la liste reste utilisable')}
+  else{const n=S.outbox.length;S.offline=false;S.outbox=[];const t=new Date();S.syncAt=fmtD('2026-10-03',{day:'numeric',month:'short'})+' '+t.toTimeString().slice(0,5);
+   act.toastMsg(n?`Réseau retrouvé · ${n} modification${n>1?'s':''} envoyée${n>1?'s':''} · 1 changement reçu de Léa`:'Réseau retrouvé · tout est à jour')}},
+ importRecipe(){const u=(S.ed.url||'').trim();
+  if(!u){S.ed.url='https://recettes.example/gratin-dauphinois';}
+  if(S.offline){act.toastMsg("Import impossible hors-ligne : le lien est gardé, réessayer avec du réseau");return}
+  S.sheet=()=>'<h3>Chargement de la recette…</h3><p class="muted">Lecture des données de la page (schema.org/Recipe).</p>';render();
+  setTimeout(()=>{const find=n=>Object.values(P).find(p=>p.n.toLowerCase().startsWith(n));
+   S.imp={name:'Gratin dauphinois',portions:6,time:'1 h 30',steps:['Préchauffer le four à 160 °C.','Éplucher et couper les pommes de terre en fines rondelles.','Frotter le plat avec l\'ail.','Disposer les pommes de terre, verser lait et crème, saler, poivrer, muscade.','Parsemer de gruyère, cuire 1 h 15.'],
+    ing:[['1,2 kg de pommes de terre',null,'Pommes de terre','fl','kg',1.2],['50 cl de crème fraîche liquide',null,'Crème fraîche liquide 50 cl','fr','brique',1],['25 cl de lait','lait',null,null,null,1],['2 gousses d\'ail',null,'Ail','fl','tête',1],['100 g de gruyère râpé','rape',null,null,null,1],['Sel, poivre','sel',null,null,null,null],['1 pincée de noix de muscade',null,'Noix de muscade','ep','pot',null,true]].map(([raw,pid,nw,c,u,q,base])=>({raw,pid,nw,c,u,q,base:base||(pid&&P[pid].base),on:true})),
+    f:{name:!S.ed.n,portions:true,time:true,steps:true}};act.importSheet()},900)},
+ importSheet(){const m=S.imp;
+  S.sheet=()=>`<h3>📖 ${m.name}</h3><p class="muted">Trouvé sur la page · cocher ce qu'il faut reprendre</p>
+   ${[['name','Nom',m.name],['portions','Portions',m.portions+' personnes'],['time','Temps',m.time],['steps','Étapes',m.steps.length+' étapes']].map(([k,t,v])=>`<div class="item" style="cursor:pointer" onclick="S.imp.f.${k}=!S.imp.f.${k};act.importSheet()"><span class="chk ${m.f[k]?'on':''}">${m.f[k]?'✓':''}</span><span class="grow"><b>${t}</b> · ${v}</span></div>`).join('')}
+   <div class="sec">Ingrédients (${m.ing.length})</div>${m.ing.map((g,i)=>`<div class="item" style="cursor:pointer;align-items:flex-start" onclick="S.imp.ing[${i}].on=!S.imp.ing[${i}].on;act.importSheet()"><span class="chk ${g.on?'on':''}">${g.on?'✓':''}</span><div class="grow"><div class="muted" style="font-size:12px">« ${g.raw} »</div>${g.pid?`<div>→ ${P[g.pid].n}</div>`:`<div>→ <span class="pill p-carrot">＋ créer</span> ${g.nw} <span class="muted">(${CATS[g.c]})</span></div>`}${g.base?'<span class="pill p-grey">de base</span>':''}</div></div>`).join('')}
+   <p class="muted">Les produits manquants seront créés dans le catalogue (prix inconnus jusqu'aux premiers relevés).</p>
+   <button class="btn full" onclick="act.importOk()">Appliquer au plat</button>`;render()},
+ importOk(){const m=S.imp,e=S.ed;if(m.f.name)e.n=m.name;if(m.f.portions)e.portions=m.portions;if(m.f.time)e.time=m.time;if(m.f.steps)e.steps=m.steps.join('\n');
+  let c=0;for(const g of m.ing){if(!g.on)continue;let pid=g.pid;if(!pid){pid='p'+Date.now()+c++;P[pid]={id:pid,n:g.nw,c:g.c,u:g.u,price:{im:null,co:null},nb:0,rec:null,base:!!g.base}}
+   if(!e.ing.some(i=>i[0]===pid))e.ing.push(P[pid].base?[pid]:[pid,g.q||1])}
+  S.sheet=null;act.toastMsg(`Recette importée · ${c} produit${c>1?'s':''} créé${c>1?'s':''} au catalogue`)},
  acc(id){S.acc[id]=!S.acc[id];render()},
  catEdit(c,sid){const name=c?CATS[c]:'';S.sheet=()=>`<h3>${c?'Renommer le rayon':'Nouveau rayon'}</h3><input class="txt" id="cn" value="${name}" placeholder="ex. Boulangerie"><p class="muted">${c?'Le nom change pour tous les magasins et dans le catalogue.':`Ajouté à la fin du parcours de ${STORES.find(s=>s.id===sid).name} et des autres magasins ; à replacer avec ↑ ↓.`}</p><button class="btn full" onclick="act.catSave(${c?`'${c}'`:'null'})">Enregistrer</button>`;render()},
  catSave(c){const v=$('#cn').value.trim();if(!v)return;if(c)CATS[c]=v;else{const k='c'+Date.now();CATS[k]=v;STORES.forEach(s=>ORDER[s.id].push(k))}S.sheet=null;act.toastMsg(c?'Rayon renommé':'Rayon ajouté')},
