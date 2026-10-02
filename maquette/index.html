@@ -251,6 +251,10 @@ const S={
     {d:'2026-10-05',s:'soir',dish:'soupe',p:4},{d:'2026-10-07',s:'soir',dish:'lasa',p:4},
     {d:'2026-10-09',s:'soir',dish:'croque',p:4},{d:'2026-10-10',s:'midi',dish:'chili',p:6},
     {d:'2026-10-12',s:'soir',dish:'crepes',p:4,by:'Léa',sugg:'pending'},
+    // passé (historique)
+    {d:'2026-09-19',s:'soir',dish:'lasa',p:4},{d:'2026-09-21',s:'midi',dish:'curry',p:4},{d:'2026-09-24',s:'soir',dish:'carbo',p:4},
+    {d:'2026-09-27',s:'soir',dish:'chili',p:5},{d:'2026-09-30',s:'soir',dish:'soupe',p:4},{d:'2026-09-06',s:'soir',dish:'lasa',p:6},
+    {d:'2026-08-23',s:'midi',dish:'lasa',p:4},{d:'2026-08-30',s:'soir',dish:'chili',p:4},{d:'2026-09-12',s:'soir',dish:'crepes',p:4},
   ],
   baseOn:{}, assign:{}, checked:{}, prices:{}
 };
@@ -341,6 +345,21 @@ function recipeHtml(d,p){
    ${d.note?`<div class="sec">Notes</div><p style="margin:0">${d.note}</p>`:''}
    ${d.url?`<a class="btn sec2 full" style="display:block;text-align:center;text-decoration:none;margin-top:12px" href="${d.url}" target="_blank" rel="noopener">🔗 Ouvrir la recette en ligne</a>`:''}
    ${hasRecipe(d)?'':'<p class="muted">Aucune recette renseignée pour ce plat.</p>'}`;
+}
+const TODAY='2026-10-02';
+const slotName=s=>SLOTS.find(x=>x[0]===s)[1];
+const daysAgo=d=>Math.round((D(TODAY)-D(d))/864e5);
+// Planifications d'un plat : à venir + historique
+function dishHistory(k){
+  const ms=S.meals.map((m,ix)=>({...m,ix})).filter(m=>m.dish===k&&m.sugg!=='pending');
+  const up=ms.filter(m=>m.d>=TODAY).sort((a,b)=>a.d<b.d?-1:1),past=ms.filter(m=>m.d<TODAY).sort((a,b)=>a.d>b.d?-1:1);
+  const avg=past.length>1?Math.round(daysAgo(past.at(-1).d)/(past.length-1)):null;
+  const row=m=>`<div class="item" style="cursor:pointer" onclick="act.meal(${m.ix})"><span class="muted" style="width:96px">${fmtD(m.d,{weekday:'short',day:'numeric',month:'short'})}</span><span class="grow">${slotName(m.s)} · ${m.p} pers.</span><span class="muted">›</span></div>`;
+  return `<div class="sec">Au menu</div><div class="card">
+   <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:6px"><span class="pill p-leaf">${past.length} fois planifié</span>${past.length?`<span class="pill p-grey">dernière fois il y a ${daysAgo(past[0].d)} j</span>`:''}${avg?`<span class="pill p-grey">en moyenne tous les ${avg} j</span>`:''}</div>
+   ${up.length?`<div class="muted" style="margin-top:6px">À venir</div>${up.map(row).join('')}`:''}
+   ${past.length?`<div class="muted" style="margin-top:6px">Historique</div>${past.slice(0,S.histAll?99:4).map(row).join('')}${past.length>4&&!S.histAll?`<button class="btn sm sec2" style="margin-top:6px" onclick="S.histAll=true;render()">Voir les ${past.length} dates</button>`:''}`:'<p class="muted">Jamais planifié pour l\'instant.</p>'}
+   <button class="btn full" style="margin-top:10px" onclick="act.planDish('${k}')">📅 ${isMgr()?'Ajouter au menu':'Suggérer au menu'}</button></div>`;
 }
 function prRange(){
   if(S.pr.range==='list'){const ds=dated(),l=ds.filter(l=>l.date<=S.menuFrom).at(-1)||ds[0],[a,b]=period(l);return [a,Math.round((D(b)-D(a))/864e5)+1]}
@@ -440,12 +459,12 @@ const VIEWS={
  },
  dishes(){
   const q=S.q3.toLowerCase().trim(),f=S.dfilter;
-  const all=Object.entries(DISHES).filter(([k,d])=>(!q||d.n.toLowerCase().includes(q)||d.ing.some(([p])=>P[p].n.toLowerCase().includes(q)))&&(f==='all'||(f==='recipe'&&hasRecipe(d))||(f==='memo'&&!d.ing.length)||(f==='planned'&&S.meals.some(m=>m.dish===k))));
+  const all=Object.entries(DISHES).filter(([k,d])=>(!q||d.n.toLowerCase().includes(q)||d.ing.some(([p])=>P[p].n.toLowerCase().includes(q)))&&(f==='all'||(f==='recipe'&&hasRecipe(d))||(f==='memo'&&!d.ing.length)||(f==='planned'&&S.meals.some(m=>m.dish===k&&m.d>=TODAY))));
   const next=k=>S.meals.filter(m=>m.dish===k&&m.d>='2026-10-01').sort((x,y)=>x.d<y.d?-1:1)[0];
   return {title:'Plats',sub:Object.keys(DISHES).length+' plats du foyer',right:isMgr()?'<button class="btn sm" onclick="act.newDish()">＋ Plat</button>':'',body:`
    <input class="txt" id="q3" placeholder="🔍 Rechercher un plat ou un ingrédient…" value="${S.q3}" oninput="act.search3(this.value)">
    <div class="opt">${[['all','Tous'],['recipe','📖 Avec recette'],['memo','Sans détail'],['planned','Au menu']].map(([k,t])=>`<button class="${f===k?'on':''}" onclick="S.dfilter='${k}';render()">${t}</button>`).join('')}</div>
-   ${all.map(([k,d])=>{const n=next(k),hit=q&&!d.n.toLowerCase().includes(q)?d.ing.filter(([p])=>P[p].n.toLowerCase().includes(q)).map(([p])=>P[p].n):[];return `<div class="card click" onclick="act.editDish('${k}')"><div class="row"><div class="grow"><h4>${d.n}${hasRecipe(d)?' <span class="pill p-plum">📖</span>':''}</h4><div class="muted">${hit.length?'contient '+hit.join(', '):d.ing.length?d.ing.length+' ingrédients'+(d.time?' · ⏱ '+d.time:''):'Ingrédients connus par cœur'}</div>${n?`<span class="pill p-leaf">prévu ${fmtD(n.d,{weekday:'short',day:'numeric',month:'short'})}</span>`:''}</div><span class="muted">›</span></div></div>`}).join('')||`<p class="muted">Aucun plat trouvé.</p>${isMgr()&&q?`<button class="btn full" onclick="act.newDish(S.q3)">＋ Créer le plat « ${S.q3} »</button>`:''}`}`};
+   ${all.map(([k,d])=>{const n=next(k),hit=q&&!d.n.toLowerCase().includes(q)?d.ing.filter(([p])=>P[p].n.toLowerCase().includes(q)).map(([p])=>P[p].n):[];return `<div class="card click" onclick="act.editDish('${k}')"><div class="row"><div class="grow"><h4>${d.n}${hasRecipe(d)?' <span class="pill p-plum">📖</span>':''}</h4><div class="muted">${hit.length?'contient '+hit.join(', '):d.ing.length?d.ing.length+' ingrédients'+(d.time?' · ⏱ '+d.time:''):'Ingrédients connus par cœur'}</div>${n?`<span class="pill p-leaf">prévu ${fmtD(n.d,{weekday:'short',day:'numeric',month:'short'})}</span>`:''}${(()=>{const last=S.meals.filter(m=>m.dish===k&&m.d<TODAY).map(m=>m.d).sort().at(-1);return last?` <span class="pill p-grey">dernière fois il y a ${daysAgo(last)} j</span>`:''})()}</div><span class="muted">›</span></div></div>`}).join('')||`<p class="muted">Aucun plat trouvé.</p>${isMgr()&&q?`<button class="btn full" onclick="act.newDish(S.q3)">＋ Créer le plat « ${S.q3} »</button>`:''}`}`};
  },
  dishEdit(){
   const e=S.ed,ro=!isMgr(),used=S.meals.filter(m=>m.dish===e.k).length;
@@ -453,6 +472,7 @@ const VIEWS={
   return {title:e.isNew?'Nouveau plat':e.n,sub:ro?'Lecture seule (membre)':used?`Prévu dans ${used} repas`:'Plat du foyer',back:'dishes',body:`
    <div class="card"><label class="muted">Nom</label><input class="txt" value="${e.n}" ${ro?'disabled':''} oninput="S.ed.n=this.value">
     <div class="row" style="margin-top:8px;gap:8px"><div class="grow"><label class="muted">Portions de référence</label><input class="txt" type="number" value="${e.portions}" ${ro?'disabled':''} oninput="S.ed.portions=+this.value"></div><div class="grow"><label class="muted">Temps</label><input class="txt" value="${e.time}" placeholder="ex. 45 min" ${ro?'disabled':''} oninput="S.ed.time=this.value"></div></div></div>
+   ${e.isNew?'':dishHistory(e.k)}
    <div class="sec">Ingrédients</div><div class="card" style="padding:2px 14px">${e.ing.map(([pid,q],i)=>`<div class="item"><span class="grow">${P[pid].n}</span>${P[pid].base?'<span class="pill p-grey">de base</span>':`<input class="txt" style="width:62px;padding:5px 8px" type="number" step="0.5" value="${q??''}" placeholder="—" ${ro?'disabled':''} oninput="S.ed.ing[${i}][1]=this.value?+this.value:undefined"><span class="muted" style="width:62px">${P[pid].u}</span>`}${ro?'':`<button class="btn sm sec2" onclick="act.ingDel(${i})">✕</button>`}</div>`).join('')||'<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>'}</div>
    ${ro?'':`<input class="txt" placeholder="Ajouter un ingrédient du catalogue…" value="${S.q2}" oninput="act.search2(this.value)" id="q2">${S.q2?`<div class="ac">${res.map(p=>`<button onclick="act.ingAdd('${p.id}')"><span class="grow">${p.n}</span><span class="muted">${CATS[p.c]}</span></button>`).join('')}${Object.values(P).some(p=>p.n.toLowerCase()===S.q2.toLowerCase().trim())?'':`<button onclick="act.newProd(S.q2,'dish')"><b>＋ Créer « ${S.q2} » dans le catalogue</b></button>`}</div>`:''}<p class="muted">Quantités facultatives, ajustées au nombre de personnes du repas.</p>`}
    <div class="sec">Recette (facultatif)</div><div class="card">
@@ -675,6 +695,13 @@ const act={
    ${ing.length?`<div class="sec">Ingrédients à acheter</div><p class="muted" style="margin-top:0">Décocher ce qui est encore en réserve.</p>${ing.map(([pid,q])=>{const off=m.skip.includes(pid);return `<div class="item" style="cursor:pointer" onclick="act.toggleSkip('${pid}')"><span class="chk ${off?'':'on'}">${off?'':'✓'}</span><span class="grow ${off?'muted':''}">${P[pid].n}</span>${off?'<span class="pill p-grey">en réserve</span>':q?`<span class="muted">${String(+(q*m.p/(d.portions||4)).toFixed(1)).replace('.',',')} ${P[pid].u}</span>`:''}</div>`}).join('')}`:'<p class="muted">Plat sans ingrédients détaillés : simple rappel dans la liste.</p>'}
    <button class="btn full" style="margin-top:12px" onclick="act.pmOk()">${m.ix==null?(isMgr()?'Ajouter au menu':'Suggérer ce plat'):'Enregistrer'}</button>`;render()},
  toggleSkip(pid){const s=S.pm.skip,i=s.indexOf(pid);i<0?s.push(pid):s.splice(i,1);render()},
+ planDish(k){let d=TODAY;while(S.meals.some(m=>m.d===d&&m.s==='soir'))d=addDays(d,1);S.plan={k,d,s:'soir'};act.planSheet()},
+ planSheet(){const p=S.plan,occ=S.meals.find(m=>m.d===p.d&&m.s===p.s);
+  S.sheet=()=>`<h3>📅 ${DISHES[p.k].n}</h3><label class="muted">Date</label><input class="txt" type="date" value="${p.d}" min="${TODAY}" onchange="S.plan.d=this.value;act.planSheet()">
+   <div class="sec">Créneau</div><div class="seg">${SLOTS.map(([k,t])=>`<button class="${p.s===k?'on':''}" onclick="S.plan.s='${k}';act.planSheet()">${t}</button>`).join('')}</div>
+   ${occ?`<p class="muted">⚠ Créneau déjà occupé par <b>${DISHES[occ.dish].n}</b>${isMgr()?' : il sera remplacé.':'.'}</p>`:''}
+   <button class="btn full" onclick="act.planOk()">Continuer : personnes et ingrédients</button>`;render()},
+ planOk(){const p=S.plan;if(isMgr()){const i=S.meals.findIndex(m=>m.d===p.d&&m.s===p.s);if(i>=0)S.meals.splice(i,1)}S.planFrom=S.view==='dishEdit';act.pickMeal(p.d,p.s,p.k)},
  pmOk(){const m=S.pm,isNew=m.ix==null,k=m.dish,d=m.d;
   if(isNew)S.meals.push(isMgr()?{d,s:m.s,dish:k,p:m.p,skip:m.skip}:{d,s:m.s,dish:k,p:m.p,skip:m.skip,by:'Léa',sugg:'pending'});
   else Object.assign(S.meals[m.ix],{p:m.p,skip:m.skip});

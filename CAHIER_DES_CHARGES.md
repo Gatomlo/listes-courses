@@ -130,6 +130,9 @@ Produit du catalogue (ou texte libre non rattaché), quantité, note, **origine*
 - Un plat peut n'avoir **aucun ingrédient détaillé** (« je connais par cœur ») : il apparaît alors comme simple **rappel** dans la liste.
 - Ajustement des quantités au nombre de personnes du repas.
 - **Recette facultative** : temps de préparation, lien vers une recette en ligne, étapes (texte), notes ; plus tard photo/PDF (page de livre).
+- **Depuis la fiche d'un plat** :
+  - **Ajouter au menu** (membre : suggérer) : date (à partir d'aujourd'hui) et créneau ; si le créneau est déjà occupé, avertissement et remplacement ; puis même écran que depuis le menu (personnes, ingrédients en réserve).
+  - **Historique des planifications** : nombre de fois planifié, dernière fois (« il y a 13 j »), fréquence moyenne, liste des dates à venir et passées (créneau, personnes), chaque date ouvre le repas. Dans l'écran Plats, chaque carte affiche la prochaine date prévue et la dernière fois.
 - **Import automatique depuis un lien** : en collant l'URL d'une recette, le serveur charge la page et en extrait, quand le site les publie, les données structurées `schema.org/Recipe` (JSON-LD ou microdonnées — Marmiton, 750g, Cuisine AZ, CuisineActuelle, Jow, sites WordPress de blogs culinaires…) : nom, photo, portions, temps, ingrédients, étapes.
   - **Ingrédients analysés** (« 2 oignons », « 400 g de tomates concassées ») → quantité, unité, produit, rapprochés du catalogue ; ceux qui manquent sont proposés à la création ; « sel, poivre… » proposés comme ingrédients de base.
   - **Aperçu avant application** : chaque élément importé est cochable ; l'existant du plat n'est remplacé qu'après validation. Quantités ramenées aux portions du plat.
