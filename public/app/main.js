@@ -5,6 +5,7 @@ import { get, post, ApiError, net, outbox, onNetChange, onFlushed, flush } from 
 import { S, setRenderer, render, loadHouse, loadProducts, go } from './state.js';
 import { loginView, foyersView, setInvite, setReset, loadOptions, loadInvitation, acceptPending, resetPending } from './connexion.js';
 import { foyerView } from './foyer.js';
+import { magasinsView } from './magasins.js';
 import './install.js'; // tot : retient l'invite d'installation du navigateur
 import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
@@ -19,6 +20,7 @@ const NAV = [
   ['menu', 'Menu', '<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/>'],
   ['plats', 'Plats', '<path d="M5 4.5A1.5 1.5 0 016.5 3H19v15H6.5A1.5 1.5 0 005 19.5v-15zM5 19.5A1.5 1.5 0 006.5 21H19"/>'],
   ['catalogue', 'Catalogue', '<path d="M4 7l8-4 8 4-8 4-8-4zM4 12l8 4 8-4M4 17l8 4 8-4"/>'],
+  ['magasins', 'Magasins', '<path d="M3 9l1.5-5h15L21 9M3 9h18M3 9a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0M5 12v8h14v-8M10 20v-5h4v5"/>'],
   ['foyer', 'Foyer', '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.8c1.9.7 3 2.4 3.5 5.2"/>'],
 ];
 
@@ -32,6 +34,7 @@ const ROUTES = {
   plat: dishView,
   catalogue: catalogueView,
   produit: productView,
+  magasins: magasinsView,
   foyer: foyerView,
   foyers: foyersView,
   scan: scanView,
