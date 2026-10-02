@@ -25,6 +25,14 @@ app.use(express.json({ limit: '1mb' }));
 // Interface : fichiers toujours revalides (304 si inchanges), sauf la page elle-meme.
 app.use(express.static(PUBLIC_DIR, { index: false, setHeaders: (res) => res.set('Cache-Control', 'no-cache') }));
 
+// Lecture des tickets (Tesseract.js) servie par l'app elle-meme, sans site externe :
+// bibliotheque, moteur WebAssembly et donnees de langue francaise (paquets npm versionnes).
+const NM = path.join(__dirname, 'node_modules');
+const vendor = (dir) => express.static(path.join(NM, dir), { index: false, maxAge: '30d' });
+app.use('/vendor/tesseract', vendor('tesseract.js/dist'));
+app.use('/vendor/tesseract-core', vendor('tesseract.js-core'));
+app.use('/vendor/tessdata', vendor('@tesseract.js-data/fra/4.0.0_best_int'));
+
 app.use('/api', auth.loadUser, security.jsonOnly, router());
 app.use('/api', (req, res) => res.status(404).json({ error: 'Adresse inconnue.' }));
 app.use('/api', (err, req, res, next) => { // eslint-disable-line no-unused-vars

@@ -91,17 +91,17 @@ Aucun suivi des dépenses (total payé) : géré dans un autre outil.
 
 ### 4.4 Scan du ticket de caisse
 Proposé en fin de courses (« Terminer chez X ») ou depuis la liste clôturée.
-1. **Photo** du ticket (ou import d'une image / PDF de ticket électronique).
+1. **Photo** du ticket (appareil photo ou image de la galerie ; PDF de ticket électronique : plus tard).
 2. **Lecture** : magasin, date et lignes (libellé, quantité, prix unitaire, remise éventuelle).
 3. **Rapprochement** de chaque ligne avec le catalogue :
    - d'abord via les **correspondances mémorisées par magasin** (ex. « TOMAT CONC 400G » chez Colruyt → Tomates concassées 400 g),
    - puis par similarité avec les articles de la liste du magasin,
    - sinon la ligne est « à associer » : choisir un produit, le créer dans le catalogue, ou ignorer (chaque association est mémorisée).
 4. **Validation** : écran récapitulatif avec, par ligne, le prix lu, la moyenne actuelle et l'écart en %. Lignes décochables.
-5. **Effets** : un relevé de prix (`source = ocr`) par ligne validée **pour ce magasin**, recalcul des moyennes, articles correspondants de la liste cochés « achetés ». Les lignes avec remise sont marquées « promo » (exclues de la moyenne, cf. 4.3). La photo est conservée 3 mois.
+5. **Effets** : un relevé de prix (`source = ocr`) par ligne validée **pour ce magasin**, recalcul des moyennes, articles correspondants de la liste cochés « achetés ». Les lignes avec remise sont marquées « promo » (exclues de la moyenne, cf. 4.3).
 
 Lecture : **Tesseract.js** (gratuit, open source), exécuté **sur le téléphone** dans le navigateur (worker + modèle `fra` mis en cache par le service worker ; rien n'est envoyé à un service tiers).
-- Prétraitement de la photo avant OCR : recadrage manuel, niveaux de gris, binarisation, redressement.
+- Prétraitement de la photo avant OCR : mise à l'échelle (1000–1800 px de large), niveaux de gris, contraste étiré (recadrage manuel et redressement : plus tard si la lecture s'avère insuffisante). La photo n'est pas envoyée ni conservée : seul le texte lu est gardé avec le ticket.
 - Analyse des lignes par expressions régulières propres à chaque magasin (format Intermarché / Colruyt : libellé, quantité × prix, remises).
 - Tesseract étant moins précis sur les tickets froissés ou pâles, l'écran de validation (étape 4) permet de **corriger un prix lu** ou un libellé ; les correspondances mémorisées compensent les libellés mal lus récurrents.
 
@@ -255,7 +255,7 @@ PlannedMealSkip(planned_meal, product)                     -- ingrédients en r�
 2. ✅ Listes (À prévoir + datées), suggestions, clôture/report, récurrents.
 3. ✅ Prix : relevés, moyennes, conseil, scénarios et économie, listes par magasin triées, promos.
 4. ✅ Mode courses : cochage, saisie prix, temps réel (SSE), hors-ligne complet (stockage local, file d'opérations, synchronisation à la reprise).
-5. Scan du ticket (Tesseract.js) : lecture, rapprochement, alias par magasin, mise à jour des prix.
+5. ✅ Scan du ticket (Tesseract.js) : lecture, rapprochement, alias par magasin, mise à jour des prix.
 6. Plats (écran dédié, recherche, recettes avec import depuis un lien), planning avec ingrédients en réserve, génération et fusion des ingrédients, export du menu.
 7. Plus tard : photo/PDF de recette.
 

@@ -6,6 +6,7 @@ import { S, setRenderer, render, loadHouse, loadProducts, go } from './state.js'
 import { loginView, foyersView, setInvite, loadInvitation, acceptPending } from './connexion.js';
 import { foyerView } from './foyer.js';
 import { catalogueView, productView, loadProduct } from './catalogue.js';
+import { scanView } from './scan.js';
 import { listesView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList } from './listes.js';
 
 const app = document.getElementById('app');
@@ -35,10 +36,11 @@ const ROUTES = {
   produit: productView,
   foyer: foyerView,
   foyers: foyersView,
+  scan: scanView,
 };
 
 function shell(v) {
-  const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes', magasin: 'listes' }[S.route[0]] || S.route[0];
+  const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes', magasin: 'listes', scan: 'listes' }[S.route[0]] || S.route[0];
   const badge = S.house && S.house.role === 'manager' && S.house.pending ? `<span class="badge">${S.house.pending}</span>` : '';
   const nav = v.noNav ? '' : `<nav class="tabs">${isPc() ? `<div class="brand">🧺 Le Cabas<small>${esc(S.house ? S.house.household.name : '')}</small></div>` : ''}
     ${NAV.map(([k, t, svg]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg><span>${t}</span>${k === 'listes' ? badge : ''}</a>`).join('')}</nav>`;

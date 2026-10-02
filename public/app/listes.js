@@ -207,7 +207,8 @@ on('click', 'shop-end', (el) => {
   const sid = Number(el.dataset.sid);
   const left = current.items.filter((i) => !i.suggestion && i.at_store_id === sid && i.status === 'todo');
   sheet(`<h3>Terminer chez ${esc(storeName(sid))}</h3>
-    <button class="btn full sec2" disabled>📷 Scanner le ticket (étape suivante)</button>
+    <button class="btn full" data-a="scan-start" data-lid="${current.id}" data-sid="${sid}">📷 Scanner le ticket</button>
+    <p class="muted small">Lit chaque ligne sur le téléphone, met à jour les prix ${esc(storeName(sid))} et coche les articles achetés.</p>
     ${left.length ? `<p class="muted">${left.length} article${left.length > 1 ? 's' : ''} non pris. Les marquer « indisponible » ? Ils seront reportés à la clôture de la liste.</p>` : ''}
     <div class="row end">${left.length ? `<button class="btn sec2" data-a="shop-end-unav" data-sid="${sid}">Marquer indisponibles</button>` : ''}<button class="btn" data-a="shop-end-ok">Terminer</button></div>`);
 });
@@ -276,7 +277,7 @@ function closedBody(l) {
   const left = l.items.filter((i) => i.status !== 'bought');
   return `${acc('h_bought', { icon: '✅', title: 'Achetés', sum: ` · ${bought.length}`, def: true, body: bought.map((i) => itemRow(i, l)).join('') || '<p class="muted">Rien.</p>' })}
     ${acc('h_left', { icon: '↪', title: 'Non achetés', sum: ` · ${left.length}`, def: true, body: left.map((i) => itemRow(i, l)).join('') || '<p class="muted">Tout a été acheté.</p>' })}
-    ${isManager() && bought.length ? '<button class="btn sec2" data-a="list-copy">⧉ Copier les articles achetés dans « À prévoir »</button>' : ''}`;
+    <div class="row wrap">${isManager() && bought.length ? '<button class="btn sec2" data-a="list-copy">⧉ Copier les articles achetés dans « À prévoir »</button>' : ''}<button class="btn sec2" data-a="scan-start" data-lid="${l.id}">📷 Scanner un ticket</button></div>`;
 }
 
 // ---------- Ajout avec recherche dans le catalogue ----------

@@ -8,7 +8,8 @@ Outil privé du foyer : listes de courses partagées (« À prévoir » + listes
 - **Étape 2 (listes) codée** : « À prévoir » (créée à la demande), listes datées (une par date, date proposée = dernière + rythme), import des récurrents dus et d'articles « À prévoir », ajout avec recherche/création de produit, quantités cumulées, coche « acheté », fiche article (quantité, note, indisponible, déplacer, récurrent, retirer), suggestions des membres (validation dans la liste ou Foyer, badge), menu ⋯ (date, statut, clôture avec report par article, suppression), historique en lecture seule + copie vers « À prévoir ».
 - **Étape 3 (prix) codée** : prix effectif par article et magasin (promo valable sinon moyenne), magasin conseillé (imposé > moins cher), choix manuel par article (étiquette cliquable, tout membre ; retour au conseil), « tout chez X » (gestionnaire), scénarios + économie vs seuil, liste par magasin (`#/listes/:id/magasin/:sid`, ordre des rayons du magasin), promos (sortie ou date, prix facultatif, une par produit × magasin, tout membre). Suggestions en attente : accordéon en haut de l'écran Listes + badge onglet Listes.
 - **Étape 4 (mode courses, temps réel, hors-ligne) codée** : mode courses `#/listes/:id/magasin/:sid` (rayons du magasin, gros texte, « Dans le caddie », prix payé facultatif au cochage → relevé `check`, « Terminer » : non pris → indisponibles), présence (« Léa est aussi sur cette liste ») et rechargement en direct par SSE, hors-ligne (copie locale de chaque lecture, file d'opérations rejouée au retour du réseau, bandeau), service worker `public/sw.js`.
-- Écrans Menu / Plats : « bientôt ». Prochaine étape : 5 (scan du ticket, Tesseract.js).
+- **Étape 5 (scan du ticket) codée** : photo (« Terminer chez X » ou liste clôturée) → image préparée → Tesseract.js sur le téléphone (fichiers servis par l'app depuis `node_modules` sous `/vendor/…`) → `ticket.mjs` (lignes, quantités, remises = promo, date, magasin ; rapprochement : correspondance mémorisée par magasin, sinon ressemblance des mots + bonus liste) → écran de validation (libellé, quantité, prix, promo, produit / créer / ignorer) → opération `receipt.save` (relevés `ocr`, articles cochés, produits créés, correspondances mémorisées ; marche hors-ligne).
+- Écrans Menu / Plats : « bientôt ». Prochaine étape : 6 (plats, recettes et import, menu, ingrédients en réserve, fusion, export).
 - Décisions : nom « Le Cabas », seuil 5 €, prix comparés par emballage (contenance facultative), OCR Tesseract.js, pas de total ticket ni lien budget-foyer, pas de sous-domaine (`/cabas` sur le domaine de la passerelle). Point ouvert : coût fixe 2e magasin (défaut : non).
 
 ## Stack
@@ -18,8 +19,8 @@ Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/cabas.db`), nodemaile
 - `server.js` : exporte `app` (listen seulement si lancé directement), page `index.html` avec `{{ROOT}}` → `<base href>`, API sur `/api`.
 - `lib/db.js` : connexion, `tx`, `normalize`, migrations (`MIGRATIONS`, `PRAGMA user_version` ; ne jamais modifier une entrée déployée).
 - `lib/auth.js` : lien de connexion (15 min, usage unique), sessions 90 j (cookie `cabas_session`, `Path=<montage>/`), gardes `householdMember` / `manager`.
-- `lib/api.js` : toutes les routes ; `lib/households.js` (foyer, membres, invitations) ; `lib/catalog.js` (magasins, rayons, produits, relevés, prix moyens) ; `lib/lists.js` (listes, articles, suggestions, clôture, récurrents, promos) ; `lib/pricing.js` (prix effectifs, magasin retenu, scénarios) ; `lib/sync.js` (rejeu d'opérations, conflits) ; `lib/events.js` (SSE, présence, diffusion après chaque modification) ; `lib/mailer.js` ; `lib/security.js` (CSP, `jsonOnly`).
-- `public/app/` : `main.js` (démarrage, routes, cadre), `ui.js` (esc, accordéons, panneau, toast, actions), `api.js`, `state.js`, un fichier par écran (`connexion.js`, `foyer.js`, `catalogue.js`, `listes.js`).
+- `lib/api.js` : toutes les routes ; `lib/households.js` (foyer, membres, invitations) ; `lib/catalog.js` (magasins, rayons, produits, relevés, prix moyens) ; `lib/lists.js` (listes, articles, suggestions, clôture, récurrents, promos) ; `lib/pricing.js` (prix effectifs, magasin retenu, scénarios) ; `lib/sync.js` (rejeu d'opérations, conflits) ; `lib/events.js` (SSE, présence, diffusion après chaque modification) ; `lib/receipts.js` (tickets, correspondances `store_aliases`) ; `lib/mailer.js` ; `lib/security.js` (CSP, `jsonOnly`).
+- `public/app/` : `main.js` (démarrage, routes, cadre), `ui.js` (esc, accordéons, panneau, toast, actions), `api.js`, `state.js`, un fichier par écran (`connexion.js`, `foyer.js`, `catalogue.js`, `listes.js`, `scan.js`) ; `ticket.mjs` (analyse du texte et rapprochement, sans dépendance, testé par node).
 
 ## Règles non évidentes
 - **CSP stricte** : aucun script ni `onclick` en ligne → boutons `data-a="action"` (+ `data-*`) traités par `on('click', 'action', fn)` ; champs `data-in` / `data-ch` / `data-enter`. Texte affiché : toujours `esc()`.
@@ -33,6 +34,7 @@ Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/cabas.db`), nodemaile
 - Accordéons : état en `localStorage`, séparé mobile/PC ; sur PC ouverts par défaut.
 
 ## Commandes
+- CSP : `script-src 'self' 'wasm-unsafe-eval'` (Tesseract) ; tout reste servi par l'app (aucun CDN pour l'OCR).
 - `npm test` (API sur base temporaire, e-mails en mémoire ; `tests/helpers.js` : clients, foyer gestionnaire + membre).
 - Essai local : `CABAS_DATA_DIR=<dossier temp> CABAS_MAIL=log PORT=3101 node server.js` → le lien de connexion s'affiche dans la console. Ne jamais essayer sur `data/`.
 - Passerelle locale : jonction `node-gateway/apps/cabas` → ce dossier (créée), servie sur `http://localhost:3000/cabas/`.

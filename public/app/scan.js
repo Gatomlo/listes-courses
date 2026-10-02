@@ -1,0 +1,228 @@
+// Scan du ticket de caisse : photo -> preparation de l'image -> lecture sur le telephone
+// (Tesseract.js, rien n'est envoye a un service tiers) -> lignes rapprochees du
+// catalogue -> validation -> operation receipt.save (fonctionne aussi hors-ligne).
+import { esc, eur, on, acc, sheet, closeSheet, toast, formData } from './ui.js';
+import { get, sync, newOp, attempt } from './api.js';
+import { S, hp, render, go, loadProducts, activeStores, storeById, catName, categoryOrder } from './state.js';
+import { parseTicket, detectStore, matchLines } from './ticket.mjs';
+import { unitOptions, catOptions } from './catalogue.js';
+
+const abs = (p) => new URL(p, document.baseURI).href;
+let scan = null; // { listId, storeId, date, status, progress, text, lines: [...] }
+
+// ---------- Prise de photo ----------
+// Le choix du fichier doit partir directement du clic (exigence des navigateurs).
+on('click', 'scan-start', (el) => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.addEventListener('change', () => {
+    if (!input.files[0]) return;
+    closeSheet();
+    scan = { listId: Number(el.dataset.lid) || null, storeId: Number(el.dataset.sid) || null, date: new Date().toISOString().slice(0, 10), status: 'reading', progress: 0, lines: [] };
+    go('#/scan');
+    read(input.files[0]);
+  });
+  input.click();
+});
+
+// Image preparee : largeur ramenee entre 1000 et 1800 px, niveaux de gris, contraste
+// etire (les tickets thermiques sont souvent pales).
+async function prepare(file) {
+  const img = await createImageBitmap(file);
+  const scale = Math.min(1800 / img.width, Math.max(1, 1000 / img.width));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * scale);
+  c.height = Math.round(img.height * scale);
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0, c.width, c.height);
+  const d = g.getImageData(0, 0, c.width, c.height), px = d.data;
+  let lo = 255, hi = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const y = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+    px[i] = y;
+    if (y < lo) lo = y;
+    if (y > hi) hi = y;
+  }
+  const k = 255 / Math.max(1, hi - lo);
+  for (let i = 0; i < px.length; i += 4) {
+    const y = (px[i] - lo) * k;
+    px[i] = px[i + 1] = px[i + 2] = y;
+  }
+  g.putImageData(d, 0, 0);
+  return c;
+}
+
+let tesseract = null;
+function loadTesseract() {
+  if (tesseract) return tesseract;
+  tesseract = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = abs('vendor/tesseract/tesseract.min.js');
+    s.onload = () => resolve(window.Tesseract);
+    s.onerror = () => { tesseract = null; reject(new Error('Lecteur de ticket indisponible (ouvrez l’app une fois avec du réseau).')); };
+    document.head.appendChild(s);
+  });
+  return tesseract;
+}
+
+async function read(file) {
+  try {
+    const [T, canvas] = await Promise.all([loadTesseract(), prepare(file)]);
+    const worker = await T.createWorker('fra', 1, {
+      workerPath: abs('vendor/tesseract/worker.min.js'),
+      corePath: abs('vendor/tesseract-core'),
+      langPath: abs('vendor/tessdata'),
+      logger: (m) => {
+        if (m.status === 'recognizing text' && scan) { scan.progress = Math.round(m.progress * 100); updateProgress(); }
+      },
+    });
+    const { data } = await worker.recognize(canvas);
+    await worker.terminate();
+    await analyse(data.text);
+  } catch (e) {
+    if (scan) { scan.status = 'error'; scan.error = e.message; render(); }
+  }
+}
+function updateProgress() {
+  const bar = document.querySelector('#scan-progress i');
+  if (bar) bar.style.width = `${scan.progress}%`;
+  const t = document.querySelector('#scan-progress-text');
+  if (t) t.textContent = `Lecture du ticket… ${scan.progress} %`;
+}
+
+async function analyse(text) {
+  if (!S.products) await loadProducts();
+  const aliases = await get(hp('/aliases')).catch(() => []);
+  const list = scan.listId ? await get(hp(`/lists/${scan.listId}`)).catch(() => null) : null;
+  const t = parseTicket(text);
+  scan.text = text;
+  if (t.date) scan.date = t.date;
+  const detected = detectStore(text, activeStores());
+  if (!scan.storeId || (detected && detected !== scan.storeId && !scan.storeFixed)) scan.storeId = detected || scan.storeId || activeStores()[0].id;
+  scan.listItems = list ? list.items : [];
+  scan.aliases = aliases;
+  scan.lines = matchLines(t.items, { products: S.products, aliases, storeId: scan.storeId, listItems: scan.listItems })
+    .map((l) => ({ ...l, on: true }));
+  scan.status = 'review';
+  render();
+}
+
+// ---------- Ecran de validation ----------
+const price = (n) => (n == null ? '' : n.toFixed(2).replace('.', ','));
+function productOptions(cur) {
+  return `<option value="">— à associer —</option><option value="new">＋ Créer dans le catalogue…</option><option value="ignore">Ignorer cette ligne</option>
+    ${[...S.products].sort((a, b) => a.name.localeCompare(b.name)).map((p) => `<option value="${p.id}" ${p.id === cur ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}`;
+}
+
+export function scanView() {
+  if (!scan) return { title: 'Ticket', back: '#/listes', body: '<p class="muted">Aucun ticket en cours.</p>' };
+  const back = scan.listId ? `#/listes/${scan.listId}` : '#/listes';
+  if (scan.status === 'reading') {
+    return {
+      title: 'Lecture du ticket', back,
+      body: `<div class="card"><p id="scan-progress-text">Lecture du ticket… ${scan.progress} %</p><div class="bar" id="scan-progress"><i style="width:${scan.progress}%;background:var(--leaf)"></i></div>
+        <p class="muted small">Lecture sur le téléphone (Tesseract.js), rien n'est envoyé. La première fois, le lecteur se charge (quelques secondes).</p></div>`,
+    };
+  }
+  if (scan.status === 'error') {
+    return { title: 'Ticket', back, body: `<div class="card error">${esc(scan.error)}</div><button class="btn" data-a="scan-start" data-lid="${scan.listId || ''}" data-sid="${scan.storeId || ''}">📷 Reprendre une photo</button>` };
+  }
+  const st = storeById(scan.storeId);
+  const on_ = scan.lines.filter((l) => l.on && l.product_id !== 'ignore');
+  const todo = on_.filter((l) => !l.product_id && !l.create).length;
+  const total = on_.reduce((n, l) => n + (Number(l.unit) || 0) * (Number(l.qty) || 1), 0);
+  const avgOf = (pid) => { const p = S.products.find((x) => x.id === pid); return p && p.prices[scan.storeId] ? p.prices[scan.storeId].avg : null; };
+  const rows = scan.lines.map((l, i) => {
+    const avg = typeof l.product_id === 'number' ? avgOf(l.product_id) : null;
+    const delta = avg && l.unit ? Math.round(((l.unit * 100 - avg) / avg) * 100) : null;
+    return `<div class="item scanline${l.on ? '' : ' off'}"><button class="chk${l.on ? ' on' : ''}" data-a="scan-toggle" data-i="${i}">${l.on ? '✓' : ''}</button>
+      <div class="grow"><input class="txt sm mono" value="${esc(l.label)}" data-ch="scan-label" data-i="${i}" aria-label="Libellé lu">
+      <div class="row gap"><input class="txt w5 sm c" value="${esc(String(l.qty).replace('.', ','))}" data-ch="scan-qty" data-i="${i}" aria-label="Quantité"><span class="muted">×</span><input class="txt w5 sm c" value="${price(l.unit)}" data-ch="scan-unit" data-i="${i}" aria-label="Prix unitaire"><span class="muted small">€</span>
+      <label class="row small"><input type="checkbox" class="cb" data-ch="scan-promo" data-i="${i}" ${l.promo ? 'checked' : ''}>promo</label></div>
+      ${l.create ? `<div class="pill p-carrot">＋ créer « ${esc(l.create.name)} » (${esc(catName(Number(l.create.category_id)))})</div>`
+        : `<select class="txt sm" data-ch="scan-product" data-i="${i}">${productOptions(l.product_id)}</select>`}
+      <div class="muted small">${l.how === 'alias' ? '<span class="pill p-plum">correspondance mémorisée</span> ' : l.how === 'guess' ? '<span class="pill p-grey">proposé</span> ' : ''}${avg != null ? `moyenne ${eur(avg)}` : ''}${delta && Math.abs(delta) >= 1 ? ` · <b class="${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '+' : ''}${delta} %</b>` : ''}</div>
+      </div></div>`;
+  }).join('');
+  return {
+    title: `Ticket ${st ? st.name : ''}`, back,
+    sub: `${scan.lines.length} ligne${scan.lines.length > 1 ? 's' : ''} lue${scan.lines.length > 1 ? 's' : ''}${todo ? ` · ${todo} à associer` : ''} · ${eur(Math.round(total * 100))}`,
+    body: `<div class="card"><div class="row gap"><label class="grow"><span class="muted">Magasin</span><select class="txt" data-ch="scan-store">${activeStores().map((s) => `<option value="${s.id}" ${s.id === scan.storeId ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+      <label class="grow"><span class="muted">Date</span><input class="txt" type="date" value="${scan.date}" data-ch="scan-date"></label></div>
+      <p class="muted small">Chaque ligne validée devient un prix relevé ${st ? 'chez ' + esc(st.name) : ''} et coche l'article de la liste. Les associations sont mémorisées pour les prochains tickets.</p></div>
+      ${acc('scan_lines', { icon: '🧾', title: 'Lignes du ticket', sum: ` · ${on_.length} retenue${on_.length > 1 ? 's' : ''}`, def: true,
+        body: (rows || '<p class="muted">Aucune ligne reconnue. Reprenez la photo bien à plat, avec de la lumière.</p>') + '<button class="btn sm sec2" style="margin:8px 0" data-a="scan-add">＋ Ajouter une ligne</button>' })}
+      ${acc('scan_text', { icon: '🔤', title: 'Texte lu', sum: ' · pour vérifier', body: `<pre class="ocr">${esc(scan.text || '')}</pre>` })}
+      <div class="row end wide"><button class="btn sec2" data-a="scan-start" data-lid="${scan.listId || ''}" data-sid="${scan.storeId || ''}">📷 Reprendre</button><button class="btn" data-a="scan-save" ${todo ? 'disabled title="Des lignes sont à associer, à créer ou à ignorer"' : ''}>Valider et mettre à jour les prix</button></div>`,
+  };
+}
+
+const line = (el) => scan.lines[Number(el.dataset.i)];
+const num = (v) => Number(String(v).replace(',', '.'));
+on('click', 'scan-toggle', (el) => { const l = line(el); l.on = !l.on; render(); });
+on('change', 'scan-label', (el) => { line(el).label = el.value; });
+on('change', 'scan-qty', (el) => { line(el).qty = num(el.value) || 1; render(); });
+on('change', 'scan-unit', (el) => { line(el).unit = num(el.value) || null; render(); });
+on('change', 'scan-promo', (el) => { line(el).promo = el.checked; });
+on('change', 'scan-date', (el) => { scan.date = el.value; });
+on('change', 'scan-store', (el) => {
+  scan.storeId = Number(el.value);
+  scan.storeFixed = true;
+  // Correspondances du magasin choisi
+  scan.lines = matchLines(scan.lines, { products: S.products, aliases: scan.aliases, storeId: scan.storeId, listItems: scan.listItems })
+    .map((l, i) => ({ ...scan.lines[i], product_id: scan.lines[i].create ? null : (l.product_id ?? scan.lines[i].product_id), how: l.how }));
+  render();
+});
+on('change', 'scan-product', (el) => {
+  const l = line(el);
+  if (el.value === 'new') { createSheet(Number(el.dataset.i)); return; }
+  l.product_id = el.value === 'ignore' ? 'ignore' : el.value ? Number(el.value) : null;
+  l.how = null;
+  render();
+});
+on('click', 'scan-add', () => { scan.lines.push({ label: '', qty: 1, unit: null, promo: false, product_id: null, on: true }); render(); });
+
+// Nom propose pour un produit a creer : libelle du ticket en casse normale.
+const pretty = (s) => { const t = String(s).toLowerCase().trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
+function createSheet(i) {
+  const l = scan.lines[i];
+  sheet(`<h3>Nouveau produit</h3><p class="muted small">Ligne du ticket : « ${esc(l.label)} »</p>
+    <label class="muted">Nom</label><input class="txt" name="name" value="${esc(pretty(l.label))}">
+    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions(categoryOrder()[0])}</select></label>
+    <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
+    <p class="muted small">Créé à la validation du ticket.</p>
+    <div class="row end"><button class="btn sec2" data-a="scan-create-cancel">Annuler</button><button class="btn" data-a="scan-create-ok" data-i="${i}">OK</button></div>`);
+}
+on('click', 'scan-create-cancel', () => { closeSheet(); render(); });
+on('click', 'scan-create-ok', (el) => {
+  const f = formData(document.querySelector('.sheet'));
+  if (!f.name.trim()) return;
+  const l = scan.lines[Number(el.dataset.i)];
+  l.create = { name: f.name.trim(), category_id: Number(f.category_id), unit: f.unit };
+  l.product_id = null;
+  closeSheet();
+  render();
+});
+
+on('click', 'scan-save', async () => {
+  const lines = scan.lines.filter((l) => l.on).map((l) => ({
+    label: l.label, qty: l.qty, unit_price: l.unit, promo: !!l.promo,
+    ...(l.product_id === 'ignore' ? { ignore: true } : l.create ? { create: l.create } : { product_id: l.product_id }),
+  }));
+  const op = newOp({ type: 'receipt.save', store_id: scan.storeId, list_id: scan.listId, date: scan.date, raw_text: scan.text, lines });
+  const r = await attempt(() => sync(S.me.householdId, [op]));
+  if (r === undefined) return;
+  const back = scan.listId ? `#/listes/${scan.listId}` : '#/listes';
+  if (r === null) toast('Ticket gardé : envoyé au retour du réseau');
+  else {
+    const x = r.results[0];
+    if (!x.ok) { toast(x.reason || 'Ticket refusé.', true); return; }
+    const s = x.receipt;
+    toast(`${s.records} prix mis à jour · ${s.checked} article${s.checked > 1 ? 's' : ''} coché${s.checked > 1 ? 's' : ''}${s.created ? ` · ${s.created} produit${s.created > 1 ? 's' : ''} créé${s.created > 1 ? 's' : ''}` : ''}`);
+    S.products = null;
+  }
+  scan = null;
+  go(back);
+});
