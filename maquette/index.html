@@ -354,13 +354,15 @@ const daysAgo=d=>Math.round((D(TODAY)-D(d))/864e5);
 // Planifications d'un plat : à venir (dishPlan) et 5 dernières fois (dishPast)
 function dishMeals(k){const ms=S.meals.map((m,ix)=>({...m,ix})).filter(m=>m.dish===k&&m.sugg!=='pending');
   return {up:ms.filter(m=>m.d>=TODAY).sort((a,b)=>a.d<b.d?-1:1),past:ms.filter(m=>m.d<TODAY).sort((a,b)=>a.d>b.d?-1:1)}}
+// Un seul panneau : à venir + bouton d'ajout, puis les 5 dernières fois
+function dishMenu(k){const {up,past}=dishMeals(k),avg=past.length>1?Math.round(daysAgo(past.at(-1).d)/(past.length-1)):null;
+  const sum=(up.length?` · prévu ${fmtD(up[0].d,{weekday:'short',day:'numeric',month:'short'})}`:' · rien de prévu')+(past.length?` · ${past.length} fois`:'');
+  return accd('d_menu','📅','Au menu et historique',sum,
+   `<div class="muted" style="margin-top:8px">À venir</div>${up.map(mealRow).join('')||'<p class="muted" style="margin:4px 0">Pas encore prévu au menu.</p>'}
+   <button class="btn sec2" style="margin:8px 0" onclick="act.planDish('${k}')">📅 ${isMgr()?'Ajouter au menu':'Suggérer au menu'}</button>
+   <div class="muted" style="margin-top:6px">Historique${past.length>5?' · 5 dernières fois':''}</div>
+   ${past.length?`<div class="row" style="gap:6px;flex-wrap:wrap;padding:6px 0 2px"><span class="pill p-leaf">${past.length} fois planifié</span><span class="pill p-grey">dernière il y a ${daysAgo(past[0].d)} j</span>${avg?`<span class="pill p-grey">en moyenne tous les ${avg} j</span>`:''}</div>${past.slice(0,5).map(mealRow).join('')}`:'<p class="muted" style="margin:4px 0 10px">Jamais planifié pour l\'instant.</p>'}`,true)}
 const mealRow=m=>`<div class="item" style="cursor:pointer" onclick="act.meal(${m.ix})"><span class="muted" style="width:96px">${fmtD(m.d,{weekday:'short',day:'numeric',month:'short'})}</span><span class="grow">${slotName(m.s)} · ${m.p} pers.</span><span class="muted">›</span></div>`;
-function dishPlan(k){const {up}=dishMeals(k);
-  return accd('d_plan','📅','Au menu',up.length?` · prévu ${fmtD(up[0].d,{weekday:'short',day:'numeric',month:'short'})}`:' · rien de prévu',
-   `${up.map(mealRow).join('')||'<p class="muted">Pas encore prévu au menu.</p>'}<button class="btn full" style="margin:8px 0 10px" onclick="act.planDish('${k}')">📅 ${isMgr()?'Ajouter au menu':'Suggérer au menu'}</button>`,true)}
-function dishPast(k){const {past}=dishMeals(k),avg=past.length>1?Math.round(daysAgo(past.at(-1).d)/(past.length-1)):null;
-  return accd('d_past','🕓','Historique',past.length?` · ${past.length} fois · dernière il y a ${daysAgo(past[0].d)} j`:' · jamais planifié',
-   past.length?`<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 0 4px"><span class="pill p-leaf">${past.length} fois planifié</span>${avg?`<span class="pill p-grey">en moyenne tous les ${avg} j</span>`:''}</div>${past.slice(0,5).map(mealRow).join('')}<p class="muted">${past.length>5?'Les 5 dernières fois.':''}</p>`:'<p class="muted">Jamais planifié pour l\'instant.</p>')}
 function prRange(){
   if(S.pr.range==='list'){const ds=dated(),l=ds.filter(l=>l.date<=S.menuFrom).at(-1)||ds[0],[a,b]=period(l);return [a,Math.round((D(b)-D(a))/864e5)+1]}
   return [S.menuFrom,S.pr.range==='2w'?14:7];
@@ -478,10 +480,8 @@ const VIEWS={
     <label class="muted" style="display:block;margin-top:8px">Notes</label><textarea class="txt" rows="2" ${ro?'disabled':''} oninput="S.ed.note=this.value">${e.note}</textarea>
     <p class="muted" style="margin-bottom:0">📎 Photo ou PDF de la recette (ex. page de livre) : prévu.</p>
     ${e.isNew?'':`<button class="btn sec2 full" style="margin-top:8px" onclick="act.recipe('${e.k}')">📖 ${ro?'Voir':'Aperçu de'} la recette</button>`}</div>`)}
-   ${e.isNew?'':dishPlan(e.k)}
-   ${ro?'':`<button class="btn full" style="margin:4px 0 10px" onclick="act.saveDish()">Enregistrer</button>`}
-   ${ro||e.isNew?'':`<button class="btn sec2 full" style="color:var(--im);margin-bottom:10px" onclick="act.delDish()">Supprimer le plat</button>`}
-   ${e.isNew?'':dishPast(e.k)}`};
+   ${e.isNew?'':dishMenu(e.k)}
+   ${ro?'':`<div class="row" style="gap:8px;justify-content:flex-end;margin:4px 0 10px">${e.isNew?'':`<button class="btn sec2" style="color:var(--im)" onclick="act.delDish()">Supprimer</button>`}<button class="btn" onclick="act.saveDish()">Enregistrer</button></div>`}`};
  },
  printMenu(){
   const [from,days]=prRange();
