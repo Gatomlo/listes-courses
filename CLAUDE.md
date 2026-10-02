@@ -50,6 +50,9 @@ Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/cabas.db`), nodemaile
 - Essai local : `CABAS_DATA_DIR=<dossier temp> CABAS_MAIL=log PORT=3101 node server.js` → le lien de connexion s'affiche dans la console. Ne jamais essayer sur `data/`.
 - Passerelle locale : jonction `node-gateway/apps/cabas` → ce dossier (créée), servie sur `http://localhost:3000/cabas/`.
 
+## Dépôt
+GitHub privé : https://github.com/Gatomlo/listes-courses (branche `master`) ; pousser après chaque commit.
+
 ## Déploiement (Infomaniak, via node-gateway)
 Envoyer `server.js`, `package.json`, `package-lock.json`, `lib/`, `public/` dans `apps/cabas` (jamais `data/`), `npm install --omit=dev`, redémarrer. Variables : `CABAS_PUBLIC_URL` (ex. `https://<domaine>/cabas`, recommandée : adresse des liens d'invitation et de réinitialisation) ; e-mails facultatifs : `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`MAIL_FROM` ou `CABAS_MAIL=sendmail`. Mot de passe de secours : `npm run set-password -- <email> <mdp>`. Migrations automatiques au démarrage.
 
