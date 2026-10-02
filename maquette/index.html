@@ -145,10 +145,13 @@ input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);backgr
 .phone.pc nav.tabs .badge{position:static;margin-left:auto}
 .brand{font:800 20px var(--display);padding:6px 12px 16px;color:var(--leaf)}
 .brand small{display:block;font:400 12px var(--body);color:var(--muted)}
-.phone.pc .cols{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
-.phone.pc .cols>:not(.acc){grid-column:1/-1}
-.phone.pc .cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 12px;align-items:start}
-.phone.pc .cards3>:not(.card){grid-column:1/-1}
+/* Colonnes « maçonnerie » : chaque panneau se place sous le précédent, sans trou */
+.phone.pc .cols{columns:2;column-gap:16px}
+.phone.pc .cols>.acc{break-inside:avoid;display:inline-block;width:100%;vertical-align:top}
+.phone.pc .cols>:not(.acc){column-span:all}
+.phone.pc .cards3{columns:3;column-gap:12px}
+.phone.pc .cards3>.card{break-inside:avoid;display:inline-block;width:100%}
+.phone.pc .cards3>:not(.card){column-span:all}
 .phone.pc .grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:start}
 .phone.pc .sheet-bg{align-items:center;justify-content:center}
 .phone.pc .sheet{width:500px;border-radius:18px;max-height:80%}
