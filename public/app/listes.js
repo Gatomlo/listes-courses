@@ -181,14 +181,15 @@ export function listView() {
   let body;
   if (l.status === 'closed') body = closedBody(l);
   else if (l.type === 'backlog') body = items;
-  else if (isPc()) body = `<div class="grid2"><div>${items}</div><div>${storesPanel(l)}${mealsPanel(l)}</div></div>`;
+  // PC : toute la largeur, rayons et panneaux en colonnes comme les autres ecrans.
+  else if (isPc()) body = `${add}${storesPanel(l)}${itemsBody(l, l.items, categoryOrder())}${basePanel(l)}${mealsPanel(l)}`;
   else {
     const tab = S.q.listTab || 'items';
     body = `<div class="seg">${[['items', 'Articles'], ['meals', `Repas${l.meals.length ? ` (${l.meals.length})` : ''}`], ['stores', 'Magasins']].map(([k, t]) => `<button class="${tab === k ? 'on' : ''}" data-a="list-tab" data-t="${k}">${t}</button>`).join('')}</div>
       ${tab === 'items' ? items : tab === 'meals' ? mealsPanel(l) : storesPanel(l)}`;
   }
   return {
-    title: listTitle(l), back: '#/listes',
+    cols: isPc() && l.status !== 'closed', title: listTitle(l), back: '#/listes',
     sub: l.type === 'backlog' ? 'Liste permanente' : `${STATUS[l.status]}${open ? ` · ${done}/${l.items.filter((i) => !i.suggestion).length} coché${done > 1 ? 's' : ''} · ≈ ${eur(l.pricing.split)}` : ''}`,
     right: l.type === 'dated' && open && mgr ? '<button class="btn sm sec2" data-a="list-menu" title="Actions de la liste">⋯</button>' : '',
     body,

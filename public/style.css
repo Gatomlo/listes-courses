@@ -219,7 +219,6 @@ table.wk button.meal,table.wk button.add{width:100%;font-size:13px}
   .cols{columns:2;column-gap:16px}
   .cols>.acc{break-inside:avoid;display:inline-block;width:100%;vertical-align:top}
   .cols>:not(.acc){column-span:all}
-  .grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:start}
   .cards3{columns:3;column-gap:12px}
   .cards3>.card{break-inside:avoid;display:inline-block;width:100%}
   .sheet-bg{align-items:center;justify-content:center}
