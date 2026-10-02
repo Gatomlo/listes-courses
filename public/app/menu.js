@@ -232,7 +232,8 @@ async function stockSheet() {
   sheet(`<h3>${esc(d.name)}</h3><p class="muted">${esc(fmtDate(pm.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[pm.slot]}</p>
     ${d.groups.map((g) => `<div class="sec">${esc(g.name)}</div><div class="opt">${g.options.map((o) => `<button class="${pm.options.includes(o.id) ? 'on' : ''}" data-a="pm-opt" data-id="${o.id}">${esc(o.name)}</button>`).join('')}</div>`).join('')}
     <div class="row"><span class="grow">Personnes</span><button class="btn sm sec2" data-a="pm-p" data-d="-1">−</button><b class="w3 c" id="pm-persons">${pm.persons}</b><button class="btn sm sec2" data-a="pm-p" data-d="1">＋</button></div>
-    ${ing.length ? `<div class="sec">Ingrédients à acheter</div><p class="muted small">Décocher ce qui est encore en réserve.</p>
+    ${ing.length ? `<div class="sec">Ingrédients à acheter</div><div class="row"><p class="muted small grow">Décocher ce qui est encore en réserve.</p>
+      <button class="btn sm sec2" data-a="pm-all" data-on="${ing.every((i) => !pm.skip.includes(i.product_id)) ? '' : '1'}">${ing.every((i) => !pm.skip.includes(i.product_id)) ? 'Tout décocher' : 'Tout cocher'}</button></div>
       ${ing.map((i) => `<label class="row line"><input type="checkbox" class="cb" data-ch="pm-skip" data-pid="${i.product_id}" ${pm.skip.includes(i.product_id) ? '' : 'checked'}><span class="grow">${esc(i.name)}</span></label>`).join('')}`
       : '<p class="muted">Plat sans ingrédients détaillés : simple rappel dans la liste.</p>'}
     <div class="row end"><button class="btn" data-a="pm-save">${pm.id ? 'Enregistrer' : isManager() ? 'Ajouter au menu' : 'Suggérer ce plat'}</button></div>`);
@@ -242,10 +243,19 @@ on('click', 'pm-opt', (el) => {
   pm.options = [...pm.options.filter((o) => !g.options.some((x) => x.id === o)), id];
   stockSheet();
 });
+// Tout cocher (rien en reserve) / tout decocher (tout en reserve).
+on('click', 'pm-all', (el) => {
+  const ids = dishIngredients(pm.dish, pm.options).filter((i) => !i.is_base).map((i) => i.product_id);
+  pm.skip = el.dataset.on ? pm.skip.filter((x) => !ids.includes(x)) : [...new Set([...pm.skip, ...ids])];
+  stockSheet();
+});
 on('click', 'pm-p', (el) => { pm.persons = Math.max(1, pm.persons + Number(el.dataset.d)); document.getElementById('pm-persons').textContent = pm.persons; });
 on('change', 'pm-skip', (el) => {
   const pid = Number(el.dataset.pid);
   pm.skip = el.checked ? pm.skip.filter((x) => x !== pid) : [...pm.skip, pid];
+  // Bouton « tout » mis a jour sans redessiner le panneau (garde le defilement).
+  const all = document.querySelector('[data-a="pm-all"]'), none = !document.querySelector('[data-ch="pm-skip"]:not(:checked)');
+  if (all) { all.dataset.on = none ? '' : '1'; all.textContent = none ? 'Tout décocher' : 'Tout cocher'; }
 });
 on('click', 'pm-save', async () => {
   const body = { date: pm.date, slot: pm.slot, dish_id: pm.dish_id, persons: pm.persons, skip: pm.skip, options: pm.options };

@@ -176,13 +176,12 @@ export function listView() {
   const l = current, mgr = isManager(), open = l.status !== 'closed';
   const done = l.items.filter((i) => i.status === 'bought' && !i.suggestion).length;
   const add = open ? `<div class="addbox"><input class="txt" id="add-q" autocomplete="off" placeholder="${mgr ? '＋ Ajouter un article…' : '＋ Suggérer un article…'}" data-in="add-q" data-enter="add-first"><div id="add-ac"></div></div>` : '';
-  const shopBtns = l.type === 'dated' && open && !isPc() ? `<div class="row wrap">${activeStores().map((s) => `<a class="btn sm sec2" href="#/listes/${l.id}/magasin/${s.id}">🛒 ${esc(s.name)}</a>`).join('')}</div>` : '';
+  const shopBtns = l.type === 'dated' && open ? `<div class="row wrap">${activeStores().map((s) => `<a class="btn sm sec2" href="#/listes/${l.id}/magasin/${s.id}">🛒 ${esc(s.name)}</a>`).join('')}</div>` : '';
   const items = `${shopBtns}${add}${itemsBody(l, l.items, categoryOrder())}${l.type === 'dated' ? basePanel(l) : ''}`;
   let body;
   if (l.status === 'closed') body = closedBody(l);
   else if (l.type === 'backlog') body = items;
-  // PC : toute la largeur, rayons et panneaux en colonnes comme les autres ecrans.
-  else if (isPc()) body = `${add}${storesPanel(l)}${itemsBody(l, l.items, categoryOrder())}${basePanel(l)}${mealsPanel(l)}`;
+  // Meme decoupage en onglets sur PC (rayons en colonnes) que sur telephone.
   else {
     const tab = S.q.listTab || 'items';
     body = `<div class="seg">${[['items', 'Articles'], ['meals', `Repas${l.meals.length ? ` (${l.meals.length})` : ''}`], ['stores', 'Magasins']].map(([k, t]) => `<button class="${tab === k ? 'on' : ''}" data-a="list-tab" data-t="${k}">${t}</button>`).join('')}</div>
