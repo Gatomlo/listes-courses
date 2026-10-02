@@ -38,8 +38,11 @@
 - **Gestion des membres** (gestionnaire) : modifier le nom affiché et l'e-mail, **changer le profil** Membre ↔ Gestionnaire, **retirer du foyer** (le compte n'est pas supprimé ; ses suggestions en attente sont refusées ; son nom reste dans l'historique). Le foyer garde toujours au moins un gestionnaire : le dernier ne peut être ni rétrogradé ni retiré.
 - Écran **Foyer** organisé en **accordéons** (en-tête avec résumé : nombre, valeurs clés) : Membres, Réglages, puis un accordéon par magasin (ordre des rayons). Bouton « Tout ouvrir / Tout replier » ; état mémorisé par appareil.
 - **Accès** :
-  - **Connexion** par lien magique : saisie de l'e-mail, lien valable 15 min et à usage unique, session de 90 jours sur l'appareil ; déconnexion depuis « Mes foyers ».
-  - **Invitation** (gestionnaire) : par e-mail ou lien copiable, avec le profil proposé (membre ou gestionnaire), valable 7 jours ; l'invité voit qui l'invite, dans quel foyer et avec quel rôle, puis rejoint ou refuse.
+  - **Connexion par e-mail et mot de passe** (8 caractères minimum, haché scrypt ; blocage 15 min après 8 échecs), session de 90 jours sur l'appareil ; déconnexion depuis « Mes foyers ». Aucun e-mail n'est nécessaire.
+  - **Premier compte** : créé librement sur la page d'accueil tant qu'aucun compte n'existe ; ensuite, seulement par invitation.
+  - **Mot de passe oublié** : un gestionnaire crée un lien de réinitialisation (48 h, usage unique) depuis la fiche du membre et le lui transmet ; secours : `npm run set-password -- <email> <mot de passe>` sur le serveur. Chacun peut changer son mot de passe (« Mes foyers »).
+  - **Lien de connexion par e-mail** (15 min, usage unique) : proposé en plus, seulement si l'envoi d'e-mails est configuré.
+  - **Invitation** (gestionnaire) : lien copiable (et e-mail si l'envoi est configuré), avec le profil proposé (membre ou gestionnaire), valable 7 jours ; l'invité voit qui l'invite, dans quel foyer et avec quel rôle, puis crée son compte (prénom, e-mail, mot de passe) — ou se connecte s'il en a déjà un — et rejoint le foyer.
   - **Mes foyers** : sélecteur en haut de l'écran Listes, créer un foyer (on en devient gestionnaire). Catalogue, magasins, listes et plats sont propres à chaque foyer.
 
 ## 3. Catalogue commun du foyer
@@ -218,7 +221,7 @@ Pour afficher le menu (frigo, cuisine) ou le partager.
 - Temps réel : **Server-Sent Events** par foyer (process unique → diffusion en mémoire suffit).
 - Hors-ligne : stockage local du navigateur (copie de chaque lecture, file d'opérations) ; chaque opération porte un `op_id` unique (table `AppliedOp` côté serveur pour l'idempotence) ; `POST /api/h/:hid/sync` rejoue les opérations ; au retour du réseau, l'écran courant est rechargé (pas de rattrapage incrémental).
 - Import de recette : extraction JSON-LD/microdonnées côté serveur (lecture des blocs JSON-LD sans dépendance), analyse des lignes d'ingrédients par règles (quantités, fractions, unités françaises).
-- Authentification : lien magique e-mail (comme La Hotte), session cookie.
+- Authentification : e-mail + mot de passe (scrypt), session cookie ; lien magique par e-mail en option (e-mails désactivés par défaut).
 - Pas de sous-domaine : URL = domaine de la passerelle + `/cabas/`.
 
 ### Modèle de données (simplifié)

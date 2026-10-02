@@ -3,7 +3,7 @@
 import { esc, on, toggleAcc, isPc, toast } from './ui.js';
 import { get, post, ApiError, net, outbox, onNetChange, onFlushed, flush } from './api.js';
 import { S, setRenderer, render, loadHouse, loadProducts, go } from './state.js';
-import { loginView, foyersView, setInvite, loadInvitation, acceptPending } from './connexion.js';
+import { loginView, foyersView, setInvite, setReset, loadOptions, loadInvitation, acceptPending, resetPending } from './connexion.js';
 import { foyerView } from './foyer.js';
 import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
@@ -60,7 +60,7 @@ async function route() {
     shell(publicView());
     return;
   }
-  if (!S.me) { S.route = ['login']; shell(loginView()); return; }
+  if (!S.me || resetPending()) { S.route = ['login']; shell(loginView()); return; }
   if (!S.me.householdId) { S.route = ['foyers']; shell(foyersView()); return; }
   let [name, arg] = parts;
   if (name === 'catalogue' && arg) name = 'produit';
@@ -98,7 +98,7 @@ setRenderer(() => {
   // Re-rendu sans recharger (sauf changement d'adresse) : on garde le defilement.
   const y = window.scrollY;
   const [name, arg] = S.route;
-  if (!S.me) shell(loginView());
+  if (!S.me || resetPending()) shell(loginView());
   else if (!S.me.householdId) shell(foyersView());
   else if (name === 'affichage') shell(publicView());
   else if ((name === 'catalogue' && !S.products) || (name === 'listes' && listNeedsLoad()) || (name === 'plats' && !S.dishes)) { route(); return; }
@@ -164,7 +164,9 @@ async function boot() {
   const params = new URLSearchParams(location.search);
   const login = params.get('login');
   if (params.get('invite')) setInvite(params.get('invite'));
-  if (login || params.get('invite')) history.replaceState(null, '', location.pathname + location.hash);
+  if (params.get('reset')) setReset(params.get('reset'));
+  if (login || params.get('invite') || params.get('reset')) history.replaceState(null, '', location.pathname + location.hash);
+  await loadOptions();
   let loginError = null;
   if (login) {
     try { S.me = await post('auth/verify', { token: login }); } catch (e) { loginError = e.message; }

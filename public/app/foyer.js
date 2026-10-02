@@ -61,6 +61,7 @@ on('click', 'member', (el) => {
     ${mgr ? `<label class="muted">Nom affiché dans ce foyer</label><input class="txt" name="display_name" value="${esc(m.name)}">
     <div class="sec">Profil</div><div class="seg">${['member', 'manager'].map((r) => `<button class="${m.role === r ? 'on' : ''}" data-a="member-role" data-id="${m.id}" data-role="${r}" ${last && r === 'member' ? 'disabled title="Dernier gestionnaire"' : ''}>${roleLabel(r)}</button>`).join('')}</div>
     <p class="muted small">${m.role === 'manager' ? 'Ajoute directement, valide les suggestions, gère plats, catalogue, magasins et membres.' : 'Consulte, coche en magasin, scanne les tickets et suggère articles et plats.'}${last ? ' Il faut au moins un gestionnaire dans le foyer.' : ''}</p>` : ''}
+    ${mgr && !m.me ? `<div class="sec">Mot de passe oublié</div><button class="btn sec2 sm" data-a="member-reset" data-id="${m.id}">🔑 Créer un lien de réinitialisation</button><div id="reset-out"></div>` : ''}
     <div class="row end">${!last ? `<button class="btn sec2 danger-t" data-a="member-del" data-id="${m.id}">${m.me ? 'Quitter le foyer' : 'Retirer du foyer'}</button>` : ''}${mgr ? `<button class="btn" data-a="member-save" data-id="${m.id}">Enregistrer</button>` : ''}</div>`);
 });
 on('click', 'member-role', async (el) => {
@@ -87,7 +88,7 @@ on('click', 'member-del', async (el) => {
 
 // ---------- Invitation ----------
 on('click', 'invite', () => {
-  sheet(`<h3>Inviter un membre</h3><label class="muted">E-mail (facultatif : sinon, copiez le lien)</label><input class="txt" name="email" type="email" placeholder="prenom@exemple.be">
+  sheet(`<h3>Inviter un membre</h3><label class="muted">E-mail (facultatif, envoyé seulement si l'envoi d'e-mails est configuré)</label><input class="txt" name="email" type="email" placeholder="prenom@exemple.be">
     <div class="sec">Profil</div><select class="txt" name="role"><option value="member">Membre</option><option value="manager">Gestionnaire</option></select>
     <div class="row end" style="margin-top:12px"><button class="btn" data-a="invite-ok">Créer l'invitation</button></div><div id="invite-out"></div>`);
 });
@@ -161,3 +162,16 @@ on('click', 'cat-del-ok', async (el) => {
   if (await attempt(() => del(hp(`/categories/${el.dataset.id}${to ? `?moveTo=${to.value}` : ''}`)))) { closeSheet(); toast('Rayon supprimé'); S.products = null; await refresh(); }
 });
 on('click', 'close', () => closeSheet());
+
+// Lien de reinitialisation du mot de passe (48 h), a transmettre au membre.
+on('click', 'member-reset', async (el) => {
+  const r = await attempt(() => post(hp(`/members/${el.dataset.id}/reset-link`)));
+  if (!r) return;
+  document.getElementById('reset-out').innerHTML = `<input class="txt" readonly value="${esc(r.url)}" id="reset-url" style="margin-top:8px">
+    <p class="muted small">Valable 48 h, une seule fois. À transmettre au membre (message, SMS…) : il y choisira un nouveau mot de passe.</p>
+    <button class="btn sec2 sm" data-a="reset-copy">🔗 Copier</button>`;
+});
+on('click', 'reset-copy', async () => {
+  const i = document.getElementById('reset-url');
+  try { await navigator.clipboard.writeText(i.value); toast('Lien copié'); } catch { i.select(); }
+});

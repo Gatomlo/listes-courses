@@ -37,7 +37,8 @@ nav.tabs svg{width:22px;height:22px}
 .card.click{cursor:pointer}
 a.card{text-decoration:none}
 .card h4{margin:0 0 4px;font:600 16px var(--display)}
-.card.narrow{max-width:520px}
+.card.narrow{max-width:520px;margin-left:auto;margin-right:auto}
+.hero{max-width:520px;margin-left:auto;margin-right:auto}
 .card.error{color:var(--danger)}
 .row{display:flex;align-items:center;gap:8px}
 .row.gap{gap:10px}
