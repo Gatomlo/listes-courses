@@ -89,6 +89,23 @@ input.cb{width:22px;height:22px;flex:none;accent-color:var(--leaf)}
 .hero .logo{font-size:56px}
 .hero h1{font:800 30px var(--display);margin:6px 0}
 
+/* ---------- Listes ---------- */
+.chk{width:28px;height:28px;border-radius:8px;border:2px solid var(--line);background:var(--surface);flex:none;display:grid;place-items:center;color:#fff;font-weight:800;padding:0}
+.chk.on{background:var(--leaf);border-color:var(--leaf)}
+.item.done .nm{text-decoration:line-through;color:var(--muted)}
+.item.pending{opacity:.7}
+.item.pending .nm{font-style:italic}
+.fw4{font-weight:400}
+.txt.c{text-align:center}
+.addbox{position:relative;margin-bottom:12px}
+.ac{background:var(--surface);border:1px solid var(--line);border-radius:11px;margin-top:4px;overflow:hidden}
+.ac button{display:flex;width:100%;border:0;background:none;padding:10px 12px;text-align:left;gap:8px;border-bottom:1px solid var(--line)}
+.ac button:last-child{border-bottom:0}
+.ac button:hover{background:var(--sunk)}
+.badge{background:var(--carrot);color:#fff;border-radius:99px;font-size:11px;font-weight:700;padding:0 6px;min-width:18px;text-align:center;display:inline-block}
+nav.tabs a{position:relative}
+nav.tabs .badge{position:absolute;top:4px;left:calc(50% + 6px)}
+
 /* ---------- Accordeons ---------- */
 .acc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
 .acc-h{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:12px 14px;text-align:left}
@@ -114,6 +131,7 @@ input.cb{width:22px;height:22px;flex:none;accent-color:var(--leaf)}
   nav.tabs{position:sticky;top:0;height:100vh;grid-column:1;grid-row:1/3;flex-direction:column;border-top:0;border-right:1px solid var(--line);padding:14px 10px;gap:2px}
   nav.tabs a{flex:none;flex-direction:row;gap:10px;font-size:14px;padding:10px 12px;border-radius:10px;color:var(--ink)}
   nav.tabs a.on{background:var(--leaf-soft);color:var(--leaf)}
+  nav.tabs .badge{position:static;margin-left:auto}
   /* Colonnes « maconnerie » : chaque panneau se place sous le precedent, sans trou. */
   .cols{columns:2;column-gap:16px}
   .cols>.acc{break-inside:avoid;display:inline-block;width:100%;vertical-align:top}

@@ -2,7 +2,7 @@
 // (caracteristiques, prix moyens par magasin, releves), creation, fusion, suppression.
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
 import { get, post, patch, del, attempt } from './api.js';
-import { S, hp, isManager, render, go, loadProducts, loadHouse, activeStores, storeById, catName } from './state.js';
+import { S, hp, isManager, render, go, loadProducts, loadHouse, activeStores, storeById, catName, categoryOrder } from './state.js';
 
 const REC = { 1: 'chaque liste', 2: 'toutes les 2 listes', 3: 'toutes les 3 listes' };
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -10,12 +10,6 @@ const stTag = (sid) => {
   const s = storeById(sid);
   return s ? `<span class="st" style="--c:${esc(s.color)}">${esc(s.name)}</span>` : '';
 };
-
-// Rayons dans l'ordre du premier magasin actif (parcours de reference).
-function categoryOrder() {
-  const first = activeStores()[0];
-  return first ? first.categoryOrder : S.house.categories.map((c) => c.id);
-}
 
 export function catalogueView() {
   const q = S.q.cat || '', f = S.q.catFilter || 'all';
@@ -46,8 +40,8 @@ on('input', 'cat-q', (el) => {
 on('click', 'cat-filter', (el) => { S.q.catFilter = el.dataset.f; render(); });
 
 // ---------- Creation ----------
-const unitOptions = (cur) => S.house.units.map((u) => `<option ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('');
-const catOptions = (cur) => categoryOrder().map((cid) => `<option value="${cid}" ${cid === cur ? 'selected' : ''}>${esc(catName(cid))}</option>`).join('');
+export const unitOptions = (cur) => S.house.units.map((u) => `<option ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('');
+export const catOptions = (cur) => categoryOrder().map((cid) => `<option value="${cid}" ${cid === cur ? 'selected' : ''}>${esc(catName(cid))}</option>`).join('');
 
 on('click', 'prod-new', (el) => {
   sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté au catalogue commun du foyer.</p>

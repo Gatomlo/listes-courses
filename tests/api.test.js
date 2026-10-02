@@ -1,49 +1,11 @@
 // Tests de l'API sur une base temporaire (aucun e-mail envoye : CABAS_MAIL=log).
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-
-const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'cabas-test-'));
-process.env.CABAS_DATA_DIR = DIR;
-process.env.CABAS_MAIL = 'log';
-process.env.CABAS_QUIET = '1';
-const app = require('../server');
-const { outbox } = require('../lib/mailer');
-const { requests } = require('../lib/auth');
+const { start, baseUrl, client, outbox } = require('./helpers');
 
 let server, base;
-before(async () => {
-  server = app.listen(0);
-  await new Promise((r) => server.once('listening', r));
-  base = `http://127.0.0.1:${server.address().port}`;
-});
+before(async () => { server = await start(); base = baseUrl(); });
 after(() => server.close());
-
-// Client avec son cookie de session.
-function client() {
-  let cookie = '';
-  const call = async (method, url, body) => {
-    const res = await fetch(base + url, {
-      method, headers: { 'content-type': 'application/json', cookie }, body: body ? JSON.stringify(body) : undefined,
-    });
-    const set = res.headers.get('set-cookie');
-    if (set) cookie = set.split(';')[0];
-    const data = await res.json().catch(() => null);
-    return { status: res.status, data };
-  };
-  return {
-    get: (u) => call('GET', u), post: (u, b) => call('POST', u, b || {}), patch: (u, b) => call('PATCH', u, b),
-    put: (u, b) => call('PUT', u, b), del: (u) => call('DELETE', u),
-    async login(email) {
-      requests.clear();
-      await call('POST', '/api/auth/request', { email });
-      const token = new URL(outbox.at(-1).text.match(/https?:\S+/)[0]).searchParams.get('login');
-      return call('POST', '/api/auth/verify', { token });
-    },
-  };
-}
 
 let thomas, lea, hid, h;
 

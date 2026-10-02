@@ -6,6 +6,7 @@ import { S, setRenderer, render, loadHouse, loadProducts, go } from './state.js'
 import { loginView, foyersView, setInvite, loadInvitation, acceptPending } from './connexion.js';
 import { foyerView } from './foyer.js';
 import { catalogueView, productView, loadProduct } from './catalogue.js';
+import { listesView, listView, loadSummary, loadList, loadSuggestions, listNeedsLoad } from './listes.js';
 
 const app = document.getElementById('app');
 
@@ -25,7 +26,8 @@ const soon = (title, what) => () => ({
 });
 
 const ROUTES = {
-  listes: soon('Listes', 'Listes « À prévoir » et datées, suggestions des membres, répartition par magasin et économie estimée, mode courses par rayon.'),
+  listes: listesView,
+  liste: listView,
   menu: soon('Menu', 'Planning des repas par créneau, ingrédients ajoutés à la liste de la période, export et impression.'),
   plats: soon('Plats', 'Plats et recettes (import depuis un lien), historique des planifications.'),
   catalogue: catalogueView,
@@ -35,9 +37,10 @@ const ROUTES = {
 };
 
 function shell(v) {
-  const tab = S.route[0] === 'produit' ? 'catalogue' : S.route[0] === 'foyers' ? 'foyer' : S.route[0];
+  const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes' }[S.route[0]] || S.route[0];
+  const badge = S.house && S.house.role === 'manager' && S.house.pending ? `<span class="badge">${S.house.pending}</span>` : '';
   const nav = v.noNav ? '' : `<nav class="tabs">${isPc() ? `<div class="brand">🧺 Le Cabas<small>${esc(S.house ? S.house.household.name : '')}</small></div>` : ''}
-    ${NAV.map(([k, t, svg]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg><span>${t}</span></a>`).join('')}</nav>`;
+    ${NAV.map(([k, t, svg]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg><span>${t}</span>${k === 'foyer' ? badge : ''}</a>`).join('')}</nav>`;
   app.className = 'shell' + (v.noNav ? ' nonav' : '');
   app.innerHTML = `<header class="top">${v.back ? `<a class="back" href="${v.back}" aria-label="Retour">‹</a>` : ''}<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>${v.right || ''}</header>
     <main><div class="${v.cols ? 'cols' : ''}">${v.body}</div></main>${nav}`;
@@ -49,15 +52,20 @@ async function route() {
   if (!S.me.householdId) { S.route = ['foyers']; shell(foyersView()); return; }
   let [name, arg] = parts;
   if (name === 'catalogue' && arg) name = 'produit';
-  if (!ROUTES[name]) { go('#/catalogue'); return; }
+  if (name === 'listes' && arg) name = 'liste';
+  if (!ROUTES[name]) { go('#/listes'); return; }
   S.route = [name, arg];
   try {
     if (!S.house) await loadHouse();
     if (name === 'catalogue' && !S.products) await loadProducts();
     if (name === 'produit') await loadProduct(arg);
+    if (name === 'listes') await loadSummary();
+    if (name === 'liste') await loadList(arg);
+    if (name === 'foyer') await loadSuggestions();
     shell(ROUTES[name]());
   } catch (e) {
     if (e instanceof ApiError && e.status === 404 && name === 'produit') { go('#/catalogue'); return; }
+    if (e instanceof ApiError && e.status === 404 && name === 'liste') { go('#/listes'); return; }
     if (e instanceof ApiError && e.status === 401) { location.href = './'; return; }
     app.innerHTML = `<div class="card error">${esc(e.message)}</div>`;
   }
@@ -65,17 +73,16 @@ async function route() {
 
 setRenderer(() => {
   // Re-rendu sans recharger (sauf changement d'adresse) : on garde le defilement.
-  const y = document.querySelector('main') ? document.querySelector('main').scrollTop : 0;
+  const y = window.scrollY;
   const [name, arg] = S.route;
   if (!S.me) shell(loginView());
   else if (!S.me.householdId) shell(foyersView());
-  else if (name === 'catalogue' && !S.products) { route(); return; }
+  else if ((name === 'catalogue' && !S.products) || (name === 'listes' && listNeedsLoad())) { route(); return; }
   else if (ROUTES[name]) shell(ROUTES[name](arg));
-  const m = document.querySelector('main');
-  if (m) m.scrollTop = y;
+  window.scrollTo(0, y);
 });
 
-window.addEventListener('hashchange', () => { route().then(() => { const m = document.querySelector('main'); if (m) m.scrollTop = 0; }); });
+window.addEventListener('hashchange', () => { route().then(() => window.scrollTo(0, 0)); });
 // Passage mobile <-> PC : la mise en page et l'etat des accordeons changent.
 window.matchMedia('(min-width: 900px)').addEventListener('change', () => render());
 

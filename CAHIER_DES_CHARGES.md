@@ -251,7 +251,7 @@ PlannedMealSkip(planned_meal, product)                     -- ingrédients en r�
 ## 11. Étapes
 
 1. ✅ Socle : auth, foyer, rôles, catalogue, magasins, déploiement node-gateway.
-2. Listes (À prévoir + datées), suggestions, clôture/report, récurrents.
+2. ✅ Listes (À prévoir + datées), suggestions, clôture/report, récurrents.
 3. Prix : relevés, moyennes, conseil, scénarios et économie, listes par magasin triées.
 4. Mode courses : cochage, saisie prix, temps réel (SSE), hors-ligne complet (stockage local, file d'opérations, synchronisation à la reprise).
 5. Scan du ticket (Tesseract.js) : lecture, rapprochement, alias par magasin, mise à jour des prix.

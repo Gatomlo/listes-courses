@@ -15,6 +15,12 @@ export const activeStores = () => S.house.stores.filter((s) => s.active);
 export const storeById = (id) => S.house.stores.find((s) => s.id === id);
 export const catName = (id) => (S.house.categories.find((c) => c.id === id) || {}).name || '—';
 
+// Rayons dans l'ordre du premier magasin actif (parcours de reference).
+export function categoryOrder() {
+  const first = activeStores()[0];
+  return first ? first.categoryOrder : S.house.categories.map((c) => c.id);
+}
+
 export async function loadHouse() {
   S.house = S.me.householdId ? await get(hp()) : null;
 }
