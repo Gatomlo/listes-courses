@@ -167,6 +167,10 @@ test('lecture des ingredients et des recettes', () => {
   assert.deepEqual(r.steps, ['Éplucher.', 'Cuire 1 h.']);
   assert.equal(r.ingredients.length, 3);
   assert.equal(parseRecipeHtml('<html>rien</html>'), null);
+  const ent = parseRecipeHtml(`<script type="application/ld+json">${JSON.stringify({ '@type': 'Recipe', name: 'Gratin d&#x27;endives', recipeIngredient: ['200 g d&amp;#x27;emmental'], recipeInstructions: 'Pr&eacute;chauffer l&#39;four' })}</script>`);
+  assert.equal(ent.name, "Gratin d'endives");
+  assert.equal(ent.ingredients[0].raw, "200 g d'emmental");
+  assert.deepEqual(ent.steps, ["Préchauffer l'four"]);
   assert.ok(privateIp('127.0.0.1') && privateIp('10.1.2.3') && privateIp('192.168.1.1') && privateIp('::1') && !privateIp('8.8.8.8'));
 });
 
