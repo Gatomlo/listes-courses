@@ -1,12 +1,12 @@
 // Point d'entree : connexion (lien e-mail, invitation), navigation par #, cadre de
 // l'ecran (en-tete, navigation en bas sur mobile / barre laterale sur PC).
 import { esc, on, toggleAcc, isPc, toast } from './ui.js';
-import { get, post, ApiError } from './api.js';
+import { get, post, ApiError, net, outbox, onNetChange, onFlushed, flush } from './api.js';
 import { S, setRenderer, render, loadHouse, loadProducts, go } from './state.js';
 import { loginView, foyersView, setInvite, loadInvitation, acceptPending } from './connexion.js';
 import { foyerView } from './foyer.js';
 import { catalogueView, productView, loadProduct } from './catalogue.js';
-import { listesView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad } from './listes.js';
+import { listesView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList } from './listes.js';
 
 const app = document.getElementById('app');
 
@@ -43,8 +43,13 @@ function shell(v) {
   const nav = v.noNav ? '' : `<nav class="tabs">${isPc() ? `<div class="brand">🧺 Le Cabas<small>${esc(S.house ? S.house.household.name : '')}</small></div>` : ''}
     ${NAV.map(([k, t, svg]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg><span>${t}</span>${k === 'listes' ? badge : ''}</a>`).join('')}</nav>`;
   app.className = 'shell' + (v.noNav ? ' nonav' : '');
+  const pending = S.me ? outbox().length : 0;
+  const hhmm = (t) => new Date(t).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
+  const banner = !S.me ? '' : !net.online
+    ? `<div class="net off">📴 <b>Hors-ligne</b>${net.syncedAt ? ` · données du ${hhmm(net.syncedAt)}` : ''}${pending ? ` · ${pending} modification${pending > 1 ? 's' : ''} en attente` : ''}</div>`
+    : pending ? `<div class="net wait">⏳ ${pending} modification${pending > 1 ? 's' : ''} en cours d'envoi…</div>` : '';
   app.innerHTML = `<header class="top">${v.back ? `<a class="back" href="${v.back}" aria-label="Retour">‹</a>` : ''}<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>${v.right || ''}</header>
-    <main><div class="${v.cols ? 'cols' : ''}">${v.body}</div></main>${nav}`;
+    <main>${banner}<div class="${v.cols ? 'cols' : ''}">${v.body}</div></main>${nav}`;
 }
 
 async function route() {
@@ -56,6 +61,7 @@ async function route() {
   if (name === 'listes' && arg) name = parts[2] === 'magasin' ? 'magasin' : 'liste';
   if (!ROUTES[name]) { go('#/listes'); return; }
   S.route = [name, arg, parts[3]];
+  connectEvents();
   try {
     if (!S.house) await loadHouse();
     if (name === 'catalogue' && !S.products) await loadProducts();
@@ -67,6 +73,10 @@ async function route() {
     if (e instanceof ApiError && e.status === 404 && name === 'produit') { go('#/catalogue'); return; }
     if (e instanceof ApiError && e.status === 404 && name === 'liste') { go('#/listes'); return; }
     if (e instanceof ApiError && e.status === 401) { location.href = './'; return; }
+    if (e instanceof ApiError && e.status === 0) {
+      shell({ title: 'Hors-ligne', back: '#/listes', body: '<div class="card"><h4>📴 Pas de réseau</h4><p class="muted">Cette page n’a pas encore été ouverte avec du réseau sur cet appareil. Les listes à venir, elles, sont gardées dès l’ouverture de l’app.</p></div>' });
+      return;
+    }
     app.innerHTML = `<div class="card error">${esc(e.message)}</div>`;
   }
 }
@@ -87,6 +97,52 @@ window.addEventListener('hashchange', () => { route().then(() => window.scrollTo
 window.matchMedia('(min-width: 900px)').addEventListener('change', () => render());
 
 on('click', 'acc', (el) => { toggleAcc(el.dataset.id, !!el.dataset.def); render(); });
+
+// ---------- Temps reel (SSE) ----------
+let es = null, esKey = '', reloadTimer = null;
+function connectEvents() {
+  const hid = S.me && S.me.householdId;
+  const listId = ['liste', 'magasin'].includes(S.route[0]) ? S.route[1] : '';
+  const key = hid && net.online ? `${hid}:${listId}` : '';
+  if (key === esKey) return;
+  if (es) es.close();
+  es = null; esKey = key;
+  if (!key) return;
+  es = new EventSource(`api/h/${hid}/events?list=${listId}`);
+  es.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.type === 'presence') { S.presence = d.users; if (S.route[0] === 'magasin' && currentList()) render(); return; }
+    if (d.type === 'change' && d.by !== S.me.id) {
+      clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(reloadView, 300); // plusieurs changements rapproches : un seul rechargement
+    }
+  };
+}
+// Recharge l'ecran courant apres un changement fait par quelqu'un d'autre.
+async function reloadView() {
+  try {
+    const [name, arg] = S.route;
+    if ((name === 'liste' || name === 'magasin') && currentList()) await loadList(arg);
+    else if (name === 'listes') await Promise.all([loadSummary(), loadSuggestions()]);
+    await loadHouse();
+    if (!document.querySelector('.sheet-bg')) render();
+  } catch { /* hors-ligne : on garde l'affichage */ }
+}
+onNetChange(() => { connectEvents(); if (S.me) render(); });
+onFlushed(() => reloadView());
+
+// Listes a venir gardees sur l'appareil a l'ouverture (magasins sans reseau).
+async function prefetch() {
+  if (!net.online || !S.me || !S.me.householdId) return;
+  try {
+    const s = await get(`h/${S.me.householdId}/lists`);
+    for (const l of [s.backlog, ...s.upcoming]) await get(`h/${S.me.householdId}/lists/${l.id}`);
+    await get(`h/${S.me.householdId}/products`);
+  } catch { /* sans importance */ }
+}
+
+// Application installable et utilisable sans reseau (voir sw.js).
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 on('click', 'go', (el) => go(el.dataset.to));
 
 // ---------- Demarrage ----------
@@ -104,5 +160,7 @@ async function boot() {
   await route();
   if (loginError && !S.me) toast(loginError, true);
   if (S.me) await acceptPending();
+  flush();
+  prefetch();
 }
 boot();

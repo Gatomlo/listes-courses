@@ -1,7 +1,7 @@
 // Listes : accueil (A prevoir, prochaines courses, historique), detail d'une liste
 // (articles par rayon, ajout, suggestions, fiche article, actions), creation, cloture.
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc } from './ui.js';
-import { get, post, patch, del, attempt } from './api.js';
+import { get, post, patch, del, attempt, sync, newOp, setCached } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
 import { unitOptions, catOptions } from './catalogue.js';
 
@@ -19,7 +19,24 @@ export async function loadList(id) {
   current = await get(hp(`/lists/${id}`));
   if (!S.products) await loadProducts();
 }
-const refreshList = async (l) => { current = l || await get(hp(`/lists/${current.id}`)); await loadHouse(); render(); };
+const refreshList = async (l) => { current = l || await get(hp(`/lists/${current.id}`)); setCached(hp(`/lists/${current.id}`), current); await loadHouse(); render(); };
+export const currentList = () => current;
+const isTemp = (id) => String(id).startsWith('tmp');
+
+// Actions du mode courses : appliquees tout de suite a l'ecran et a la copie locale,
+// puis envoyees (ou mises en file sans reseau, voir api.js).
+async function runOps(ops, local) {
+  local(current);
+  setCached(hp(`/lists/${current.id}`), current);
+  render();
+  const r = await attempt(() => sync(S.me.householdId, ops));
+  if (r && r.lists) {
+    const l = r.lists.find((x) => x.id === current.id);
+    if (l) await refreshList(l);
+  }
+}
+const itemUpdate = (i, fields) => runOps([newOp({ type: 'item.update', item_id: i.id, fields })], () => Object.assign(i, fields,
+  fields.store_id !== undefined ? { manual_store: !!fields.store_id, at_store_id: fields.store_id || i.best_store_id || i.at_store_id } : {}));
 
 // ---------- Accueil ----------
 export function listesView() {
@@ -143,7 +160,8 @@ export function listView() {
   const l = current, mgr = isManager(), open = l.status !== 'closed';
   const done = l.items.filter((i) => i.status === 'bought' && !i.suggestion).length;
   const add = open ? `<div class="addbox"><input class="txt" id="add-q" autocomplete="off" placeholder="${mgr ? '＋ Ajouter un article…' : '＋ Suggérer un article…'}" data-in="add-q" data-enter="add-first"><div id="add-ac"></div></div>` : '';
-  const items = `${add}${itemsBody(l, l.items, categoryOrder())}`;
+  const shopBtns = l.type === 'dated' && open && !isPc() ? `<div class="row wrap">${activeStores().map((s) => `<a class="btn sm sec2" href="#/listes/${l.id}/magasin/${s.id}">🛒 ${esc(s.name)}</a>`).join('')}</div>` : '';
+  const items = `${shopBtns}${add}${itemsBody(l, l.items, categoryOrder())}`;
   let body;
   if (l.status === 'closed') body = closedBody(l);
   else if (l.type === 'backlog') body = items;
@@ -161,18 +179,46 @@ export function listView() {
   };
 }
 
-// Liste d'un magasin : ses articles, dans l'ordre des rayons de ce magasin.
+// Mode courses : les articles du magasin dans l'ordre de ses rayons, en grand ; les
+// articles coches descendent dans « Dans le caddie ».
 export function storeListView(sid) {
+  if (!current) return { title: 'Chargement…', body: '' };
   const l = current, s = storeById(Number(sid));
+  if (!s) return { title: 'Magasin', back: `#/listes/${l.id}`, body: '<p class="muted">Magasin inactif.</p>' };
   const items = l.items.filter((i) => !i.suggestion && i.at_store_id === s.id);
-  const st = l.pricing.stores.find((x) => x.id === s.id) || { itemsTotal: 0, itemsUnknown: 0 };
-  const n = items.filter((i) => i.status === 'bought').length;
+  const todo = items.filter((i) => i.status !== 'bought'), done = items.filter((i) => i.status === 'bought');
+  const st = (l.pricing && l.pricing.stores.find((x) => x.id === s.id)) || { itemsTotal: 0, itemsUnknown: 0 };
+  const others = (S.presence || []).filter((u) => u.listId === l.id && u.id !== S.me.id).map((u) => u.name);
+  const open = l.status !== 'closed';
+  const groups = s.categoryOrder.map((cid) => [cid, todo.filter((i) => i.category_id === cid)]).filter(([, is]) => is.length);
   return {
-    title: s.name, back: `#/listes/${l.id}`,
-    sub: `${listTitle(l)} · ${n}/${items.length} coché${n > 1 ? 's' : ''} · ≈ ${eur(st.itemsTotal)}${st.itemsUnknown ? ` (${st.itemsUnknown} sans prix)` : ''}`,
-    body: itemsBody(l, items, s.categoryOrder) || '<p class="muted">Aucun article prévu dans ce magasin.</p>',
+    title: `En courses · ${s.name}`, back: `#/listes/${l.id}`,
+    sub: `${listTitle(l)} · ${done.length}/${items.length} dans le caddie · ≈ ${eur(st.itemsTotal)}${st.itemsUnknown ? ` (${st.itemsUnknown} sans prix)` : ''}`,
+    body: `<div class="shop">
+      ${activeStores().length > 1 ? `<div class="seg">${activeStores().map((x) => `<a class="${x.id === s.id ? 'on' : ''}" href="#/listes/${l.id}/magasin/${x.id}">${esc(x.name)}</a>`).join('')}</div>` : ''}
+      ${others.length ? `<p class="muted small">🟢 ${esc([...new Set(others)].join(', '))} ${others.length > 1 ? 'sont' : 'est'} aussi sur cette liste · synchronisé en direct</p>` : ''}
+      ${groups.map(([cid, is]) => acc(`sh_${cid}`, { title: catName(cid), sum: ` · ${is.length} à prendre`, def: true, body: is.map((i) => itemRow(i, l)).join('') })).join('')
+        || (items.length ? '<div class="card">🎉 Tout est dans le caddie.</div>' : '<p class="muted">Aucun article prévu dans ce magasin.</p>')}
+      ${done.length ? acc('sh_done', { icon: '🛒', title: 'Dans le caddie', sum: ` · ${done.length}`, body: done.map((i) => itemRow(i, l)).join('') }) : ''}
+      ${open && items.length ? `<button class="btn full" data-a="shop-end" data-sid="${s.id}">Terminer chez ${esc(s.name)}</button>` : ''}</div>`,
   };
 }
+on('click', 'shop-end', (el) => {
+  const sid = Number(el.dataset.sid);
+  const left = current.items.filter((i) => !i.suggestion && i.at_store_id === sid && i.status === 'todo');
+  sheet(`<h3>Terminer chez ${esc(storeName(sid))}</h3>
+    <button class="btn full sec2" disabled>📷 Scanner le ticket (étape suivante)</button>
+    ${left.length ? `<p class="muted">${left.length} article${left.length > 1 ? 's' : ''} non pris. Les marquer « indisponible » ? Ils seront reportés à la clôture de la liste.</p>` : ''}
+    <div class="row end">${left.length ? `<button class="btn sec2" data-a="shop-end-unav" data-sid="${sid}">Marquer indisponibles</button>` : ''}<button class="btn" data-a="shop-end-ok">Terminer</button></div>`);
+});
+on('click', 'shop-end-unav', async (el) => {
+  const sid = Number(el.dataset.sid);
+  const left = current.items.filter((i) => !i.suggestion && i.at_store_id === sid && i.status === 'todo' && !isTemp(i.id));
+  closeSheet();
+  await runOps(left.map((i) => newOp({ type: 'item.update', item_id: i.id, fields: { status: 'unavailable' } })), () => left.forEach((i) => { i.status = 'unavailable'; }));
+  go(`#/listes/${current.id}`);
+});
+on('click', 'shop-end-ok', () => { closeSheet(); go(`#/listes/${current.id}`); });
 
 on('click', 'list-tab', (el) => { S.q.listTab = el.dataset.t; render(); });
 on('click', 'store-cycle', async (el) => {
@@ -180,8 +226,7 @@ on('click', 'store-cycle', async (el) => {
   const ids = activeStores().map((s) => s.id);
   const next = ids[(ids.indexOf(i.at_store_id) + 1) % ids.length];
   // Revenir sur le magasin conseille = retour au conseil (plus de choix manuel).
-  const l = await attempt(() => patch(hp(`/items/${i.id}`), { store_id: next === i.best_store_id ? null : next }));
-  if (l) refreshList(l);
+  itemUpdate(i, { store_id: next === i.best_store_id ? null : next });
 });
 on('click', 'assign', async (el) => {
   const l = await attempt(() => post(hp(`/lists/${current.id}/assign`), { store_id: el.dataset.sid ? Number(el.dataset.sid) : null }));
@@ -246,11 +291,15 @@ on('input', 'add-q', (el) => {
     ${ms.some((p) => norm(p.name) === norm(q)) ? '' : `<button data-a="add-new"><b>＋ Créer « ${esc(q)} » dans le catalogue</b></button>`}</div>` : '';
 });
 async function addItem(product_id) {
-  const l = await attempt(() => post(hp(`/lists/${current.id}/items`), { product_id }));
-  if (!l) return;
-  const name = (S.products.find((p) => p.id === product_id) || {}).name;
-  await refreshList(l);
-  toast(isManager() ? `${name} ajouté` : 'Suggestion envoyée au gestionnaire');
+  const p = S.products.find((x) => x.id === product_id) || { name: '?' };
+  await runOps([newOp({ type: 'item.add', list_id: current.id, product_id, qty: 1 })], (l) => {
+    const ex = isManager() && l.items.find((i) => i.product_id === product_id && !i.suggestion);
+    if (ex) { ex.qty += 1; return; }
+    const sid = p.best_store_id || (activeStores()[0] || {}).id;
+    l.items.push({ id: `tmp-${Date.now()}`, product_id, name: p.name, category_id: p.category_id, unit: p.unit, qty: 1, origin: 'manual', status: 'todo',
+      suggestion: isManager() ? null : 'pending', suggested_by: S.me.id, suggested_by_name: S.me.name, prices: {}, promos: [], at_store_id: sid, best_store_id: sid });
+  });
+  toast(isManager() ? `${p.name} ajouté` : 'Suggestion envoyée au gestionnaire');
   document.getElementById('add-q')?.focus();
 }
 on('click', 'add-item', (el) => addItem(Number(el.dataset.id)));
@@ -277,9 +326,27 @@ on('click', 'add-new-ok', async () => {
 
 // ---------- Coche, suggestions ----------
 on('click', 'item-check', async (el) => {
-  const i = current.items.find((x) => x.id === Number(el.dataset.id));
-  const l = await attempt(() => patch(hp(`/items/${i.id}`), { status: i.status === 'bought' ? 'todo' : 'bought' }));
-  if (l) refreshList(l);
+  const i = current.items.find((x) => String(x.id) === el.dataset.id);
+  if (!i || isTemp(i.id)) return;
+  const buying = i.status !== 'bought';
+  await itemUpdate(i, { status: buying ? 'bought' : 'todo' });
+  // Mode courses : prix paye facultatif (devient un releve du magasin).
+  if (buying && S.route[0] === 'magasin') priceSheet(i, Number(S.route[2]));
+});
+function priceSheet(i, sid) {
+  const avg = i.prices[sid];
+  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Prix payé chez ${esc(storeName(sid))} (facultatif)${avg != null ? ` — moyenne ${eur(avg)}` : ''}</p>
+    <input class="txt big" name="price" inputmode="decimal" placeholder="${avg != null ? (avg / 100).toFixed(2).replace('.', ',') : '0,00'}" data-enter="price-ok" data-id="${i.id}" data-sid="${sid}">
+    <label class="row line"><input type="checkbox" class="cb" name="promo"><span class="grow">Prix promo (hors moyenne)</span></label>
+    <div class="row end"><button class="btn sec2" data-a="close">Passer</button><button class="btn" data-a="price-ok" data-id="${i.id}" data-sid="${sid}">Enregistrer le prix</button></div>`);
+}
+on('click', 'price-ok', async (el) => {
+  const f = formData(document.querySelector('.sheet'));
+  closeSheet();
+  if (!String(f.price).trim()) return;
+  const i = current.items.find((x) => String(x.id) === el.dataset.id);
+  const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'record.add', product_id: i.product_id, store_id: Number(el.dataset.sid), price: f.price, promo: f.promo })]));
+  toast(r === null ? 'Prix gardé, envoyé au retour du réseau' : 'Relevé enregistré · moyenne recalculée');
 });
 on('click', 'sugg-ok', async (el) => { const l = await attempt(() => post(hp(`/items/${el.dataset.id}/accept`))); if (l) { toast('Suggestion acceptée'); refreshList(l); } });
 on('click', 'sugg-no', async (el) => { const l = await attempt(() => post(hp(`/items/${el.dataset.id}/refuse`))); if (l) { toast('Suggestion refusée'); refreshList(l); } });
@@ -290,10 +357,11 @@ on('click', 'item-del', async (el) => {
 
 // ---------- Fiche article ----------
 on('click', 'item', async (el) => {
-  const i = current.items.find((x) => x.id === Number(el.dataset.id));
+  const i = current.items.find((x) => String(x.id) === el.dataset.id);
+  if (!i || isTemp(i.id)) return;
   const mgr = isManager();
-  if (!summary) await loadSummary();
-  const others = [summary.backlog, ...summary.upcoming].filter((x) => x.id !== current.id);
+  if (!summary) await loadSummary().catch(() => {});
+  const others = summary ? [summary.backlog, ...summary.upcoming].filter((x) => x.id !== current.id) : [];
   const p = S.products.find((x) => x.id === i.product_id) || {};
   sheet(`<h3>${esc(i.name)}</h3><p class="muted">${esc(catName(i.category_id))} · ${esc(i.unit)}</p>
     <div class="row"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="${qtyText(i.qty)}"><button class="btn sm sec2" data-a="qty" data-d="1">＋</button></div>
@@ -311,11 +379,12 @@ on('click', 'qty', (el) => {
 });
 on('click', 'item-save', async (el) => {
   const f = formData(document.querySelector('.sheet'));
-  const i = current.items.find((x) => x.id === Number(el.dataset.id));
-  const body = { qty: f.qty, note: f.note };
+  const i = current.items.find((x) => String(x.id) === el.dataset.id);
+  const qty = Number(String(f.qty).replace(',', '.'));
+  const body = { qty: qty > 0 ? qty : i.qty, note: f.note.trim() || null };
   if (f.unavailable !== undefined && i.status !== 'bought') body.status = f.unavailable ? 'unavailable' : 'todo';
-  const l = await attempt(() => patch(hp(`/items/${i.id}`), body));
-  if (l) { closeSheet(); refreshList(l); }
+  closeSheet();
+  itemUpdate(i, body);
 });
 on('click', 'item-move', async (el) => {
   const l = await attempt(() => post(hp(`/items/${el.dataset.id}/move`), { list_id: Number(el.dataset.to) }));
@@ -378,7 +447,7 @@ on('click', 'list-copy', async () => {
 });
 
 // ---------- Suggestions (ecran Foyer) ----------
-export async function loadSuggestions() { S.suggestions = await get(hp('/suggestions')); }
+export async function loadSuggestions() { S.suggestions = await get(hp('/suggestions')).catch(() => S.suggestions || []); }
 export function suggestionsHtml() {
   const mgr = isManager();
   return (S.suggestions || []).map((s) => `<div class="item"><div class="grow"><div class="nm">${qtyText(s.qty)} × ${esc(s.name)}</div>
@@ -393,7 +462,7 @@ on('click', 'fsugg-no', async (el) => { if (await attempt(() => post(hp(`/items/
 export const listNeedsLoad = () => !summary;
 export const resetLists = () => { summary = null; };
 
-on('click', 'store-advice', async (el) => {
-  const l = await attempt(() => patch(hp(`/items/${el.dataset.id}`), { store_id: null }));
-  if (l) { closeSheet(); refreshList(l); }
+on('click', 'store-advice', (el) => {
+  closeSheet();
+  itemUpdate(current.items.find((x) => String(x.id) === el.dataset.id), { store_id: null });
 });

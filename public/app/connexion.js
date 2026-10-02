@@ -1,6 +1,6 @@
 // Ecrans d'acces : connexion par lien e-mail, invitation recue, choix / creation de foyer.
 import { esc, on, toast, sheet, closeSheet } from './ui.js';
-import { get, post, patch, attempt } from './api.js';
+import { get, post, patch, attempt, clearLocal } from './api.js';
 import { S, render, loadHouse, go } from './state.js';
 
 const pending = { invite: null, invitation: null, sent: null };
@@ -82,6 +82,7 @@ on('click', 'foyer-create', async () => {
 });
 on('click', 'logout', async () => {
   await attempt(() => post('auth/logout'));
+  clearLocal();
   location.href = './';
 });
 on('click', 'me-name', () => {

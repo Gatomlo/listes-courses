@@ -216,7 +216,7 @@ Pour afficher le menu (frigo, cuisine) ou le partager.
   - icône du portail : `manifest.json` à la racine du dossier (ou `public/manifest.json`), premier élément de `icons` ;
   - même domaine que les autres outils : cookie de session avec `Path=/cabas` et nom propre, service worker limité au scope `/cabas/`, bases IndexedDB préfixées `cabas-`, manifest PWA avec `start_url` et `scope` = `/cabas/`.
 - Temps réel : **Server-Sent Events** par foyer (process unique → diffusion en mémoire suffit).
-- Hors-ligne : IndexedDB (API native) pour les données locales et la file d'opérations ; chaque opération porte un `op_id` unique (table `AppliedOp` côté serveur pour l'idempotence) ; endpoint `GET /sync?since=<version>` pour rattraper les changements.
+- Hors-ligne : stockage local du navigateur (copie de chaque lecture, file d'opérations) ; chaque opération porte un `op_id` unique (table `AppliedOp` côté serveur pour l'idempotence) ; `POST /api/h/:hid/sync` rejoue les opérations ; au retour du réseau, l'écran courant est rechargé (pas de rattrapage incrémental).
 - Import de recette : extraction JSON-LD/microdonnées côté serveur (lecture des blocs JSON-LD sans dépendance), analyse des lignes d'ingrédients par règles (quantités, fractions, unités françaises).
 - Authentification : lien magique e-mail (comme La Hotte), session cookie.
 - Pas de sous-domaine : URL = domaine de la passerelle + `/cabas/`.
@@ -254,7 +254,7 @@ PlannedMealSkip(planned_meal, product)                     -- ingrédients en r�
 1. ✅ Socle : auth, foyer, rôles, catalogue, magasins, déploiement node-gateway.
 2. ✅ Listes (À prévoir + datées), suggestions, clôture/report, récurrents.
 3. ✅ Prix : relevés, moyennes, conseil, scénarios et économie, listes par magasin triées, promos.
-4. Mode courses : cochage, saisie prix, temps réel (SSE), hors-ligne complet (stockage local, file d'opérations, synchronisation à la reprise).
+4. ✅ Mode courses : cochage, saisie prix, temps réel (SSE), hors-ligne complet (stockage local, file d'opérations, synchronisation à la reprise).
 5. Scan du ticket (Tesseract.js) : lecture, rapprochement, alias par magasin, mise à jour des prix.
 6. Plats (écran dédié, recherche, recettes avec import depuis un lien), planning avec ingrédients en réserve, génération et fusion des ingrédients, export du menu.
 7. Plus tard : photo/PDF de recette.

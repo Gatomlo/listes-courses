@@ -35,7 +35,7 @@ function client() {
   };
   return {
     get: (u) => call('GET', u), post: (u, b) => call('POST', u, b || {}), patch: (u, b) => call('PATCH', u, b),
-    put: (u, b) => call('PUT', u, b), del: (u) => call('DELETE', u),
+    put: (u, b) => call('PUT', u, b), del: (u) => call('DELETE', u), cookie: () => cookie,
     async login(email) {
       requests.clear();
       await call('POST', '/api/auth/request', { email });

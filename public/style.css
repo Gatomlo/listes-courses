@@ -122,6 +122,17 @@ button.st{border:0;cursor:pointer;flex:none}
 .bar{height:8px;border-radius:99px;background:var(--sunk);overflow:hidden;margin-top:4px}
 .bar i{display:block;height:100%}
 
+/* ---------- Reseau et mode courses ---------- */
+.net{border-radius:12px;padding:9px 12px;margin-bottom:12px;font-size:13px}
+.net.off{background:var(--carrot-soft);color:var(--carrot)}
+.net.wait{background:var(--sunk);color:var(--muted)}
+.seg a{flex:1;text-align:center;border-radius:9px;padding:7px 0;font-weight:600;font-size:13px;color:var(--muted);text-decoration:none}
+.seg a.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px #0002}
+.shop .item .nm{font-size:17px}
+.shop .item{padding:12px 0}
+.shop .chk{width:34px;height:34px}
+.txt.big{font-size:22px;text-align:center}
+
 /* ---------- Accordeons ---------- */
 .acc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
 .acc-h{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:12px 14px;text-align:left}
