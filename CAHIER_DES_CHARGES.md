@@ -187,12 +187,17 @@ Pour afficher le menu (frigo, cuisine) ou le partager.
 ## 10. Proposition technique
 
 - **SvelteKit** (adapter-node) + **SQLite / Drizzle**, PWA (manifest + service worker), même socle que La Hotte.
-- Déploiement derrière **node-gateway** : monté sur `/courses` (`paths.base = '/courses'`), le module exporte un handler Express ; aucun `app.listen` / `process.on` / `setInterval` hors `require.main === module`.
+- Déploiement dans **node-gateway** (pas de sous-domaine) : dossier `apps/cabas` → servi sur `<domaine de la passerelle>/cabas/`, avec sa tuile « Cabas » sur le portail d'accueil de la passerelle. Le module exporte l'app Express (`module.exports = app`) ; aucun `app.listen` / `process.on` / `setInterval` hors `require.main === module`.
+- Contraintes du montage sous `/cabas` :
+  - SvelteKit avec `paths.base = '/cabas'` ; la passerelle retirant le préfixe (`app.use('/cabas', …)`), l'entrée Express remet `req.url = req.originalUrl` avant le handler SvelteKit ;
+  - aucun chemin absolu `/…` côté navigateur (liens, `fetch`, images) ;
+  - icône du portail : `manifest.json` à la racine du dossier (ou `public/manifest.json`), premier élément de `icons` ;
+  - même domaine que les autres outils : cookie de session avec `Path=/cabas` et nom propre, service worker limité au scope `/cabas/`, bases IndexedDB préfixées `cabas-`, manifest PWA avec `start_url` et `scope` = `/cabas/`.
 - Temps réel : **Server-Sent Events** par foyer (process unique → diffusion en mémoire suffit).
 - Hors-ligne : IndexedDB (via Dexie) pour les données locales et la file d'opérations ; chaque opération porte un `op_id` unique (table `AppliedOp` côté serveur pour l'idempotence) ; endpoint `GET /sync?since=<version>` pour rattraper les changements.
 - Import de recette : extraction JSON-LD/microdonnées côté serveur (parseur HTML léger, ex. `cheerio`), analyse des lignes d'ingrédients par règles (quantités, fractions, unités françaises).
 - Authentification : lien magique e-mail (comme La Hotte), session cookie.
-- Sous-domaine envisagé : `cabas.ranchduphoenix.be` (à router vers la passerelle).
+- Pas de sous-domaine : URL = domaine de la passerelle + `/cabas/`.
 
 ### Modèle de données (simplifié)
 
@@ -233,5 +238,4 @@ PlannedMealSkip(planned_meal, product)                     -- ingrédients en r�
 7. Plus tard : photo/PDF de recette.
 
 ## 12. Points ouverts
-- Sous-domaine : `cabas.ranchduphoenix.be` ou `courses.ranchduphoenix.be` ?
 - Prendre en compte un coût fixe pour le 2e magasin (trajet, temps) en plus du seuil ? (par défaut : non)

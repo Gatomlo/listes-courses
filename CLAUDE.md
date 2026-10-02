@@ -8,10 +8,10 @@ Phase d'étude. Aucun code applicatif. Maquette cliquable statique : `maquette/i
 
 Fait dans la maquette + cahier des charges : listes À prévoir/datées, conseil magasin et économie du split, mode courses par rayon, scan ticket (Tesseract.js, simulé), menu + export/impression, écran Plats dédié avec recherche, édition/suppression de plats et recettes, création d'ingrédient à la volée, ingrédients « en réserve » à l'ajout d'un repas, Foyer en accordéons, gestion des membres (profil, retrait), rayons (ajout/renommage/suppression/ordre), promos (prix pour une sortie ou jusqu'à une date), hors-ligne (stockage local à l'ouverture, file d'opérations, synchro à la reprise ; simulé), import de recette depuis une URL (schema.org/Recipe, simulé), catalogue complet (fiche éditable, relevé manuel, fusion, suppression, filtres récurrents), magasins (ajout, couleur, inactif), fiche article, actions de liste (date, suppression), repas rattaché à une autre liste, historique détaillé, écrans connexion / invitation / foyers.
 Décisions utilisateur : nom « Le Cabas », seuil 5 €, comparaison des prix par emballage (contenance facultative), pas de saisie du total ticket (dépenses suivies ailleurs, pas de lien budget-foyer), OCR = Tesseract.js gratuit uniquement.
-Prochaine étape : relecture de la maquette par l'utilisateur, trancher le sous-domaine (section 12), puis démarrer l'étape 1 (socle).
+Prochaine étape : relecture de la maquette par l'utilisateur, trancher le coût fixe 2e magasin (section 12), puis démarrer l'étape 1 (socle).
 
 ## Stack prévue
-SvelteKit (adapter-node) + SQLite/Drizzle, PWA, temps réel par SSE, auth lien magique. Monté dans **node-gateway** sur `/courses` (pas de `app.listen`/`process.on` hors `require.main === module`).
+SvelteKit (adapter-node) + SQLite/Drizzle, PWA, temps réel par SSE, auth lien magique. Monté dans **node-gateway** sur `/cabas` (dossier `apps/cabas`, pas de sous-domaine ; voir contraintes section 10 du cahier des charges) (pas de `app.listen`/`process.on` hors `require.main === module`).
 
 ## Règles métier non évidentes
 - Membres = suggestions seulement ; un gestionnaire valide (articles et plats).
