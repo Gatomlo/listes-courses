@@ -66,7 +66,7 @@ export function menuView() {
       <div class="grow c"><b>${range}</b><span class="muted small block">${days.length} jours · ${p.saved ? 'menu enregistré' : 'période proposée'}</span></div>
       <button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.to, 1)}" aria-label="Menu suivant">›</button></div>
       <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}</div>
-      ${body}<a class="btn sec2 full" style="margin-top:12px" href="#/plats">📖 Tous les plats</a>`,
+      ${body}`,
   };
 }
 on('click', 'menu-nav', async (el) => { S.menuAt = el.dataset.d || null; await loadMenu(); render(); });
