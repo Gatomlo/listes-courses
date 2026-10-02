@@ -24,6 +24,7 @@
     - catalogue, fiche produit, fiche plat, Foyer, historique : accordéons répartis sur 2 colonnes en « maçonnerie » (chaque panneau se place sous le précédent de sa colonne, sans trou) ;
     - fenêtres ponctuelles en boîte de dialogue centrée ; messages en bas à droite.
   - Le mode courses reste pensé pour le téléphone (il s'affiche aussi sur PC).
+  - Sur PC, **tous les accordéons sont ouverts par défaut** (on peut toujours les replier) ; l'état ouvert/replié est mémorisé séparément pour le mobile et le PC.
 
 ## 2 bis. Foyer et rôles
 

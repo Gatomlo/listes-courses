@@ -273,7 +273,7 @@ const S={
   qc:'',cfilter:'all',hh:0,loginMail:'',loginSent:false,
   households:[{n:'Foyer Phoenix',m:3,r:'gestionnaire',i:'🏡'},{n:'Chalet des Ardennes',m:5,r:'membre',i:'🏔'}],
   hist:{updated:14,bought:[['im','hache',2,4.15],['im','poul',1,7.99],['im','rape',1,2.29],['im','ban',1,1.82],['im','oeuf',1,3.29],['co','lait',3,0.99],['co','yao',2,2.49],['co','cafe',1,5.79],['co','toma',3,0.65],['co','riz',1,2.49],['co','pq',1,5.99],['co','spag',2,1.35]],missing:[['vais','À prévoir'],['coco','liste du 3 oct.']],meals:[['2026-09-19','Lasagnes'],['2026-09-21','Poulet curry coco'],['2026-09-24','Pâtes carbonara'],['2026-09-27','Chili con carne'],['2026-09-30','Soupe carottes-poireaux']]},
-  q2:'',q3:'',q4:'',dfilter:'all',acc:{sugg:true}, threshold:5, nbAvg:5, showExtra:false, sheet:null, toast:'', q:'',
+  q2:'',q3:'',q4:'',dfilter:'all',acc:{sugg:true},accPc:{}, threshold:5, nbAvg:5, showExtra:false, sheet:null, toast:'', q:'',
   lists:[
     {id:'back',type:'backlog',title:'À prévoir',items:[
       {pid:'pq',q:1,o:'manual'},{pid:'vais',q:1,o:'manual'},{pid:'jus',q:2,o:'suggestion',by:'Léa',sugg:'pending'}]},
@@ -388,7 +388,11 @@ function recipeHtml(d,p){
    ${hasRecipe(d)?'':'<p class="muted">Aucune recette renseignée pour ce plat.</p>'}`;
 }
 // Accordéon générique : état mémorisé dans S.acc, ouvert par défaut si def
-function accd(id,icon,title,sum,content,def=false){const o=S.acc[id]??def;return `<div class="acc${o?' open':''}"><button class="acc-h" aria-expanded="${!!o}" onclick="act.accT('${id}',${!!def})">${icon?`<span class="acc-i">${icon}</span>`:''}<span class="grow"><b>${title}</b><span class="muted">${sum||''}</span></span><span class="acc-c">›</span></button>${o?`<div class="acc-b">${content}</div>`:''}</div>`}
+// État séparé mobile / PC ; sur PC tout est ouvert par défaut
+const AS=()=>S.pc?S.accPc:S.acc;
+const isOpen=(id,def)=>AS()[id]??(S.pc||def);
+const FOYER_ACC=()=>['sugg','mem','set',...ALLSTORES.map(s=>'st_'+s.id)];
+function accd(id,icon,title,sum,content,def=false){const o=isOpen(id,def);return `<div class="acc${o?' open':''}"><button class="acc-h" aria-expanded="${!!o}" onclick="act.accT('${id}',${!!def})">${icon?`<span class="acc-i">${icon}</span>`:''}<span class="grow"><b>${title}</b><span class="muted">${sum||''}</span></span><span class="acc-c">›</span></button>${o?`<div class="acc-b">${content}</div>`:''}</div>`}
 const TODAY='2026-10-02';
 const slotName=s=>SLOTS.find(x=>x[0]===s)[1];
 const daysAgo=d=>Math.round((D(TODAY)-D(d))/864e5);
@@ -578,7 +582,7 @@ const VIEWS={
   const ord=sid=>`<div style="padding:4px 0 8px"><div class="muted" style="margin:4px 0">Rayons dans l'ordre du parcours</div>${ORDER[sid].map((c,i)=>`<div class="ord"><span class="muted" style="width:18px">${i+1}</span><span class="grow">${CATS[c]} <span class="muted">· ${Object.values(P).filter(p=>p.c===c).length} produits</span></span>${isMgr()?`<button onclick="act.mv('${sid}',${i},-1)" title="Monter">↑</button><button onclick="act.mv('${sid}',${i},1)" title="Descendre">↓</button><button onclick="act.catEdit('${c}')" title="Renommer">✎</button><button onclick="act.catDel('${c}')" title="Supprimer">✕</button>`:''}</div>`).join('')}${isMgr()?`<button class="btn sec2 full" style="margin-top:8px" onclick="act.catEdit(null,'${sid}')">＋ Ajouter un rayon</button>`:''}</div>`;
   const acc=(id,icon,title,sum,content)=>accd(id,icon,title,sum,content);
   const mem=S.members.map(m=>[m.n,m.r==='manager'?'Gestionnaire':'Membre']);
-  return {cols:true,title:'Foyer Phoenix',sub:isMgr()?'Vous êtes gestionnaire':'Vous êtes membre',right:`<button class="btn sm sec2" onclick="act.accAll()">${Object.values(S.acc).some(Boolean)?'Tout replier':'Tout ouvrir'}</button>`,body:`
+  return {cols:true,title:'Foyer Phoenix',sub:isMgr()?'Vous êtes gestionnaire':'Vous êtes membre',right:`<button class="btn sm sec2" onclick="act.accAll()">${FOYER_ACC().some(k=>isOpen(k,false))?'Tout replier':'Tout ouvrir'}</button>`,body:`
    ${acc('sugg','💡','Suggestions en attente',sug.length?`<span class="badge" style="margin-left:6px">${sug.length}</span>`:' · rien en attente',sug.join('')||'<p class="muted">Rien en attente.</p>')}
    ${acc('mem','👥','Membres',` · ${mem.length} personnes`,mem.map(([n,r],i)=>`<div class="item" ${isMgr()?`style="cursor:pointer" onclick="act.member(${i})"`:''}><span class="grow nm">${n}<div class="muted" style="font-weight:400">${S.members[i].e}</div></span><span class="pill ${r==='Gestionnaire'?'p-leaf':'p-grey'}">${r}</span>${isMgr()?'<span class="muted">✎</span>':''}</div>`).join('')+(isMgr()?`<button class="btn sec2 full" style="margin:8px 0" onclick="act.invite()">＋ Inviter un membre</button>`:''))}
    ${acc('set','⚙️','Réglages',` · seuil ${eur(S.threshold)}, ${S.nbAvg} relevés, 15 jours`,`<div style="padding:10px 0">
@@ -827,7 +831,7 @@ const act={
    if(!e.ing.some(i=>i[0]===pid))e.ing.push(P[pid].base?[pid]:[pid,g.q||1])}
   S.sheet=null;act.toastMsg(`Recette importée · ${c} produit${c>1?'s':''} créé${c>1?'s':''} au catalogue`)},
  acc(id){S.acc[id]=!S.acc[id];render()},
- accT(id,def){S.acc[id]=!(S.acc[id]??def);render()},
+ accT(id,def){AS()[id]=!isOpen(id,def);render()},
  catEdit(c,sid){const name=c?CATS[c]:'';S.sheet=()=>`<h3>${c?'Renommer le rayon':'Nouveau rayon'}</h3><input class="txt" id="cn" value="${name}" placeholder="ex. Boulangerie"><p class="muted">${c?'Le nom change pour tous les magasins et dans le catalogue.':`Ajouté à la fin du parcours de ${STORES.find(s=>s.id===sid).name} et des autres magasins ; à replacer avec ↑ ↓.`}</p><button class="btn full" onclick="act.catSave(${c?`'${c}'`:'null'})">Enregistrer</button>`;render()},
  catSave(c){const v=$('#cn').value.trim();if(!v)return;if(c)CATS[c]=v;else{const k='c'+Date.now();CATS[k]=v;STORES.forEach(s=>ORDER[s.id].push(k))}S.sheet=null;act.toastMsg(c?'Rayon renommé':'Rayon ajouté')},
  catDel(c){const prods=Object.values(P).filter(p=>p.c===c),others=Object.entries(CATS).filter(([k])=>k!==c);
@@ -840,7 +844,7 @@ const act={
    <button class="btn full" onclick="S.members[${i}].n=$('#mn').value;S.members[${i}].e=$('#me').value;act.close();act.toastMsg('Membre mis à jour')">Enregistrer</button>
    <button class="btn sec2 full" style="margin-top:8px;color:var(--im)" ${last?'disabled':''} onclick="act.memberDel(${i})">Retirer du foyer</button>`;render()},
  memberDel(i){const m=S.members[i];S.sheet=()=>`<h3>Retirer ${m.n} du foyer ?</h3><p class="muted">Son compte n'est pas supprimé, il perd l'accès à ce foyer. Ses suggestions en attente sont refusées ; son nom reste dans l'historique.</p><div class="row" style="gap:8px"><button class="btn sec2 grow" onclick="act.close()">Annuler</button><button class="btn grow" style="background:var(--im)" onclick="S.members.splice(${i},1);act.close();act.toastMsg('${m.n} retiré du foyer')">Retirer</button></div>`;render()},
- accAll(){const open=!Object.values(S.acc).some(Boolean);for(const k of ['sugg','mem','set',...STORES.map(s=>'st_'+s.id)])S.acc[k]=open;render()},
+ accAll(){const open=!FOYER_ACC().some(k=>isOpen(k,false));for(const k of FOYER_ACC())AS()[k]=open;render()},
  week(n){S.menuFrom=addDays(S.menuFrom,n);render()},
  exportMenu(){act.go('printMenu')},
  pr(k,v){S.pr[k]=v;render()},
