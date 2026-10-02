@@ -357,7 +357,7 @@ function dishMeals(k){const ms=S.meals.map((m,ix)=>({...m,ix})).filter(m=>m.dish
 // Un seul panneau : à venir + bouton d'ajout, puis les 5 dernières fois
 function dishMenu(k){const {up,past}=dishMeals(k),avg=past.length>1?Math.round(daysAgo(past.at(-1).d)/(past.length-1)):null;
   const sum=(up.length?` · prévu ${fmtD(up[0].d,{weekday:'short',day:'numeric',month:'short'})}`:' · rien de prévu')+(past.length?` · ${past.length} fois`:'');
-  return accd('d_menu','📅','Au menu et historique',sum,
+  return accd('d_menu','📅','Au menu',sum,
    `<div class="muted" style="margin-top:8px">À venir</div>${up.map(mealRow).join('')||'<p class="muted" style="margin:4px 0">Pas encore prévu au menu.</p>'}
    <button class="btn sec2" style="margin:8px 0" onclick="act.planDish('${k}')">📅 ${isMgr()?'Ajouter au menu':'Suggérer au menu'}</button>
    <div class="muted" style="margin-top:6px">Historique${past.length>5?' · 5 dernières fois':''}</div>
