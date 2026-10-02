@@ -29,11 +29,11 @@ export function platsView() {
   };
   return {
     title: 'Plats', sub: `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`,
-    right: isManager() ? '<a class="btn sm" href="#/plats/nouveau">＋ Plat</a>' : '',
     body: `<input class="txt" id="dish-q" placeholder="🔍 Rechercher un plat ou un ingrédient…" value="${esc(q)}" data-in="dish-q">
       <div class="opt">${[['all', 'Tous'], ['recipe', '📖 Avec recette'], ['memo', 'Sans détail'], ['planned', 'Au menu']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
       <div class="cards3">${list.map(card).join('')}</div>
-      ${list.length ? '' : `<p class="muted">Aucun plat trouvé.</p>${isManager() && q ? `<button class="btn" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}`}`,
+      ${list.length ? '' : `<p class="muted">Aucun plat trouvé.</p>${isManager() && q ? `<button class="btn" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}`}
+      ${isManager() ? '<a class="fab" href="#/plats/nouveau" title="Nouveau plat">＋</a>' : ''}`,
   };
 }
 on('input', 'dish-q', (el) => { S.q.dish = el.value; render(); const i = document.getElementById('dish-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
