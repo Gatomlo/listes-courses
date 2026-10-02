@@ -346,21 +346,21 @@ function recipeHtml(d,p){
    ${d.url?`<a class="btn sec2 full" style="display:block;text-align:center;text-decoration:none;margin-top:12px" href="${d.url}" target="_blank" rel="noopener">🔗 Ouvrir la recette en ligne</a>`:''}
    ${hasRecipe(d)?'':'<p class="muted">Aucune recette renseignée pour ce plat.</p>'}`;
 }
+// Accordéon générique : état mémorisé dans S.acc, ouvert par défaut si def
+function accd(id,icon,title,sum,content,def=false){const o=S.acc[id]??def;return `<div class="acc${o?' open':''}"><button class="acc-h" aria-expanded="${!!o}" onclick="act.accT('${id}',${!!def})">${icon?`<span class="acc-i">${icon}</span>`:''}<span class="grow"><b>${title}</b><span class="muted">${sum||''}</span></span><span class="acc-c">›</span></button>${o?`<div class="acc-b">${content}</div>`:''}</div>`}
 const TODAY='2026-10-02';
 const slotName=s=>SLOTS.find(x=>x[0]===s)[1];
 const daysAgo=d=>Math.round((D(TODAY)-D(d))/864e5);
-// Planifications d'un plat : à venir + historique
-function dishHistory(k){
-  const ms=S.meals.map((m,ix)=>({...m,ix})).filter(m=>m.dish===k&&m.sugg!=='pending');
-  const up=ms.filter(m=>m.d>=TODAY).sort((a,b)=>a.d<b.d?-1:1),past=ms.filter(m=>m.d<TODAY).sort((a,b)=>a.d>b.d?-1:1);
-  const avg=past.length>1?Math.round(daysAgo(past.at(-1).d)/(past.length-1)):null;
-  const row=m=>`<div class="item" style="cursor:pointer" onclick="act.meal(${m.ix})"><span class="muted" style="width:96px">${fmtD(m.d,{weekday:'short',day:'numeric',month:'short'})}</span><span class="grow">${slotName(m.s)} · ${m.p} pers.</span><span class="muted">›</span></div>`;
-  return `<div class="sec">Au menu</div><div class="card">
-   <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:6px"><span class="pill p-leaf">${past.length} fois planifié</span>${past.length?`<span class="pill p-grey">dernière fois il y a ${daysAgo(past[0].d)} j</span>`:''}${avg?`<span class="pill p-grey">en moyenne tous les ${avg} j</span>`:''}</div>
-   ${up.length?`<div class="muted" style="margin-top:6px">À venir</div>${up.map(row).join('')}`:''}
-   ${past.length?`<div class="muted" style="margin-top:6px">Historique</div>${past.slice(0,S.histAll?99:4).map(row).join('')}${past.length>4&&!S.histAll?`<button class="btn sm sec2" style="margin-top:6px" onclick="S.histAll=true;render()">Voir les ${past.length} dates</button>`:''}`:'<p class="muted">Jamais planifié pour l\'instant.</p>'}
-   <button class="btn full" style="margin-top:10px" onclick="act.planDish('${k}')">📅 ${isMgr()?'Ajouter au menu':'Suggérer au menu'}</button></div>`;
-}
+// Planifications d'un plat : à venir (dishPlan) et 5 dernières fois (dishPast)
+function dishMeals(k){const ms=S.meals.map((m,ix)=>({...m,ix})).filter(m=>m.dish===k&&m.sugg!=='pending');
+  return {up:ms.filter(m=>m.d>=TODAY).sort((a,b)=>a.d<b.d?-1:1),past:ms.filter(m=>m.d<TODAY).sort((a,b)=>a.d>b.d?-1:1)}}
+const mealRow=m=>`<div class="item" style="cursor:pointer" onclick="act.meal(${m.ix})"><span class="muted" style="width:96px">${fmtD(m.d,{weekday:'short',day:'numeric',month:'short'})}</span><span class="grow">${slotName(m.s)} · ${m.p} pers.</span><span class="muted">›</span></div>`;
+function dishPlan(k){const {up}=dishMeals(k);
+  return accd('d_plan','📅','Au menu',up.length?` · prévu ${fmtD(up[0].d,{weekday:'short',day:'numeric',month:'short'})}`:' · rien de prévu',
+   `${up.map(mealRow).join('')||'<p class="muted">Pas encore prévu au menu.</p>'}<button class="btn full" style="margin:8px 0 10px" onclick="act.planDish('${k}')">📅 ${isMgr()?'Ajouter au menu':'Suggérer au menu'}</button>`,true)}
+function dishPast(k){const {past}=dishMeals(k),avg=past.length>1?Math.round(daysAgo(past.at(-1).d)/(past.length-1)):null;
+  return accd('d_past','🕓','Historique',past.length?` · ${past.length} fois · dernière il y a ${daysAgo(past[0].d)} j`:' · jamais planifié',
+   past.length?`<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 0 4px"><span class="pill p-leaf">${past.length} fois planifié</span>${avg?`<span class="pill p-grey">en moyenne tous les ${avg} j</span>`:''}</div>${past.slice(0,5).map(mealRow).join('')}<p class="muted">${past.length>5?'Les 5 dernières fois.':''}</p>`:'<p class="muted">Jamais planifié pour l\'instant.</p>')}
 function prRange(){
   if(S.pr.range==='list'){const ds=dated(),l=ds.filter(l=>l.date<=S.menuFrom).at(-1)||ds[0],[a,b]=period(l);return [a,Math.round((D(b)-D(a))/864e5)+1]}
   return [S.menuFrom,S.pr.range==='2w'?14:7];
@@ -382,9 +382,8 @@ const VIEWS={
   return {title:'Listes',sub:S.offline?'Foyer Phoenix · hors-ligne':'Foyer Phoenix · synchronisé à '+S.syncAt.split(' ').pop(),right:`<button class="btn sm sec2" title="Simuler le réseau" onclick="act.net(${!S.offline})">${S.offline?'📴':'📶'}</button>`,body:`
    <button class="btn sec2 full" style="margin-bottom:10px;text-align:left" onclick="act.go('households')">🏡 ${S.households[S.hh].n} <span class="muted">▾ changer de foyer</span></button>
    <div class="card click" onclick="act.open('back')"><div class="row"><div class="grow"><h4>À prévoir</h4><div class="muted">${bk.items.length} articles en attente d'une sortie</div></div><span class="pill p-grey">permanente</span></div></div>
-   <div class="sec">Prochaines courses</div>${cur.map(card).join('')}
-   <button class="btn sec2 full" onclick="act.newList()">＋ Nouvelle liste datée</button>
-   <div class="sec">Historique</div>${old.map(l=>`<div class="card click" onclick="act.open('${l.id}')"><div class="row"><div class="grow"><h4>Courses du ${fmtD(l.date,{day:'numeric',month:'long'})}</h4><div class="muted">Estimé ${eur(l.est)} · 23 articles achetés · 2 tickets scannés (14 prix mis à jour)</div></div><span class="muted">›</span></div></div>`).join('')}`};
+   ${accd('h_next','🛒','Prochaines courses',` · ${cur.length} liste${cur.length>1?'s':''}`,`<div style="padding:10px 0 2px">${cur.map(card).join('')}<button class="btn sec2 full" style="margin-bottom:10px" onclick="act.newList()">＋ Nouvelle liste datée</button></div>`,true)}
+   ${accd('h_old','🕓','Historique',` · ${old.length} liste${old.length>1?'s':''} clôturée${old.length>1?'s':''}`,`<div style="padding:10px 0 2px">${old.map(l=>`<div class="card click" onclick="act.open('${l.id}')"><div class="row"><div class="grow"><h4>Courses du ${fmtD(l.date,{day:'numeric',month:'long'})}</h4><div class="muted">Estimé ${eur(l.est)} · 23 articles achetés · 2 tickets scannés (14 prix mis à jour)</div></div><span class="muted">›</span></div></div>`).join('')}</div>`)}`};
  },
  list(){
   const l=list(S.listId),L=lines(l),sc=scenarios(L.items),bk=l.type==='backlog';
@@ -395,24 +394,23 @@ const VIEWS={
   let body='';
   if(bk||S.listTab==='items'){
    const g={};for(const x of L.items)(g[P[x.pid].c]=g[P[x.pid].c]||[]).push(x);
-   body=add+Object.keys(CATS).filter(c=>g[c]).map(c=>`<div class="sec">${CATS[c]}</div><div class="card" style="padding:2px 14px">${g[c].map(x=>`
+   body=add+Object.keys(CATS).filter(c=>g[c]).map(c=>accd('lc_'+c,'',CATS[c],` · ${g[c].length}`,`${g[c].map(x=>`
      <div class="item ${x.sugg==='pending'?'pending':''}"><div class="grow" style="cursor:pointer" onclick="${x.sugg==='pending'?'':`act.item('${x.key}')`}"><div class="nm">${x.q} × ${P[x.pid].n}${x.note?` <span class="muted" style="font-weight:400">· ${x.note}</span>`:''}</div><div class="muted">${priceHint(x)}</div><div style="margin-top:3px">${srcPill(x)} ${promoPills(x.pid)}</div></div>
-     ${x.sugg==='pending'&&isMgr()?`<button class="btn sm" onclick="act.sugg('${l.id}','${x.pid}','ok')">✓</button><button class="btn sm sec2" onclick="act.sugg('${l.id}','${x.pid}','no')">✕</button>`:`<button class="btn sm sec2" title="Promo" onclick="act.promo('${x.pid}')">🏷</button>${storeBtn(x)}`}</div>`).join('')}</div>`).join('');
-   if(!bk&&L.base.length)body+=`<div class="sec">À vérifier dans les placards</div><div class="card" style="padding:2px 14px">${L.base.map(b=>`<div class="item"><button class="chk ${S.baseOn[b.key]?'on':''}" onclick="act.base('${b.key}')">${S.baseOn[b.key]?'✓':''}</button><div class="grow"><div class="nm">${P[b.pid].n}</div><div class="muted">pour ${b.from.join(', ')} · cocher = à acheter</div></div></div>`).join('')}</div>`;
+     ${x.sugg==='pending'&&isMgr()?`<button class="btn sm" onclick="act.sugg('${l.id}','${x.pid}','ok')">✓</button><button class="btn sm sec2" onclick="act.sugg('${l.id}','${x.pid}','no')">✕</button>`:`<button class="btn sm sec2" title="Promo" onclick="act.promo('${x.pid}')">🏷</button>${storeBtn(x)}`}</div>`).join('')}`,true)).join('');
+   if(!bk&&L.base.length)body+=accd('lc_base','🧂','À vérifier dans les placards',` · ${L.base.length}`,`${L.base.map(b=>`<div class="item"><button class="chk ${S.baseOn[b.key]?'on':''}" onclick="act.base('${b.key}')">${S.baseOn[b.key]?'✓':''}</button><div class="grow"><div class="nm">${P[b.pid].n}</div><div class="muted">pour ${b.from.join(', ')} · cocher = à acheter</div></div></div>`).join('')}`);
   } else if(S.listTab==='meals'){
    const ms=mealsOf(l);
-   body=`<p class="muted">Repas du ${fmtD(a)} au ${fmtD(b)} (jusqu'à la liste suivante).</p><div class="card" style="padding:2px 14px">${ms.map(m=>{const d=DISHES[m.dish];return `<div class="item ${m.sugg==='pending'?'pending':''}"><div style="width:74px" class="muted">${fmtD(m.d,{weekday:'short',day:'numeric'})}<br>${SLOTS.find(s=>s[0]===m.s)[1]}</div><div class="grow"><div class="nm">${d.n}</div><div class="muted">${m.p} pers. · ${d.ing.length?d.ing.length+' ingrédients':'ingrédients non détaillés (rappel)'}</div>${m.sugg==='pending'?`<span class="pill p-carrot">suggéré par ${m.by}</span>`:''}</div></div>`}).join('')}</div>
-   <button class="btn sec2 full" onclick="act.go('menu')">Ouvrir le menu</button>`;
+   body=`<p class="muted">Repas du ${fmtD(a)} au ${fmtD(b)} (jusqu'à la liste suivante).</p>${accd('lm_meals','🍽','Repas',` · ${ms.length}`,`${ms.map(m=>{const d=DISHES[m.dish];return `<div class="item ${m.sugg==='pending'?'pending':''}"><div style="width:74px" class="muted">${fmtD(m.d,{weekday:'short',day:'numeric'})}<br>${SLOTS.find(s=>s[0]===m.s)[1]}</div><div class="grow"><div class="nm">${d.n}</div><div class="muted">${m.p} pers. · ${d.ing.length?d.ing.length+' ingrédients':'ingrédients non détaillés (rappel)'}</div>${m.sugg==='pending'?`<span class="pill p-carrot">suggéré par ${m.by}</span>`:''}</div></div>`}).join('')}`,true)}
+   <button class="btn sec2 full" style="margin-bottom:10px" onclick="act.go('menu')">Ouvrir le menu</button>`;
    const memo=ms.filter(m=>!DISHES[m.dish].ing.length);
-   if(memo.length)body+=`<div class="sec">Rappels (plats sans détail)</div>${memo.map(m=>`<div class="card muted">📝 ${DISHES[m.dish].n} — penser aux ingrédients habituels</div>`).join('')}`;
+   if(memo.length)body+=accd('lm_memo','📝','Rappels (plats sans détail)',` · ${memo.length}`,memo.map(m=>`<div class="item muted">${DISHES[m.dish].n} — penser aux ingrédients habituels</div>`).join(''),true);
   } else {
    const rec=sc.save>=S.threshold, max=Math.max(...STORES.map(s=>sc[s.id]));
    body=`<div class="saving ${rec?'good':'meh'}"><div class="muted">${rec?'Deux magasins valent la peine':'Un seul magasin suffit'}</div><big>${eur(Math.abs(sc.save))} ${sc.save>=0?"d'économie":'de surcoût'}</big><div class="muted">en répartissant vs tout chez ${STORES.find(s=>s.id===sc.mono).name} · seuil ${eur(S.threshold)}</div></div>
-   <div class="card"><div class="scen">${STORES.map(s=>`<div>Tout chez ${s.name}${sc.unk[s.id]?` <span class="pill p-carrot">${sc.unk[s.id]} prix inconnu</span>`:''}<div class="bar"><i style="width:${sc[s.id]/max*100}%;background:var(--${s.id})"></i></div></div><div class="price">${eur(sc[s.id])}</div>`).join('')}
-   <div><b>Répartition actuelle</b><div class="bar"><i style="width:${sc.split/max*100}%;background:var(--leaf)"></i></div></div><div class="price">${eur(sc.split)}</div></div></div>
-   <div class="sec">Listes par magasin</div>
-   ${STORES.map(s=>{const its=L.items.filter(x=>x.store===s.id&&(!x.sugg||x.sugg==='ok'));const t=its.reduce((n,x)=>n+(effPrice(x.pid)[s.id]??0)*x.q,0);return `<div class="card click" onclick="act.shop('${s.id}')"><div class="row"><span class="st st-${s.id}">${s.name}</span><div class="grow muted">${its.length} articles · triés par rayon</div><span class="price">${eur(t)}</span></div></div>`}).join('')}
-   <div class="row" style="gap:8px">${STORES.map(s=>`<button class="btn sec2 grow" onclick="act.allTo('${s.id}')">Tout ${s.name.split(' ')[0]}</button>`).join('')}<button class="btn sec2 grow" onclick="act.allTo(null)">Conseil</button></div>
+   ${accd('ls_scen','📊','Scénarios comparés',` · répartition ${eur(sc.split)}`,`<div class="scen" style="padding:10px 0">${STORES.map(s=>`<div>Tout chez ${s.name}${sc.unk[s.id]?` <span class="pill p-carrot">${sc.unk[s.id]} prix inconnu</span>`:''}<div class="bar"><i style="width:${sc[s.id]/max*100}%;background:var(--${s.id})"></i></div></div><div class="price">${eur(sc[s.id])}</div>`).join('')}
+   <div><b>Répartition actuelle</b><div class="bar"><i style="width:${sc.split/max*100}%;background:var(--leaf)"></i></div></div><div class="price">${eur(sc.split)}</div></div>`,true)}
+   ${accd('ls_lists','🏪','Listes par magasin',` · ${STORES.length} magasins`,`<div style="padding:10px 0 2px">${STORES.map(s=>{const its=L.items.filter(x=>x.store===s.id&&(!x.sugg||x.sugg==='ok'));const t=its.reduce((n,x)=>n+(effPrice(x.pid)[s.id]??0)*x.q,0);return `<div class="card click" onclick="act.shop('${s.id}')"><div class="row"><span class="st st-${s.id}">${s.name}</span><div class="grow muted">${its.length} articles · triés par rayon</div><span class="price">${eur(t)}</span></div></div>`}).join('')}
+   <div class="row" style="gap:8px;margin-bottom:10px">${STORES.map(s=>`<button class="btn sec2 grow" onclick="act.allTo('${s.id}')">Tout ${s.name.split(' ')[0]}</button>`).join('')}<button class="btn sec2 grow" onclick="act.allTo(null)">Conseil</button></div></div>`,true)}
    <p class="muted">Astuce : dans « Articles », toucher l'étiquette d'un magasin le déplace. Les choix manuels sont en pointillé.</p>`;
   }
   const right=!bk&&isMgr()?`<button class="btn sm sec2" title="Actions de la liste" onclick="act.listMenu()">⋯</button>`:'';
@@ -425,8 +423,8 @@ const VIEWS={
   const row=x=>`<div class="item ${S.checked[x.key]?'done':''}" onclick="act.check('${x.key}','${x.pid}')"><span class="chk ${S.checked[x.key]?'on':''}">${S.checked[x.key]?'✓':''}</span><div class="grow"><div class="nm" style="font-size:17px">${x.q} × ${P[x.pid].n}</div><div class="muted">${S.prices[x.key]?'payé '+eur(S.prices[x.key]):'≈ '+eur(effPrice(x.pid)[sid])}${promoFor(x.pid,sid)?' · <span class="pill p-carrot">🏷 promo</span>':''}</div></div></div>`;
   const body=`<div class="seg">${STORES.map(s=>`<button class="${sid===s.id?'on':''}" onclick="act.shop('${s.id}')">${s.name}</button>`).join('')}</div>
    <div class="row muted" style="margin-bottom:6px"><span class="grow">🟢 Léa est aussi en courses · synchro en direct</span><span>${done.length}/${its.length}</span></div>
-   ${ORDER[sid].filter(c=>todo.some(x=>P[x.pid].c===c)).map(c=>`<div class="sec">${CATS[c]}</div><div class="card" style="padding:2px 14px">${todo.filter(x=>P[x.pid].c===c).map(row).join('')}</div>`).join('')}
-   ${done.length?`<div class="sec">Dans le caddie (${done.length})</div><div class="card" style="padding:2px 14px">${done.map(row).join('')}</div>`:''}
+   ${ORDER[sid].filter(c=>todo.some(x=>P[x.pid].c===c)).map(c=>{const t=todo.filter(x=>P[x.pid].c===c);return accd('sh_'+c,'',CATS[c],` · ${t.length} à prendre`,t.map(row).join(''),true)}).join('')}
+   ${done.length?accd('sh_done','🛒','Dans le caddie',` · ${done.length}`,done.map(row).join('')):''}
    <button class="btn full" onclick="act.ticket('${sid}')">Terminer chez ${st.name} · saisir le ticket</button>`;
   return {title:'En courses · '+st.name,sub:'Ordre des rayons de '+st.name,back:'list',body};
  },
@@ -470,18 +468,20 @@ const VIEWS={
   const e=S.ed,ro=!isMgr(),used=S.meals.filter(m=>m.dish===e.k).length;
   const res=S.q2?Object.values(P).filter(p=>p.n.toLowerCase().includes(S.q2.toLowerCase())&&!e.ing.some(i=>i[0]===p.id)).slice(0,5):[];
   return {title:e.isNew?'Nouveau plat':e.n,sub:ro?'Lecture seule (membre)':used?`Prévu dans ${used} repas`:'Plat du foyer',back:'dishes',body:`
-   <div class="card"><label class="muted">Nom</label><input class="txt" value="${e.n}" ${ro?'disabled':''} oninput="S.ed.n=this.value">
-    <div class="row" style="margin-top:8px;gap:8px"><div class="grow"><label class="muted">Portions de référence</label><input class="txt" type="number" value="${e.portions}" ${ro?'disabled':''} oninput="S.ed.portions=+this.value"></div><div class="grow"><label class="muted">Temps</label><input class="txt" value="${e.time}" placeholder="ex. 45 min" ${ro?'disabled':''} oninput="S.ed.time=this.value"></div></div></div>
-   ${e.isNew?'':dishHistory(e.k)}
-   <div class="sec">Ingrédients</div><div class="card" style="padding:2px 14px">${e.ing.map(([pid,q],i)=>`<div class="item"><span class="grow">${P[pid].n}</span>${P[pid].base?'<span class="pill p-grey">de base</span>':`<input class="txt" style="width:62px;padding:5px 8px" type="number" step="0.5" value="${q??''}" placeholder="—" ${ro?'disabled':''} oninput="S.ed.ing[${i}][1]=this.value?+this.value:undefined"><span class="muted" style="width:62px">${P[pid].u}</span>`}${ro?'':`<button class="btn sm sec2" onclick="act.ingDel(${i})">✕</button>`}</div>`).join('')||'<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>'}</div>
-   ${ro?'':`<input class="txt" placeholder="Ajouter un ingrédient du catalogue…" value="${S.q2}" oninput="act.search2(this.value)" id="q2">${S.q2?`<div class="ac">${res.map(p=>`<button onclick="act.ingAdd('${p.id}')"><span class="grow">${p.n}</span><span class="muted">${CATS[p.c]}</span></button>`).join('')}${Object.values(P).some(p=>p.n.toLowerCase()===S.q2.toLowerCase().trim())?'':`<button onclick="act.newProd(S.q2,'dish')"><b>＋ Créer « ${S.q2} » dans le catalogue</b></button>`}</div>`:''}<p class="muted">Quantités facultatives, ajustées au nombre de personnes du repas.</p>`}
-   <div class="sec">Recette (facultatif)</div><div class="card">
+   ${accd('d_info','📝','Informations',` · ${e.portions} pers.${e.time?' · ⏱ '+e.time:''}`,`<div style="padding:10px 0"><label class="muted">Nom</label><input class="txt" value="${e.n}" ${ro?'disabled':''} oninput="S.ed.n=this.value">
+    <div class="row" style="margin-top:8px;gap:8px"><div class="grow"><label class="muted">Portions de référence</label><input class="txt" type="number" value="${e.portions}" ${ro?'disabled':''} oninput="S.ed.portions=+this.value"></div><div class="grow"><label class="muted">Temps</label><input class="txt" value="${e.time}" placeholder="ex. 45 min" ${ro?'disabled':''} oninput="S.ed.time=this.value"></div></div></div>`,true)}
+   ${accd('d_ing','🥕','Ingrédients',` · ${e.ing.length||'aucun'}`,`${e.ing.map(([pid,q],i)=>`<div class="item"><span class="grow">${P[pid].n}</span>${P[pid].base?'<span class="pill p-grey">de base</span>':`<input class="txt" style="width:62px;padding:5px 8px" type="number" step="0.5" value="${q??''}" placeholder="—" ${ro?'disabled':''} oninput="S.ed.ing[${i}][1]=this.value?+this.value:undefined"><span class="muted" style="width:62px">${P[pid].u}</span>`}${ro?'':`<button class="btn sm sec2" onclick="act.ingDel(${i})">✕</button>`}</div>`).join('')||'<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>'}
+    ${ro?'':`<div style="padding:8px 0"><input class="txt" placeholder="Ajouter un ingrédient du catalogue…" value="${S.q2}" oninput="act.search2(this.value)" id="q2">${S.q2?`<div class="ac">${res.map(p=>`<button onclick="act.ingAdd('${p.id}')"><span class="grow">${p.n}</span><span class="muted">${CATS[p.c]}</span></button>`).join('')}${Object.values(P).some(p=>p.n.toLowerCase()===S.q2.toLowerCase().trim())?'':`<button onclick="act.newProd(S.q2,'dish')"><b>＋ Créer « ${S.q2} » dans le catalogue</b></button>`}</div>`:''}<p class="muted" style="margin-bottom:0">Quantités facultatives, ajustées au nombre de personnes du repas.</p></div>`}`,true)}
+   ${accd('d_rec','📖','Recette',hasRecipe({url:e.url,steps:e.steps.trim()?[1]:[],note:e.note})?' · renseignée':' · facultative, vide',`<div style="padding:10px 0">
     <label class="muted">Lien vers une recette en ligne</label><div class="row" style="gap:6px"><input class="txt grow" value="${e.url}" placeholder="https://…" ${ro?'disabled':''} oninput="S.ed.url=this.value">${ro?'':'<button class="btn sm" onclick="act.importRecipe()">⤓ Importer</button>'}</div><p class="muted" style="margin:4px 0 0">Coller un lien charge automatiquement nom, portions, temps, ingrédients et étapes quand le site les publie.</p>
     <label class="muted" style="display:block;margin-top:8px">Étapes (une par ligne)</label><textarea class="txt" rows="5" ${ro?'disabled':''} oninput="S.ed.steps=this.value">${e.steps}</textarea>
     <label class="muted" style="display:block;margin-top:8px">Notes</label><textarea class="txt" rows="2" ${ro?'disabled':''} oninput="S.ed.note=this.value">${e.note}</textarea>
-    <p class="muted" style="margin-bottom:0">📎 Photo ou PDF de la recette (ex. page de livre) : prévu.</p></div>
-   ${ro?`<button class="btn full" onclick="act.recipe('${e.k}')">📖 Voir la recette</button>`:`<button class="btn full" onclick="act.saveDish()">Enregistrer</button>
-   ${e.isNew?'':`<div class="row" style="gap:8px;margin-top:8px"><button class="btn sec2 grow" onclick="act.recipe('${e.k}')">📖 Aperçu recette</button><button class="btn sec2 grow" style="color:var(--im)" onclick="act.delDish()">Supprimer le plat</button></div>`}`}`};
+    <p class="muted" style="margin-bottom:0">📎 Photo ou PDF de la recette (ex. page de livre) : prévu.</p>
+    ${e.isNew?'':`<button class="btn sec2 full" style="margin-top:8px" onclick="act.recipe('${e.k}')">📖 ${ro?'Voir':'Aperçu de'} la recette</button>`}</div>`)}
+   ${e.isNew?'':dishPlan(e.k)}
+   ${ro?'':`<button class="btn full" style="margin:4px 0 10px" onclick="act.saveDish()">Enregistrer</button>`}
+   ${ro||e.isNew?'':`<button class="btn sec2 full" style="color:var(--im);margin-bottom:10px" onclick="act.delDish()">Supprimer le plat</button>`}
+   ${e.isNew?'':dishPast(e.k)}`};
  },
  printMenu(){
   const [from,days]=prRange();
@@ -502,7 +502,7 @@ const VIEWS={
    <input class="txt" id="qc" placeholder="🔍 Rechercher un produit…" value="${S.qc}" oninput="act.searchC(this.value)">
    <div class="opt">${[['all','Tous'],['rec','🔁 Récurrents'],['base','De base'],['noprice','Prix manquant']].map(([k,t])=>`<button class="${f===k?'on':''}" onclick="S.cfilter='${k}';render()">${t}</button>`).join('')}</div>
    ${f==='rec'?'<p class="muted" style="margin-top:0">Ajoutés automatiquement à chaque nouvelle liste datée selon leur fréquence.</p>':''}
-   ${Object.keys(CATS).filter(c=>g[c]).map(c=>`<div class="sec">${CATS[c]}</div><div class="card" style="padding:2px 14px">${g[c].map(p=>{const b=bestStore(p.id);return `<div class="item" style="cursor:pointer" onclick="act.product('${p.id}')"><div class="grow"><div class="nm">${p.n}</div><div class="muted">${p.u}${p.fmt?' · '+p.fmt:''} · ${STORES.map(s=>`${s.name} ${eur(p.price[s.id])}`).join(' · ')}</div><div style="margin-top:3px">${p.rec?`<span class="pill p-leaf">🔁 ${p.rec}</span> `:''}${p.base?'<span class="pill p-grey">de base</span> ':''}${p.forced?`<span class="pill p-plum">toujours ${STORES.find(s=>s.id===p.forced)?.name||''}</span>`:''}</div></div><span class="st st-${b}">${STORES.find(s=>s.id===b)?.name||''}</span></div>`}).join('')}</div>`).join('')||`<p class="muted">Aucun produit.</p>${isMgr()&&q?`<button class="btn full" onclick="act.newProd(S.qc,'cat')">＋ Créer « ${S.qc} »</button>`:''}`}
+   ${Object.keys(CATS).filter(c=>g[c]).map(c=>accd('cc_'+c,'',CATS[c],` · ${g[c].length} produit${g[c].length>1?'s':''}`,`${g[c].map(p=>{const b=bestStore(p.id);return `<div class="item" style="cursor:pointer" onclick="act.product('${p.id}')"><div class="grow"><div class="nm">${p.n}</div><div class="muted">${p.u}${p.fmt?' · '+p.fmt:''} · ${STORES.map(s=>`${s.name} ${eur(p.price[s.id])}`).join(' · ')}</div><div style="margin-top:3px">${p.rec?`<span class="pill p-leaf">🔁 ${p.rec}</span> `:''}${p.base?'<span class="pill p-grey">de base</span> ':''}${p.forced?`<span class="pill p-plum">toujours ${STORES.find(s=>s.id===p.forced)?.name||''}</span>`:''}</div></div><span class="st st-${b}">${STORES.find(s=>s.id===b)?.name||''}</span></div>`}).join('')}`,!!(q||f!=='all'))).join('')||`<p class="muted">Aucun produit.</p>${isMgr()&&q?`<button class="btn full" onclick="act.newProd(S.qc,'cat')">＋ Créer « ${S.qc} »</button>`:''}`}
    <p class="muted">${n} produit${n>1?'s':''} affiché${n>1?'s':''}</p>`};
  },
  product(){
@@ -511,8 +511,8 @@ const VIEWS={
   const used=S.lists.filter(l=>l.items.some(i=>i.pid===p.id)).length,usedD=Object.values(DISHES).filter(d=>d.ing.some(i=>i[0]===p.id));
   const dis=ro?'disabled':'';
   return {title:p.n,sub:CATS[p.c]+' · prix par '+p.u,back:'cat',body:`
-   <div class="card"><div class="sec" style="margin-top:0">Prix moyen par ${p.u} (${S.nbAvg} derniers relevés)</div>${STORES.map(s=>`<div class="row" style="padding:4px 0"><span class="st st-${s.id}">${s.name}</span><span class="grow muted">${p.price[s.id]==null?'aucun relevé':Math.min(p.nb,S.nbAvg)+' relevés'}</span><span class="price">${eur(p.price[s.id])}</span>${bestStore(p.id)===s.id?`<span class="pill p-leaf">${p.forced?'imposé':'conseillé'}</span>`:''}</div>`).join('')}</div>
-   <div class="card">
+   ${accd('p_prix','💶','Prix moyen',` · par ${p.u}, ${S.nbAvg} derniers relevés`,`<div style="padding:6px 0">${STORES.map(s=>`<div class="row" style="padding:4px 0"><span class="st st-${s.id}">${s.name}</span><span class="grow muted">${p.price[s.id]==null?'aucun relevé':Math.min(p.nb,S.nbAvg)+' relevés'}</span><span class="price">${eur(p.price[s.id])}</span>${bestStore(p.id)===s.id?`<span class="pill p-leaf">${p.forced?'imposé':'conseillé'}</span>`:''}</div>`).join('')}</div>`,true)}
+   ${accd('p_fiche','🏷','Caractéristiques',` · ${CATS[p.c]}, ${p.u}${p.rec?', 🔁 '+p.rec:''}`,`<div style="padding:10px 0">
     <label class="muted">Nom</label><input class="txt" value="${p.n}" ${dis} onchange="P['${p.id}'].n=this.value;render()">
     <div class="row" style="gap:8px;margin-top:8px"><div class="grow"><label class="muted">Rayon</label><select class="txt" ${dis} onchange="P['${p.id}'].c=this.value;render()">${Object.entries(CATS).map(([k,t])=>`<option value="${k}" ${p.c===k?'selected':''}>${t}</option>`).join('')}</select></div>
     <div class="grow"><label class="muted">Emballage</label><select class="txt" ${dis} onchange="P['${p.id}'].u=this.value;render()">${UNITS.map(u=>`<option ${p.u===u?'selected':''}>${u}</option>`).join('')}</select></div></div>
@@ -520,9 +520,8 @@ const VIEWS={
     <p class="muted" style="margin:4px 0 0">Les prix se comparent par emballage. La contenance ne sert qu'à signaler un emballage différent d'un magasin à l'autre (comparaison au kg/L).</p>
     <div class="row" style="margin-top:12px"><div class="grow"><b>🔁 Récurrent</b><div class="muted">Ajouté aux nouvelles listes datées</div></div><select class="txt" style="width:auto" ${dis} onchange="P['${p.id}'].rec=this.value==='non'?null:this.value;render()">${['non','chaque liste','toutes les 2 listes','toutes les 3 listes'].map(o=>`<option ${(p.rec||'non')===o?'selected':''}>${o}</option>`).join('')}</select></div>
     <div class="row" style="margin-top:10px"><div class="grow"><b>Ingrédient de base</b><div class="muted">Proposé « à vérifier », jamais ajouté d'office</div></div><input type="checkbox" style="width:22px;height:22px" ${p.base?'checked':''} ${dis} onchange="P['${p.id}'].base=this.checked;render()"></div>
-    <div class="row" style="margin-top:10px"><div class="grow"><b>Magasin imposé</b><div class="muted">Ignore le conseil prix (qualité, habitude)</div></div><select class="txt" style="width:auto" ${dis} onchange="P['${p.id}'].forced=this.value||null;render()"><option value="">aucun</option>${STORES.map(s=>`<option value="${s.id}" ${p.forced===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div></div>
-   <div class="sec">Derniers relevés</div><div class="card" style="padding:2px 14px">${p.hist.map(h=>`<div class="item"><span class="muted" style="width:62px">${fmtD(h[0],{day:'numeric',month:'short'})}</span><span class="st st-${h[1]}">${ALLSTORES.find(s=>s.id===h[1]).name}</span><span class="grow muted">${h[3]}${h[4]?' · 🏷 promo':''}</span><span class="price">${eur(h[2])}</span></div>`).join('')||'<p class="muted">Aucun relevé.</p>'}</div>
-   <button class="btn sec2 full" onclick="act.addRecord('${p.id}')">＋ Ajouter un relevé</button>
+    <div class="row" style="margin-top:10px"><div class="grow"><b>Magasin imposé</b><div class="muted">Ignore le conseil prix (qualité, habitude)</div></div><select class="txt" style="width:auto" ${dis} onchange="P['${p.id}'].forced=this.value||null;render()"><option value="">aucun</option>${STORES.map(s=>`<option value="${s.id}" ${p.forced===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div></div>`)}
+   ${accd('p_hist','🧾','Derniers relevés',` · ${p.hist.length}`,`${p.hist.map(h=>`<div class="item"><span class="muted" style="width:62px">${fmtD(h[0],{day:'numeric',month:'short'})}</span><span class="st st-${h[1]}">${ALLSTORES.find(s=>s.id===h[1]).name}</span><span class="grow muted">${h[3]}${h[4]?' · 🏷 promo':''}</span><span class="price">${eur(h[2])}</span></div>`).join('')||'<p class="muted">Aucun relevé.</p>'}<button class="btn sec2 full" style="margin:8px 0 10px" onclick="act.addRecord('${p.id}')">＋ Ajouter un relevé</button>`)}
    ${ro?'':`<div class="row" style="gap:8px;margin-top:8px"><button class="btn sec2 grow" onclick="act.mergeProd('${p.id}')">⇄ Fusionner avec…</button><button class="btn sec2 grow" style="color:var(--im)" onclick="act.delProd('${p.id}')">Supprimer</button></div>
    <p class="muted">Utilisé dans ${used} liste${used>1?'s':''} et ${usedD.length} plat${usedD.length>1?'s':''}${usedD.length?' ('+usedD.map(d=>d.n).join(', ')+')':''}.</p>`}`};
  },
@@ -530,7 +529,7 @@ const VIEWS={
   const sug=[];S.lists.forEach(l=>l.items.forEach(i=>{if(i.sugg==='pending')sug.push(`<div class="item"><div class="grow"><div class="nm">${i.q} × ${P[i.pid].n}</div><div class="muted">${i.by} → ${l.type==='backlog'?'À prévoir':'liste du '+fmtD(l.date,{day:'numeric',month:'short'})}</div></div>${isMgr()?`<button class="btn sm" onclick="act.sugg('${l.id}','${i.pid}','ok')">Accepter</button><button class="btn sm sec2" onclick="act.sugg('${l.id}','${i.pid}','no')">✕</button>`:'<span class="pill p-carrot">en attente</span>'}</div>`)}));
   S.meals.forEach((m,ix)=>{if(m.sugg==='pending')sug.push(`<div class="item"><div class="grow"><div class="nm">🍽 ${DISHES[m.dish].n}</div><div class="muted">${m.by} → ${fmtD(m.d)} ${m.s}</div></div>${isMgr()?`<button class="btn sm" onclick="act.msugg(${ix},'ok')">Accepter</button><button class="btn sm sec2" onclick="act.msugg(${ix},'no')">✕</button>`:'<span class="pill p-carrot">en attente</span>'}</div>`)});
   const ord=sid=>`<div style="padding:4px 0 8px"><div class="muted" style="margin:4px 0">Rayons dans l'ordre du parcours</div>${ORDER[sid].map((c,i)=>`<div class="ord"><span class="muted" style="width:18px">${i+1}</span><span class="grow">${CATS[c]} <span class="muted">· ${Object.values(P).filter(p=>p.c===c).length} produits</span></span>${isMgr()?`<button onclick="act.mv('${sid}',${i},-1)" title="Monter">↑</button><button onclick="act.mv('${sid}',${i},1)" title="Descendre">↓</button><button onclick="act.catEdit('${c}')" title="Renommer">✎</button><button onclick="act.catDel('${c}')" title="Supprimer">✕</button>`:''}</div>`).join('')}${isMgr()?`<button class="btn sec2 full" style="margin-top:8px" onclick="act.catEdit(null,'${sid}')">＋ Ajouter un rayon</button>`:''}</div>`;
-  const acc=(id,icon,title,sum,content)=>{const o=S.acc[id];return `<div class="acc${o?' open':''}"><button class="acc-h" aria-expanded="${!!o}" onclick="act.acc('${id}')"><span class="acc-i">${icon}</span><span class="grow"><b>${title}</b><span class="muted">${sum}</span></span><span class="acc-c">›</span></button>${o?`<div class="acc-b">${content}</div>`:''}</div>`};
+  const acc=(id,icon,title,sum,content)=>accd(id,icon,title,sum,content);
   const mem=S.members.map(m=>[m.n,m.r==='manager'?'Gestionnaire':'Membre']);
   return {title:'Foyer Phoenix',sub:isMgr()?'Vous êtes gestionnaire':'Vous êtes membre',right:`<button class="btn sm sec2" onclick="act.accAll()">${Object.values(S.acc).some(Boolean)?'Tout replier':'Tout ouvrir'}</button>`,body:`
    ${acc('sugg','💡','Suggestions en attente',sug.length?`<span class="badge" style="margin-left:6px">${sug.length}</span>`:' · rien en attente',sug.join('')||'<p class="muted">Rien en attente.</p>')}
@@ -545,12 +544,12 @@ const VIEWS={
  ,
  hist(){
   const l=list(S.listId),H=S.hist,ms=mealsOf(l).filter(m=>m.sugg!=='pending');
-  const store=sid=>{const st=ALLSTORES.find(s=>s.id===sid),its=H.bought.filter(b=>b[0]===sid);return `<div class="sec"><span class="st st-${sid}">${st.name}</span> · ${its.length} articles · ticket scanné</div><div class="card" style="padding:2px 14px">${its.map(([s,pid,q,paid])=>{const avg=P[pid].price[sid],d=avg?(paid-avg)/avg*100:0;return `<div class="item"><span class="grow">${q} × ${P[pid].n}</span><span class="muted">${Math.abs(d)>=1?`<b style="color:var(${d>0?'--im':'--leaf'})">${d>0?'+':''}${d.toFixed(0)} %</b> `:''}</span><span class="price">${eur(paid)}</span></div>`}).join('')}</div>`};
+  const store=sid=>{const st=ALLSTORES.find(s=>s.id===sid),its=H.bought.filter(b=>b[0]===sid);return accd('h_'+sid,`<span style="width:12px;height:12px;border-radius:99px;background:${st.color}"></span>`,st.name,` · ${its.length} articles · ticket scanné`,`${its.map(([s,pid,q,paid])=>{const avg=P[pid].price[sid],d=avg?(paid-avg)/avg*100:0;return `<div class="item"><span class="grow">${q} × ${P[pid].n}</span><span class="muted">${Math.abs(d)>=1?`<b style="color:var(${d>0?'--im':'--leaf'})">${d>0?'+':''}${d.toFixed(0)} %</b> `:''}</span><span class="price">${eur(paid)}</span></div>`}).join('')}`)};
   return {title:'Courses du '+fmtD(l.date,{day:'numeric',month:'long'}),sub:'Clôturée · lecture seule',back:'home',body:`
    <div class="card row"><div class="grow"><b>${H.bought.length} articles achetés</b><div class="muted">${H.updated} prix mis à jour par scan · ${H.missing.length} non trouvé${H.missing.length>1?'s':''}</div></div></div>
    ${['im','co'].map(store).join('')}
-   <div class="sec">Non trouvés → reportés</div><div class="card" style="padding:2px 14px">${H.missing.map(([pid,to])=>`<div class="item"><span class="grow">${P[pid].n}</span><span class="pill p-grey">→ ${to}</span></div>`).join('')}</div>
-   <div class="sec">Repas de la période</div><div class="card" style="padding:2px 14px">${H.meals.map(([d,n])=>`<div class="item"><span class="muted" style="width:70px">${fmtD(d,{weekday:'short',day:'numeric'})}</span><span class="grow">${n}</span></div>`).join('')}</div>
+   ${accd('h_miss','❓','Non trouvés → reportés',` · ${H.missing.length}`,H.missing.map(([pid,to])=>`<div class="item"><span class="grow">${P[pid].n}</span><span class="pill p-grey">→ ${to}</span></div>`).join(''))}
+   ${accd('h_meals','🍽','Repas de la période',` · ${H.meals.length}`,H.meals.map(([d,n])=>`<div class="item"><span class="muted" style="width:70px">${fmtD(d,{weekday:'short',day:'numeric'})}</span><span class="grow">${n}</span></div>`).join(''))}
    ${isMgr()?`<button class="btn sec2 full" onclick="act.histCopy()">⧉ Copier les articles dans « À prévoir »</button>`:''}`};
  },
  login(){
@@ -781,6 +780,7 @@ const act={
    if(!e.ing.some(i=>i[0]===pid))e.ing.push(P[pid].base?[pid]:[pid,g.q||1])}
   S.sheet=null;act.toastMsg(`Recette importée · ${c} produit${c>1?'s':''} créé${c>1?'s':''} au catalogue`)},
  acc(id){S.acc[id]=!S.acc[id];render()},
+ accT(id,def){S.acc[id]=!(S.acc[id]??def);render()},
  catEdit(c,sid){const name=c?CATS[c]:'';S.sheet=()=>`<h3>${c?'Renommer le rayon':'Nouveau rayon'}</h3><input class="txt" id="cn" value="${name}" placeholder="ex. Boulangerie"><p class="muted">${c?'Le nom change pour tous les magasins et dans le catalogue.':`Ajouté à la fin du parcours de ${STORES.find(s=>s.id===sid).name} et des autres magasins ; à replacer avec ↑ ↓.`}</p><button class="btn full" onclick="act.catSave(${c?`'${c}'`:'null'})">Enregistrer</button>`;render()},
  catSave(c){const v=$('#cn').value.trim();if(!v)return;if(c)CATS[c]=v;else{const k='c'+Date.now();CATS[k]=v;STORES.forEach(s=>ORDER[s.id].push(k))}S.sheet=null;act.toastMsg(c?'Rayon renommé':'Rayon ajouté')},
  catDel(c){const prods=Object.values(P).filter(p=>p.c===c),others=Object.entries(CATS).filter(([k])=>k!==c);
