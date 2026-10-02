@@ -127,9 +127,10 @@ function promoPills(i) {
   return i.promos.map((p) => `<span class="pill p-carrot click" data-a="promo" data-pid="${i.product_id}" data-sid="${p.store_id}">🏷 ${esc(storeName(p.store_id))} ${p.price_cents != null ? eur(p.price_cents) : 'promo'} · ${p.list_id ? 'ces courses' : `jusqu'au ${esc(fmtDate(p.valid_until))}`}</span>`).join('');
 }
 
-function storesPanel(l) {
+// Encadre en tete des articles : scenarios, economie de la repartition, « tout chez X ».
+function scenPanel(l) {
   const p = l.pricing, mgr = isManager();
-  if (!p.stores.length) return '<p class="muted">Aucun magasin actif.</p>';
+  if (!p || !p.stores.length) return '';
   const max = Math.max(1, ...p.stores.map((s) => s.total), p.split);
   const bar = (v, c) => `<div class="bar"><i style="width:${Math.round((v / max) * 100)}%;background:${c}"></i></div>`;
   const mono = p.stores.find((s) => s.id === p.monoStoreId);
@@ -138,15 +139,12 @@ function storesPanel(l) {
     <div class="muted">${used < 2 ? 'Tout est prévu dans un seul magasin' : p.recommendSplit ? 'Deux magasins valent la peine' : 'Un seul magasin suffit'}</div>
     <big>${eur(Math.abs(p.saving))} ${p.saving >= 0 ? 'd’économie' : 'de surcoût'}</big>
     <div class="muted">répartition actuelle vs tout chez ${esc(mono.name)} · seuil ${eur(p.threshold)}</div></div>`;
-  return `${banner}
-    ${acc('ls_scen', { icon: '📊', title: 'Scénarios comparés', sum: ` · répartition ${eur(p.split)}`, def: true,
-      body: `<div class="scen">${p.stores.map((s) => `<div><span>Tout chez ${esc(s.name)}${s.unknown ? ` <span class="pill p-carrot">${s.unknown} prix inconnu${s.unknown > 1 ? 's' : ''}</span>` : ''}</span>${bar(s.total, s.color)}</div><b class="price">${eur(s.total)}</b>`).join('')}
-        <div><b>Répartition actuelle</b>${bar(p.split, 'var(--leaf)')}</div><b class="price">${eur(p.split)}</b></div>
-        ${p.noPrice ? `<p class="muted small">${p.noPrice} article${p.noPrice > 1 ? 's' : ''} sans aucun prix connu (non estimé${p.noPrice > 1 ? 's' : ''}).</p>` : ''}` })}
-    ${acc('ls_lists', { icon: '🏪', title: 'Listes par magasin', sum: ` · ${p.stores.length} magasin${p.stores.length > 1 ? 's' : ''}`, def: true,
-      body: `<div class="pad">${p.stores.map((s) => `<a class="card click row" href="#/listes/${l.id}/magasin/${s.id}">${storeTag(s.id)}<span class="grow muted">${s.items} article${s.items > 1 ? 's' : ''} · triés par rayon${s.itemsUnknown ? ` · ${s.itemsUnknown} sans prix` : ''}</span><span class="price">${eur(s.itemsTotal)}</span></a>`).join('')}
-        ${mgr && p.stores.length > 1 ? `<div class="row wrap">${p.stores.map((s) => `<button class="btn sm sec2" data-a="assign" data-sid="${s.id}">Tout ${esc(s.name)}</button>`).join('')}<button class="btn sm sec2" data-a="assign" data-sid="">Conseil</button></div>` : ''}
-        <p class="muted small">Touchez l'étiquette d'un magasin dans la liste pour déplacer l'article ; les choix manuels sont en pointillé.</p></div>` })}`;
+  return acc('ls_scen', { icon: '📊', title: 'Scénarios comparés', sum: p.stores.length > 1 ? ` · ${p.saving >= 0 ? 'économie' : 'surcoût'} ${eur(Math.abs(p.saving))}` : ` · ${eur(p.split)}`, def: true,
+    body: `${banner}<div class="scen">${p.stores.map((s) => `<div><span>Tout chez ${esc(s.name)}${s.unknown ? ` <span class="pill p-carrot">${s.unknown} prix inconnu${s.unknown > 1 ? 's' : ''}</span>` : ''}</span>${bar(s.total, s.color)}</div><b class="price">${eur(s.total)}</b>`).join('')}
+      <div><b>Répartition actuelle</b>${bar(p.split, 'var(--leaf)')}</div><b class="price">${eur(p.split)}</b></div>
+      ${p.noPrice ? `<p class="muted small">${p.noPrice} article${p.noPrice > 1 ? 's' : ''} sans aucun prix connu (non estimé${p.noPrice > 1 ? 's' : ''}).</p>` : ''}
+      ${mgr && p.stores.length > 1 ? `<div class="row wrap">${p.stores.map((s) => `<button class="btn sm sec2" data-a="assign" data-sid="${s.id}">Tout ${esc(s.name)}</button>`).join('')}<button class="btn sm sec2" data-a="assign" data-sid="">Conseil</button></div>` : ''}
+      <p class="muted small">Touchez l'étiquette d'un magasin sur un article pour le déplacer ; les choix manuels sont en pointillé.</p>` });
 }
 
 function mealsPanel(l) {
@@ -163,6 +161,11 @@ function basePanel(l) {
     body: l.base.map((b) => `<div class="item"><span class="grow"><b>${esc(b.name)}</b><span class="muted block">pour ${esc(b.dishes.join(', '))}</span></span><button class="btn sm sec2" data-a="add-item" data-id="${b.product_id}">＋ À acheter</button></div>`).join('') });
 }
 
+function filterStore(l) {
+  const f = S.q.listStore;
+  return f && f.listId === l.id ? storeById(f.sid) || null : null;
+}
+
 function itemsBody(l, items, order) {
   const mgr = isManager();
   const groups = order.map((cid) => [cid, items.filter((i) => i.category_id === cid)]).filter(([, is]) => is.length);
@@ -176,16 +179,24 @@ export function listView() {
   const l = current, mgr = isManager(), open = l.status !== 'closed';
   const done = l.items.filter((i) => i.status === 'bought' && !i.suggestion).length;
   const add = open ? `<div class="addbox"><input class="txt" id="add-q" autocomplete="off" placeholder="${mgr ? '＋ Ajouter un article…' : '＋ Suggérer un article…'}" data-in="add-q" data-enter="add-first"><div id="add-ac"></div></div>` : '';
-  const shopBtns = l.type === 'dated' && open ? `<div class="row wrap">${activeStores().map((s) => `<a class="btn sm sec2" href="#/listes/${l.id}/magasin/${s.id}">🛒 ${esc(s.name)}</a>`).join('')}</div>` : '';
-  const items = `${shopBtns}${add}${itemsBody(l, l.items, categoryOrder())}${l.type === 'dated' ? basePanel(l) : ''}`;
+  // Filtre par magasin (liste datee) : articles retenus dans ce magasin, rayons dans son ordre.
+  const fs = l.type === 'dated' && open ? filterStore(l) : null;
+  let shopBtns = '';
+  if (l.type === 'dated' && open && activeStores().length) {
+    const st = fs && ((l.pricing && l.pricing.stores.find((x) => x.id === fs.id)) || { items: 0, itemsTotal: 0, itemsUnknown: 0 });
+    shopBtns = `<div class="seg">${[{ id: '', name: 'Tous' }, ...activeStores()].map((s) => `<button class="${(fs ? fs.id : '') === s.id ? 'on' : ''}" data-a="list-store" data-sid="${s.id}">${esc(s.name)}</button>`).join('')}</div>
+      ${fs ? `<div class="row wrap"><span class="grow muted">${st.items} article${st.items > 1 ? 's' : ''} · ≈ ${eur(st.itemsTotal)}${st.itemsUnknown ? ` (${st.itemsUnknown} sans prix)` : ''}</span><a class="btn sm" href="#/listes/${l.id}/magasin/${fs.id}">🛒 Mode courses</a></div>` : ''}`;
+  }
+  const shown = fs ? l.items.filter((i) => i.at_store_id === fs.id) : l.items;
+  const items = `${l.type === 'dated' && open ? scenPanel(l) : ''}${shopBtns}${add}${fs && !shown.length ? `<p class="muted">Aucun article prévu chez ${esc(fs.name)}.</p>` : itemsBody(l, shown, fs ? fs.categoryOrder : categoryOrder())}${l.type === 'dated' ? basePanel(l) : ''}`;
   let body;
   if (l.status === 'closed') body = closedBody(l);
   else if (l.type === 'backlog') body = items;
   // Meme decoupage en onglets sur PC (rayons en colonnes) que sur telephone.
   else {
-    const tab = S.q.listTab || 'items';
-    body = `<div class="seg">${[['items', 'Articles'], ['meals', `Repas${l.meals.length ? ` (${l.meals.length})` : ''}`], ['stores', 'Magasins']].map(([k, t]) => `<button class="${tab === k ? 'on' : ''}" data-a="list-tab" data-t="${k}">${t}</button>`).join('')}</div>
-      ${tab === 'items' ? items : tab === 'meals' ? mealsPanel(l) : storesPanel(l)}`;
+    const tab = S.q.listTab === 'meals' ? 'meals' : 'items';
+    body = `<div class="seg">${[['items', 'Articles'], ['meals', `Repas${l.meals.length ? ` (${l.meals.length})` : ''}`]].map(([k, t]) => `<button class="${tab === k ? 'on' : ''}" data-a="list-tab" data-t="${k}">${t}</button>`).join('')}</div>
+      ${tab === 'meals' ? mealsPanel(l) : items}`;
   }
   return {
     // PC : colonnes, sauf pour l'onglet Repas (un seul panneau).
@@ -239,6 +250,12 @@ on('click', 'shop-end-unav', async (el) => {
 on('click', 'shop-end-ok', () => { closeSheet(); go(`#/listes/${current.id}`); });
 
 on('click', 'list-tab', (el) => { S.q.listTab = el.dataset.t; render(); });
+// Filtre memorise par liste ; retoucher le magasin filtre le retire.
+on('click', 'list-store', (el) => {
+  const sid = Number(el.dataset.sid) || null, f = S.q.listStore;
+  S.q.listStore = sid && !(f && f.listId === current.id && f.sid === sid) ? { listId: current.id, sid } : null;
+  render();
+});
 on('click', 'store-cycle', async (el) => {
   const i = current.items.find((x) => x.id === Number(el.dataset.id));
   const ids = activeStores().map((s) => s.id);
