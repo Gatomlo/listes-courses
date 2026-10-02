@@ -11,10 +11,16 @@ const stTag = (sid) => {
   return s ? `<span class="st" style="--c:${esc(s.color)}">${esc(s.name)}</span>` : '';
 };
 
+// Prix manquant : aucun prix connu dans les magasins actifs (ou dans le magasin impose).
+function noPrice(p) {
+  const forced = activeStores().find((s) => s.id === p.forced_store_id);
+  return forced ? !p.prices[forced.id] : !activeStores().some((s) => p.prices[s.id]);
+}
+
 export function catalogueView() {
   const q = S.q.cat || '', f = S.q.catFilter || 'all';
   const ok = (p) => (!q || norm(p.name).includes(norm(q)))
-    && (f === 'all' || (f === 'rec' && p.recurrence) || (f === 'base' && p.is_base) || (f === 'noprice' && activeStores().some((s) => !p.prices[s.id])));
+    && (f === 'all' || (f === 'rec' && p.recurrence) || (f === 'base' && p.is_base) || (f === 'noprice' && noPrice(p)));
   const list = S.products.filter(ok);
   const groups = categoryOrder().map((cid) => [cid, list.filter((p) => p.category_id === cid)]).filter(([, ps]) => ps.length);
   const row = (p) => `<div class="item click" data-a="go" data-to="#/catalogue/${p.id}"><div class="grow"><div class="nm">${esc(p.name)}</div>
