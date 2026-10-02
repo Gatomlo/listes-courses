@@ -38,6 +38,7 @@ Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/cabas.db`), nodemaile
 
 ## Commandes
 - CSP : `script-src 'self' 'wasm-unsafe-eval'` (Tesseract) ; tout reste servi par l'app (aucun CDN pour l'OCR).
+- Import d'un panier transcrit (produits + relevés) : `CABAS_URL=… CABAS_EMAIL=… CABAS_PASSWORD=… node scripts/import-prices.js scripts/<magasin>-<date>.json [--dry]` (format : voir `scripts/colruyt-2026-10-02.json` ; relancer ne double rien).
 - `npm test` (API sur base temporaire, e-mails en mémoire ; `tests/helpers.js` : clients, foyer gestionnaire + membre).
 - Essai local : `CABAS_DATA_DIR=<dossier temp> CABAS_MAIL=log PORT=3101 node server.js` → le lien de connexion s'affiche dans la console. Ne jamais essayer sur `data/`.
 - Passerelle locale : jonction `node-gateway/apps/cabas` → ce dossier (créée), servie sur `http://localhost:3000/cabas/`.
