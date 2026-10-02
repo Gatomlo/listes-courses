@@ -23,11 +23,12 @@ export function catalogueView() {
     ${p.best_store_id ? stTag(p.best_store_id) : '<span class="muted small">prix ?</span>'}</div>`;
   return {
     cols: true, title: 'Catalogue', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer`,
-    right: `${isManager() ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button> ' : ''}<button class="btn sm" data-a="prod-new">＋ Produit</button>`,
+    right: isManager() ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button>' : '',
     body: `<input class="txt" id="cat-q" placeholder="🔍 Rechercher un produit…" value="${esc(q)}" data-in="cat-q">
       <div class="opt">${[['all', 'Tous'], ['rec', '🔁 Récurrents'], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
       ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: ps.map(row).join('') })).join('')
-        || `<p class="muted">Aucun produit.</p>${q ? `<button class="btn" data-a="prod-new" data-name="${esc(q)}">＋ Créer « ${esc(q)} »</button>` : ''}`}`,
+        || `<p class="muted">Aucun produit.</p>${q ? `<button class="btn" data-a="prod-new" data-name="${esc(q)}">＋ Créer « ${esc(q)} »</button>` : ''}`}
+      <button class="fab" data-a="prod-new" title="Nouveau produit">＋</button>`,
   };
 }
 
