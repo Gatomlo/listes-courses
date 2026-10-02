@@ -204,7 +204,7 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
 .acc-i{width:32px;height:32px;border-radius:10px;background:var(--sunk);display:grid;place-items:center;flex:none}
 .acc-c{font-size:22px;color:var(--muted);transition:transform .2s}
 .acc.open .acc-c{transform:rotate(90deg)}
-.acc-b{padding:0 14px;border-top:1px solid var(--line)}
+.acc-b{padding:0 14px 12px;border-top:1px solid var(--line)}
 
 /* ---------- Panneau et message ---------- */
 .sheet-bg{position:fixed;inset:0;z-index:10;background:#0006;display:flex;align-items:flex-end}

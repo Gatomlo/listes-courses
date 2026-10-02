@@ -3,7 +3,7 @@
 import { esc, fmtDate, on, sheet, closeSheet, confirmSheet, toast, isPc } from './ui.js';
 import { get, post, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
-import { SLOT, loadDishes, recipeSheet } from './plats.js';
+import { SLOT, loadDishes, recipeSheet, newDishFrom } from './plats.js';
 
 const SLOTS = ['pdj', 'midi', 'soir', 'coll'];
 const today = () => new Date().toISOString().slice(0, 10);
@@ -16,6 +16,10 @@ let menu = null; // { from, to, period: { id, start, end, saved }, meals, lists 
 export async function loadMenu() {
   menu = await get(hp(`/menu?at=${S.menuAt || today()}`));
   if (!S.dishes) await loadDishes();
+  // Retour apres creation d'un plat depuis le menu : on reprend l'ajout du repas.
+  const r = S.dishReturn;
+  S.dishReturn = null;
+  if (r && r.dish_id) { pm = { date: r.date, slot: r.slot, dish_id: r.dish_id, persons: 4, skip: [] }; setTimeout(stockSheet); }
 }
 const mealAt = (d, s) => menu.meals.find((m) => m.date === d && m.slot === s && !m.suggestion) || menu.meals.find((m) => m.date === d && m.slot === s);
 const shopDay = (d) => menu.lists.some((l) => l.date === d);
@@ -187,11 +191,12 @@ function pickSheet() {
   sheet(`<h3>${esc(fmtDate(pm.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[pm.slot]}</h3>
     <input class="txt" id="pick-q" placeholder="🔍 Rechercher un plat…" value="${esc(pm.q || '')}" data-in="pick-q">
     <div class="pick">${list.map((d) => `<button class="card click" data-a="pick-dish" data-id="${d.id}"><b>${esc(d.name)}</b><span class="muted block">${d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}` : 'rappel seulement'}${d.last_date ? ` · dernière fois le ${esc(fmtDate(d.last_date))}` : ''}</span></button>`).join('') || '<p class="muted">Aucun plat.</p>'}</div>
-    ${isManager() ? '<a class="btn sec2 full" href="#/plats/nouveau" data-a="close-nav">＋ Nouveau plat</a>' : ''}`);
+    ${isManager() ? `<button class="btn sec2 full" data-a="pick-new">＋ Nouveau plat${pm.q ? ` « ${esc(pm.q)} »` : ''}</button>` : ''}`);
 }
 on('click', 'meal-add', (el) => { pm = { date: el.dataset.date, slot: el.dataset.slot, persons: 4, skip: [], q: '' }; pickSheet(); });
 on('input', 'pick-q', (el) => { pm.q = el.value; pickSheet(); const i = document.getElementById('pick-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('click', 'pick-dish', (el) => { pm.dish_id = Number(el.dataset.id); stockSheet(); });
+on('click', 'pick-new', () => { closeSheet(); newDishFrom(pm.q, { date: pm.date, slot: pm.slot }); });
 on('click', 'close-nav', (el) => { closeSheet(); go(el.getAttribute('href')); });
 
 // Depuis la fiche d'un plat : choix du jour et du creneau.

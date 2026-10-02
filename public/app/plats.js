@@ -43,12 +43,15 @@ on('click', 'dish-new-named', () => { pendingName = S.q.dish; go('#/plats/nouvea
 // ---------- Fiche plat ----------
 let ed = null;          // plat en cours d'edition
 let pendingName = '';
+// Creation depuis le menu : S.dishReturn = { date, slot } ; apres enregistrement, retour au menu.
+export function newDishFrom(name, ret) { pendingName = name || ''; S.dishReturn = ret; go('#/plats/nouveau'); }
 export async function loadDish(id) {
   if (!S.products) await loadProducts();
   if (id === 'nouveau') {
     ed = { id: null, name: pendingName || '', portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], upcoming: [], past: [], times: 0 };
     pendingName = '';
   } else {
+    S.dishReturn = null;
     const d = await get(hp(`/dishes/${id}`));
     ed = { ...d, steps: d.steps || '', notes: d.notes || '', url: d.url || '', time_text: d.time_text || '' };
   }
@@ -71,7 +74,7 @@ export function dishView() {
       ${ed.times ? `<div class="pills"><span class="pill p-leaf">${ed.times} fois planifié</span><span class="pill p-grey">dernière il y a ${daysAgo(ed.past[0].date)} j</span>${ed.times > 1 ? `<span class="pill p-grey">en moyenne tous les ${Math.round(daysAgo(ed.first_date) / (ed.times - 1))} j</span>` : ''}</div>${ed.past.map((m) => mealRow(m)).join('')}` : '<p class="muted">Jamais planifié pour l’instant.</p>'}`,
   }) : '';
   return {
-    title: ed.id ? ed.name : 'Nouveau plat', sub: ro ? 'Lecture seule (membre)' : ed.id ? 'Plat du foyer' : '', back: '#/plats',
+    title: ed.id ? ed.name : 'Nouveau plat', sub: ro ? 'Lecture seule (membre)' : ed.id ? 'Plat du foyer' : '', back: !ed.id && S.dishReturn ? '#/menu' : '#/plats',
     body: `${acc('d_info', { icon: '📝', title: 'Informations', def: true, sum: ` · ${ed.portions} pers.${ed.time_text ? ' · ⏱ ' + esc(ed.time_text) : ''}`,
         body: `<div class="form"><label class="muted">Nom</label><input class="txt" value="${esc(ed.name)}" ${dis} data-ch="ed" data-f="name">
           <div class="row gap"><label class="grow"><span class="muted">Portions de référence</span><input class="txt" type="number" min="1" value="${ed.portions}" ${dis} data-ch="ed" data-f="portions"></label>
@@ -135,7 +138,7 @@ on('click', 'dish-save', async () => {
   ed = { ...d, steps: d.steps || '', notes: d.notes || '', url: d.url || '', time_text: d.time_text || '' };
   S.dishes = null;
   toast(isNew ? 'Plat créé' : 'Plat enregistré · listes recalculées');
-  if (isNew) go(`#/plats/${d.id}`); else render();
+  if (isNew && S.dishReturn) { S.dishReturn.dish_id = d.id; go('#/menu'); } else if (isNew) go(`#/plats/${d.id}`); else render();
 });
 on('click', 'dish-del', async () => {
   const n = ed.upcoming.length;

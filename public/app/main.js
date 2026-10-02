@@ -77,7 +77,7 @@ async function route() {
     if (name === 'produit') await loadProduct(arg);
     if (name === 'listes') await Promise.all([loadSummary(), loadSuggestions()]);
     if (name === 'liste' || name === 'magasin') await loadList(arg);
-    if (name === 'plats') await loadDishes();
+    if (name === 'plats') { S.dishReturn = null; await loadDishes(); }
     if (name === 'plat') await loadDish(arg);
     if (name === 'menu') await loadMenu();
     if (name === 'menuexport') await loadExport();
