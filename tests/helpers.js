@@ -5,7 +5,7 @@ const os = require('os');
 const path = require('path');
 
 process.env.CABAS_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'cabas-test-'));
-process.env.CABAS_MAIL = 'log';
+process.env.CABAS_MAIL = process.env.CABAS_MAIL || 'log';
 process.env.CABAS_QUIET = '1';
 const app = require('../server');
 const { outbox } = require('../lib/mailer');
