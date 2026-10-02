@@ -12,42 +12,107 @@ const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const extra = () => { try { return localStorage.getItem('cabas-menu-extra') === '1'; } catch { return false; } };
 const slotsShown = () => SLOTS.filter((s) => extra() || s === 'midi' || s === 'soir');
 
-let menu = null; // { from, to, meals, lists }
+let menu = null; // { from, to, period: { id, start, end, saved }, meals, lists }
 export async function loadMenu() {
-  if (!S.menuFrom) S.menuFrom = mondayOf(today());
-  menu = await get(hp(`/menu?from=${S.menuFrom}&days=14`));
+  menu = await get(hp(`/menu?at=${S.menuAt || today()}`));
   if (!S.dishes) await loadDishes();
 }
-function mondayOf(iso) { const d = new Date(iso + 'T12:00:00Z'); const w = (d.getUTCDay() + 6) % 7; return addDays(iso, -w); }
 const mealAt = (d, s) => menu.meals.find((m) => m.date === d && m.slot === s && !m.suggestion) || menu.meals.find((m) => m.date === d && m.slot === s);
 const shopDay = (d) => menu.lists.some((l) => l.date === d);
 
 function mealBtn(m) {
-  return `<button class="meal${m.suggestion ? ' pending' : ''}" data-a="meal-open" data-id="${m.id}" data-date="${m.date}">${m.has_recipe ? '📖 ' : ''}${esc(m.dish)}${m.persons !== 4 ? ` · ${m.persons} p.` : ''}${m.suggestion ? ' <span class="pill p-carrot">suggéré</span>' : ''}</button>`;
+  const drag = isPc() && isManager() && !m.suggestion ? ` draggable="true" data-drag="${m.id}"` : '';
+  return `<button class="meal${m.suggestion ? ' pending' : ''}"${drag} data-a="meal-open" data-id="${m.id}" data-date="${m.date}">${m.has_recipe ? '📖 ' : ''}${esc(m.dish)}${m.persons !== 4 ? ` · ${m.persons} p.` : ''}${m.suggestion ? ' <span class="pill p-carrot">suggéré</span>' : ''}</button>`;
 }
 const addBtn = (d, s) => `<button class="add" data-a="meal-add" data-date="${d}" data-slot="${s}" aria-label="Ajouter un plat">＋</button>`;
 
 export function menuView() {
-  const days = Array.from({ length: 14 }, (_, i) => addDays(menu.from, i));
-  const slots = slotsShown();
+  const days = []; for (let d = menu.from; d <= menu.to; d = addDays(d, 1)) days.push(d);
+  const slots = slotsShown(), p = menu.period, mgr = isManager();
   let body;
   if (isPc()) {
-    body = [0, 7].map((w) => `<table class="wk"><tr><th></th>${days.slice(w, w + 7).map((d) => `<th class="${d === today() ? 'today' : ''}">${esc(fmtDate(d, { weekday: 'short', day: 'numeric', month: 'short' }))}${shopDay(d) ? ' 🛒' : ''}</th>`).join('')}</tr>
-      ${slots.map((s) => `<tr><td class="sl">${SLOT[s]}</td>${days.slice(w, w + 7).map((d) => { const m = mealAt(d, s); return `<td>${m ? mealBtn(m) : addBtn(d, s)}</td>`; }).join('')}</tr>`).join('')}</table>`).join('');
+    // Tableaux de 7 jours depuis le premier jour du menu ; derniere ligne completee.
+    const weeks = []; for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+    const pad = (w, tag) => `<${tag} class="off"></${tag}>`.repeat(7 - w.length);
+    body = weeks.map((w) => `<table class="wk"><tr><th></th>${w.map((d) => `<th class="${d === today() ? 'today' : ''}">${esc(fmtDate(d, { weekday: 'short', day: 'numeric', month: 'short' }))}${shopDay(d) ? ' 🛒' : ''}</th>`).join('')}${pad(w, 'th')}</tr>
+      ${slots.map((s) => `<tr><td class="sl">${SLOT[s]}</td>${w.map((d) => { const m = mealAt(d, s); return `<td data-drop="${d}" data-slot="${s}">${m ? mealBtn(m) : addBtn(d, s)}</td>`; }).join('')}${pad(w, 'td')}</tr>`).join('')}</table>`).join('')
+      + (mgr ? '<p class="muted small">Glissez un repas vers un autre jour ou créneau pour le déplacer (si la case est occupée, les deux repas s’échangent).</p>' : '');
   } else {
     body = days.map((d) => `${shopDay(d) ? `<div class="sec">🛒 Courses du ${esc(fmtDate(d, { day: 'numeric', month: 'long' }))}</div>` : ''}
       <div class="day${d === today() ? ' today' : ''}"><div class="d"><span>${esc(fmtDate(d, { weekday: 'short' }))}</span><b>${new Date(d + 'T12:00').getDate()}</b></div>
       <div class="grow">${slots.map((s) => { const m = mealAt(d, s); return `<div class="slot"><span class="lbl">${SLOT[s]}</span>${m ? mealBtn(m) : addBtn(d, s)}</div>`; }).join('')}</div></div>`).join('');
   }
+  const range = `${esc(fmtDate(menu.from, { weekday: 'short', day: 'numeric', month: 'short' }))} → ${esc(fmtDate(menu.to, { weekday: 'short', day: 'numeric', month: 'short' }))}`;
   return {
     title: 'Menu', sub: 'Les plats alimentent la liste de leur période', right: '<a class="btn sm sec2" href="#/menu/export">🖨 Exporter</a>',
-    body: `<div class="row"><button class="btn sm sec2" data-a="menu-week" data-d="-7" aria-label="Semaine précédente">‹</button><b class="grow c">${esc(fmtDate(menu.from, { day: 'numeric', month: 'short' }))} → ${esc(fmtDate(menu.to, { day: 'numeric', month: 'short' }))}</b>
-      <button class="btn sm sec2" data-a="menu-week" data-d="7" aria-label="Semaine suivante">›</button></div>
-      <div class="row end" style="margin:6px 0 4px"><button class="btn sm sec2" data-a="menu-extra">${extra() ? 'Masquer' : 'Afficher'} p.-déj. / collation</button></div>
+    body: `<div class="row"><button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.from, -1)}" aria-label="Menu précédent">‹</button>
+      <div class="grow c"><b>${range}</b><span class="muted small block">${days.length} jours · ${p.saved ? 'menu enregistré' : 'période proposée'}</span></div>
+      <button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.to, 1)}" aria-label="Menu suivant">›</button></div>
+      <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}${mgr ? `<button class="btn sm sec2" data-a="menu-dates">📅 ${p.saved ? 'Modifier les dates' : 'Fixer les dates'}</button>` : ''}<button class="btn sm sec2" data-a="menu-extra">${extra() ? 'Masquer' : 'Afficher'} p.-déj. / collation</button></div>
       ${body}<a class="btn sec2 full" style="margin-top:12px" href="#/plats">📖 Tous les plats</a>`,
   };
 }
-on('click', 'menu-week', async (el) => { S.menuFrom = addDays(menu.from, Number(el.dataset.d)); await loadMenu(); render(); });
+on('click', 'menu-nav', async (el) => { S.menuAt = el.dataset.d || null; await loadMenu(); render(); });
+
+// Dates du menu (gestionnaire) : fixer une periode proposee, modifier ou supprimer un menu.
+const nDays = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000) + 1;
+function datesSheet(start, end) {
+  const n = start && end ? nDays(start, end) : 0;
+  sheet(`<h3>📅 Dates du menu</h3>
+    <div class="row gap"><label class="grow"><span class="muted">Du</span><input class="txt" type="date" name="start" value="${start}" data-ch="md-start"></label>
+    <label class="grow"><span class="muted">Au</span><input class="txt" type="date" name="end" value="${end}" min="${start}" data-ch="md-end"></label></div>
+    <p class="muted small">${n > 0 ? `${n} jour${n > 1 ? 's' : ''} : du ${esc(fmtDate(start, { weekday: 'long', day: 'numeric', month: 'long' }))} au ${esc(fmtDate(end, { weekday: 'long', day: 'numeric', month: 'long' }))}.` : 'La fin doit suivre le début.'}
+      Le menu suivant est proposé à partir du lendemain. Durée et premier jour par défaut : Foyer → Réglages.</p>
+    <div class="row end">${menu.period.saved ? '<button class="btn sec2 danger-t" data-a="md-del">Supprimer ce menu</button>' : ''}<button class="btn" data-a="md-save">Enregistrer</button></div>`);
+}
+const mdVal = () => { const s = document.querySelector('.sheet'); return { start: s.querySelector('[name=start]').value, end: s.querySelector('[name=end]').value }; };
+on('click', 'menu-dates', () => datesSheet(menu.period.start, menu.period.end));
+// Changer le debut garde la duree.
+on('change', 'md-start', () => { const v = mdVal(); if (v.start) datesSheet(v.start, addDays(v.start, nDays(menu.period.start, menu.period.end) - 1)); });
+on('change', 'md-end', () => { const v = mdVal(); if (v.start && v.end) datesSheet(v.start, v.end); });
+on('click', 'md-save', async () => {
+  const v = mdVal(), p = menu.period;
+  const r = await attempt(() => (p.saved ? patch(hp(`/menus/${p.id}`), v) : post(hp('/menus'), v)));
+  if (r) { closeSheet(); S.menuAt = r.start; toast('Dates du menu enregistrées'); await loadMenu(); render(); }
+});
+on('click', 'md-del', async () => {
+  if (!(await confirmSheet({ title: 'Supprimer ce menu ?', text: 'Seules ses dates sont oubliées : les repas prévus restent au planning.', ok: 'Supprimer', danger: true }))) return;
+  if (await attempt(() => del(hp(`/menus/${menu.period.id}`)))) { toast('Menu supprimé'); await loadMenu(); render(); }
+});
+
+// Glisser-deposer d'un repas (PC, gestionnaire) ; sur telephone : « Déplacer » dans la fiche repas.
+let dragId = null;
+const dropCell = (e) => dragId && e.target.closest && e.target.closest('[data-drop]');
+const clearDrop = () => document.querySelectorAll('.drop-on').forEach((x) => x.classList.remove('drop-on'));
+document.addEventListener('dragstart', (e) => {
+  const b = e.target.closest && e.target.closest('[data-drag]');
+  if (!b) return;
+  dragId = b.dataset.drag;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragId);
+});
+document.addEventListener('dragover', (e) => {
+  const td = dropCell(e);
+  if (!td) return;
+  e.preventDefault();
+  if (!td.classList.contains('drop-on')) { clearDrop(); td.classList.add('drop-on'); }
+});
+document.addEventListener('dragend', () => { dragId = null; clearDrop(); });
+document.addEventListener('drop', async (e) => {
+  const td = dropCell(e);
+  if (!td) return;
+  e.preventDefault();
+  const id = dragId; dragId = null; clearDrop();
+  const m = menu.meals.find((x) => x.id === Number(id));
+  if (m && (m.date !== td.dataset.drop || m.slot !== td.dataset.slot)) await moveMeal(id, td.dataset.drop, td.dataset.slot);
+});
+async function moveMeal(id, date, slot) {
+  const other = menu && date >= menu.from && date <= menu.to ? menu.meals.find((x) => x.date === date && x.slot === slot && !x.suggestion && x.id !== Number(id)) : null;
+  if (await attempt(() => patch(hp(`/meals/${id}`), { date, slot }))) {
+    toast(other ? `Échangé avec « ${other.dish} »` : 'Repas déplacé');
+    afterChange();
+  }
+}
 on('click', 'menu-extra', () => { try { localStorage.setItem('cabas-menu-extra', extra() ? '0' : '1'); } catch { /* ignore */ } render(); });
 
 // ---------- Ajouter un repas ----------
@@ -137,6 +202,8 @@ async function mealSheet(m) {
     ${m.skip.length ? `<p class="muted small">🥫 ${m.skip.length} ingrédient${m.skip.length > 1 ? 's' : ''} en réserve (non acheté${m.skip.length > 1 ? 's' : ''})</p>` : ''}
     ${mgr && !m.suggestion ? `<label class="row line"><span class="grow">Liste de courses</span><select class="txt w12" data-ch="meal-list" data-id="${m.id}">
       <option value="">Automatique (période)</option>${lists.map((l) => `<option value="${l.id}" ${m.list_id === l.id ? 'selected' : ''}>Liste du ${esc(fmtDate(l.date))}</option>`).join('')}</select></label>` : ''}
+    ${mgr && !m.suggestion ? `<div class="row gap" style="margin-top:8px"><input class="txt grow" type="date" id="mv-date" value="${m.date}"><select class="txt w8" id="mv-slot">${SLOTS.map((s) => `<option value="${s}" ${s === m.slot ? 'selected' : ''}>${SLOT[s]}</option>`).join('')}</select>
+      <button class="btn sec2" data-a="meal-move" data-id="${m.id}">Déplacer</button></div>` : ''}
     <button class="btn full" style="margin-top:8px" data-a="meal-recipe" data-dish="${m.dish_id}" data-p="${m.persons}">📖 ${m.has_recipe ? 'Voir la recette' : 'Ingrédients'}</button>
     <div class="row end">
       ${m.suggestion && mgr ? `<button class="btn" data-a="meal-accept" data-id="${m.id}">Accepter</button>` : ''}
@@ -144,6 +211,12 @@ async function mealSheet(m) {
       ${mgr && !m.suggestion ? `<button class="btn sec2" data-a="meal-edit" data-id="${m.id}" data-date="${m.date}">Personnes et réserve</button><button class="btn sec2" data-a="meal-change" data-id="${m.id}" data-date="${m.date}" data-slot="${m.slot}">Changer de plat</button><a class="btn sec2" href="#/plats/${m.dish_id}" data-a="close-nav">Modifier le plat</a>` : ''}
     </div>`);
 }
+on('click', 'meal-move', async (el) => {
+  const date = document.getElementById('mv-date').value, slot = document.getElementById('mv-slot').value;
+  if (!date) return;
+  closeSheet();
+  await moveMeal(el.dataset.id, date, slot);
+});
 on('click', 'meal-recipe', (el) => recipeSheet(Number(el.dataset.dish), Number(el.dataset.p)));
 on('change', 'meal-list', async (el) => {
   if (await attempt(() => patch(hp(`/meals/${el.dataset.id}`), { list_id: el.value }))) { toast('Repas rattaché · ingrédients déplacés'); closeSheet(); afterChange(); }
@@ -167,12 +240,11 @@ on('click', 'meal-change', (el) => {
 });
 
 // ---------- Export / impression ----------
-const ex = { range: 'week', slots: { midi: true, soir: true }, persons: false, shop: true };
+const ex = { range: 'menu', slots: { midi: true, soir: true }, persons: false, shop: true };
 let exData = null;
 export async function loadExport() {
   if (!menu) await loadMenu();
-  const from = S.menuFrom;
-  let start = from, days = ex.range === '2w' ? 14 : 7;
+  let start = menu.from, days = ex.range === 'menu' ? nDays(menu.from, menu.to) : 7;
   if (ex.range === 'list') {
     const l = (await get(hp('/lists')).catch(() => ({ upcoming: [] }))).upcoming[0];
     if (l) { start = l.date; days = S.house.household.rhythm_days; }
@@ -196,7 +268,7 @@ export function exportView() {
   const link = token ? new URL(`#/affichage/${token}`, document.baseURI).href : null;
   return {
     title: 'Exporter le menu', back: '#/menu', sub: 'A4 paysage',
-    body: `<div class="sec">Période</div><div class="opt">${[['week', '7 jours'], ['list', 'Période de la prochaine liste'], ['2w', '14 jours']].map(([k, t]) => `<button class="${ex.range === k ? 'on' : ''}" data-a="ex-range" data-k="${k}">${t}</button>`).join('')}</div>
+    body: `<div class="sec">Période</div><div class="opt">${[['menu', 'Menu affiché'], ['week', '7 jours'], ['list', 'Période de la prochaine liste']].map(([k, t]) => `<button class="${ex.range === k ? 'on' : ''}" data-a="ex-range" data-k="${k}">${t}</button>`).join('')}</div>
       <div class="sec">Créneaux</div><div class="opt">${SLOTS.map((s) => `<button class="${ex.slots[s] ? 'on' : ''}" data-a="ex-slot" data-s="${s}">${SLOT[s]}</button>`).join('')}</div>
       <div class="sec">Options</div><div class="opt"><button class="${ex.persons ? 'on' : ''}" data-a="ex-opt" data-k="persons">Nb de personnes</button><button class="${ex.shop ? 'on' : ''}" data-a="ex-opt" data-k="shop">Jours de courses 🛒</button></div>
       <div class="sec">Aperçu</div><div id="print-src">${sheetHtml(exData, S.house.household.name)}</div>
@@ -225,7 +297,7 @@ on('click', 'share-copy', async () => { const i = document.getElementById('share
 // ---------- Affichage public (sans connexion) ----------
 let pub = null, pubTimer = null;
 export async function loadPublic(token) {
-  const res = await fetch(`api/public/menu/${encodeURIComponent(token)}?from=${mondayOf(today())}&days=14`);
+  const res = await fetch(`api/public/menu/${encodeURIComponent(token)}`);
   pub = res.ok ? await res.json() : { error: (await res.json().catch(() => ({}))).error || 'Lien inconnu.' };
   clearInterval(pubTimer);
   pubTimer = setInterval(async () => { if (location.hash.startsWith('#/affichage/')) { await loadPublic(token); render(); } else clearInterval(pubTimer); }, 5 * 60 * 1000);

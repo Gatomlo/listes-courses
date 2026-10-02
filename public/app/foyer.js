@@ -3,6 +3,8 @@ import { esc, eur, on, acc, sheet, closeSheet, confirmSheet, toast, formData } f
 import { patch, post, put, del, attempt } from './api.js';
 import { S, hp, isManager, render, loadHouse } from './state.js';
 
+const DOW = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+
 const COLORS = ['#c8313b', '#e08a12', '#2f7d4f', '#5b4bb7', '#1f6fb2', '#8a5a2b'];
 const roleLabel = (r) => (r === 'manager' ? 'Gestionnaire' : 'Membre');
 const dot = (c) => `<span class="dot" style="background:${esc(c)}"></span>`;
@@ -29,12 +31,14 @@ export function foyerView() {
     right: '<button class="btn sm sec2" data-a="go" data-to="#/foyers">Mes foyers</button>',
     body: `${acc('mem', { icon: '👥', title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
         body: members + (mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="invite">＋ Inviter un membre</button>' : '') })}
-      ${acc('set', { icon: '⚙️', title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, ${h.avg_records} relevés, ${h.rhythm_days} jours`,
+      ${acc('set', { icon: '⚙️', title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, ${h.avg_records} relevés, courses ${h.rhythm_days} j, menu ${h.menu_days} j dès le ${DOW[h.menu_start_dow]}`,
         body: `<div class="form">
           <label class="row"><span class="grow"><b>Nom du foyer</b></span><input class="txt w12" name="name" value="${esc(h.name)}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Seuil « 2 magasins »</b><span class="muted block">Économie minimale (€) pour conseiller de faire les deux</span></span><input class="txt w5" name="threshold" inputmode="decimal" value="${(h.threshold_cents / 100).toFixed(2).replace('.', ',')}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Prix moyen</b><span class="muted block">Nombre de derniers relevés pris en compte</span></span><input class="txt w5" type="number" min="1" max="20" name="avg_records" value="${h.avg_records}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Rythme des courses</b><span class="muted block">Jours entre deux listes (date proposée)</span></span><input class="txt w5" type="number" min="1" max="90" name="rhythm_days" value="${h.rhythm_days}" ${mgr ? '' : 'disabled'}></label>
+          <label class="row"><span class="grow"><b>Durée d'un menu</b><span class="muted block">Jours proposés pour un nouveau menu</span></span><input class="txt w5" type="number" min="1" max="62" name="menu_days" value="${h.menu_days}" ${mgr ? '' : 'disabled'}></label>
+          <label class="row"><span class="grow"><b>Premier jour d'un menu</b><span class="muted block">Quand aucun menu n'est enregistré avant</span></span><select class="txt w8" name="menu_start_dow" ${mgr ? '' : 'disabled'}>${[1, 2, 3, 4, 5, 6, 0].map((i) => `<option value="${i}" ${i === h.menu_start_dow ? 'selected' : ''}>${DOW[i]}</option>`).join('')}</select></label>
           ${mgr ? '<div class="row end"><button class="btn" data-a="settings-save">Enregistrer</button></div>' : ''}</div>` })}
       ${stores}
       ${mgr ? '<button class="btn sec2 full" data-a="store-edit">＋ Ajouter un magasin</button>' : ''}`,
@@ -46,7 +50,7 @@ const refresh = async () => { await loadHouse(); render(); };
 on('click', 'settings-save', async () => {
   const f = formData(document.querySelector('.acc .form'));
   const threshold_cents = Math.round(parseFloat(String(f.threshold).replace(',', '.')) * 100);
-  if (await attempt(() => patch(hp(), { name: f.name, threshold_cents, avg_records: f.avg_records, rhythm_days: f.rhythm_days }))) {
+  if (await attempt(() => patch(hp(), { name: f.name, threshold_cents, avg_records: f.avg_records, rhythm_days: f.rhythm_days, menu_days: f.menu_days, menu_start_dow: f.menu_start_dow }))) {
     toast('Réglages enregistrés'); await refresh();
   }
 });
