@@ -67,7 +67,7 @@ on('click', 'cat-add-ok', async () => {
 });
 on('click', 'cat-rename', (el) => {
   const c = S.house.categories.find((x) => x.id === Number(el.dataset.id));
-  sheet(`<h3>Renommer le rayon</h3><input class="txt" name="name" value="${esc(c.name)}" data-enter="cat-rename-ok" data-id="${c.id}"><p class="muted small">Le nom change pour tous les magasins et dans le catalogue.</p><div class="row end"><button class="btn" data-a="cat-rename-ok" data-id="${c.id}">Enregistrer</button></div>`);
+  sheet(`<h3>Renommer le rayon</h3><input class="txt" name="name" value="${esc(c.name)}" data-enter="cat-rename-ok" data-id="${c.id}"><p class="muted small">Le nom change pour tous les magasins et pour les produits.</p><div class="row end"><button class="btn" data-a="cat-rename-ok" data-id="${c.id}">Enregistrer</button></div>`);
 });
 on('click', 'cat-rename-ok', async (el) => {
   const name = document.querySelector('.sheet [name=name]').value;

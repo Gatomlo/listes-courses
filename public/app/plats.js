@@ -12,6 +12,19 @@ const daysAgo = (d) => Math.round((Date.parse(today()) - Date.parse(d)) / 864e5)
 export const SLOT = { pdj: 'P.-déj.', midi: 'Midi', soir: 'Soir', coll: 'Collation' };
 const num = (v) => { const n = Number(String(v ?? '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
 const fmtQ = (q) => String(Math.round(q * 10) / 10).replace('.', ',');
+// Unite d'un ingredient : NULL = emballages du produit, sinon g / ml / pieces.
+const IUNITS = [['g', 'g'], ['ml', 'ml'], ['pc', 'pièce']];
+const iunitLabel = (i) => (i.iunit ? IUNITS.find(([k]) => k === i.iunit)[1] : i.unit);
+const amountText = (q, i) => (i.iunit === 'g' && q >= 1000 ? `${fmtQ(q / 1000)} kg` : i.iunit === 'ml' && q >= 1000 ? `${fmtQ(q / 1000)} L` : `${fmtQ(q)} ${iunitLabel(i)}${i.iunit === 'pc' && q > 1 ? 's' : ''}`);
+// Conversion possible en emballages (meme regle que lib/units.js, g et ml equivalents).
+function convertible(i) {
+  if (!i.iunit) return true;
+  const p = (S.products || []).find((x) => x.id === i.product_id);
+  if (!p) return i.conv !== false;
+  if (!p.size) return false;
+  const mass = (u) => u === 'g' || u === 'ml';
+  return p.size.u === i.iunit || (mass(p.size.u) && mass(i.iunit)) || p.piece_qty > 0;
+}
 
 export async function loadDishes() { S.dishes = await get(hp('/dishes')); }
 // Tags connus : ceux du foyer (S.house.tags) et ceux des plats charges.
@@ -72,7 +85,8 @@ export function dishView() {
   const ro = !isManager(), dis = ro ? 'disabled' : '';
   const nIng = ed.ingredients.length;
   const ingRows = (t, empty) => ingsOf(t).map((i, k) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>
-    ${i.is_base ? '<span class="pill p-grey">de base</span>' : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" ${dis} data-ch="ing-qty" data-t="${t}" data-k="${k}"><span class="muted small w5">${esc(i.unit)}</span>`}
+    ${i.is_base ? '<span class="pill p-grey">de base</span>' : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" ${dis} data-ch="ing-qty" data-t="${t}" data-k="${k}"><select class="txt sm w6" ${dis} data-ch="ing-unit" data-t="${t}" data-k="${k}" aria-label="Unité">${[['', i.unit], ...IUNITS].map(([v, l]) => `<option value="${v}" ${(i.iunit || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+    ${convertible(i) ? '' : `<a class="pill p-carrot" href="#/catalogue/${i.product_id}" title="Indiquer la contenance de l'emballage (ex. 500 g) ou le poids d'une pièce dans la fiche produit ; en attendant : 1 ${esc(i.unit)}">⚠ contenance ?</a>`}`}
     ${ro ? '' : `<button class="ic" data-a="ing-del" data-t="${t}" data-k="${k}" title="Retirer">✕</button>`}</div>`).join('') || empty;
   const ingAdd = (t, ph) => (ro ? '' : `<div class="addbox" style="margin:8px 0"><input class="txt" id="ing-q-${t}" autocomplete="off" placeholder="${ph}" data-in="ing-q" data-t="${t}" data-enter="ing-first"><div id="ing-ac-${t}"></div></div>`);
   const variants = acc('d_var', {
@@ -104,8 +118,8 @@ export function dishView() {
           ${ro ? '' : `<div class="row gap"><input class="txt grow" id="tag-in" list="tag-dl" placeholder="ex. rapide, végé, hiver…" data-enter="tag-add"><button class="btn sm sec2" data-a="tag-add">＋</button></div>
           <datalist id="tag-dl">${allTags().filter((t) => !ed.tags.includes(t)).map((t) => `<option value="${esc(t)}">`).join('')}</datalist>`}</div>` })}
       ${acc('d_ing', { icon: '🥕', title: 'Ingrédients', def: true, sum: ` · ${nIng || 'aucun'}`,
-        body: `${ingRows('c', '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient du catalogue…')}${ro ? '' : `
-          <p class="muted small">Quantités en emballages, facultatives, ajustées au nombre de personnes du repas.</p>`}` })}
+        body: `${ingRows('c', '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient (produit)…')}${ro ? '' : `
+          <p class="muted small">Quantités facultatives, ajustées au nombre de personnes du repas : en emballages, ou en g, ml, pièces (convertis en emballages grâce à la contenance du produit).</p>`}` })}
       ${variants}
       ${acc('d_rec', { icon: '📖', title: 'Recette', sum: ed.url || ed.steps || ed.notes ? ' · renseignée' : ' · facultative, vide',
         body: `<div class="form"><label class="muted">Lien vers une recette en ligne</label><div class="row gap"><input class="txt grow" value="${esc(ed.url)}" placeholder="https://…" ${dis} data-ch="ed" data-f="url">${ro ? '' : '<button class="btn sm" data-a="rec-import">⤓ Importer</button>'}</div>
@@ -127,6 +141,7 @@ function ingsOf(t) {
   return ed.groups[g].options[o].ingredients;
 }
 on('change', 'ing-qty', (el) => { ingsOf(el.dataset.t)[Number(el.dataset.k)].qty = num(el.value); });
+on('change', 'ing-unit', (el) => { ingsOf(el.dataset.t)[Number(el.dataset.k)].iunit = el.value || null; render(); });
 on('click', 'ing-del', (el) => { ingsOf(el.dataset.t).splice(Number(el.dataset.k), 1); render(); });
 
 // Variantes : groupes et options.
@@ -152,16 +167,16 @@ on('input', 'ing-q', (el) => {
   ingT = el.dataset.t;
   const q = el.value.trim(), ms = ingMatches(q);
   document.getElementById(`ing-ac-${ingT}`).innerHTML = q ? `<div class="ac">${ms.map((p) => `<button data-a="ing-add" data-id="${p.id}"><span class="grow">${esc(p.name)}</span><span class="muted">${esc(catName(p.category_id))}</span></button>`).join('')}
-    ${S.products.some((p) => norm(p.name) === norm(q)) ? '' : `<button data-a="ing-new"><b>＋ Créer « ${esc(q)} » dans le catalogue</b></button>`}</div>` : '';
+    ${S.products.some((p) => norm(p.name) === norm(q)) ? '' : `<button data-a="ing-new"><b>＋ Créer « ${esc(q)} » dans les produits</b></button>`}</div>` : '';
 });
-const addIng = (p, qty = 1, note = null, t = ingT) => {
-  ingsOf(t).push({ product_id: p.id, name: p.name, unit: p.unit, is_base: !!p.is_base, qty: p.is_base ? null : qty, note });
+const addIng = (p, qty = 1, note = null, t = ingT, iunit = null) => {
+  ingsOf(t).push({ product_id: p.id, name: p.name, unit: p.unit, iunit: p.is_base ? null : iunit, is_base: !!p.is_base, qty: p.is_base ? null : qty, note });
 };
 on('click', 'ing-add', (el) => { addIng(S.products.find((p) => p.id === Number(el.dataset.id))); render(); ingInput()?.focus(); });
 on('click', 'ing-first', (el) => { ingT = el.dataset.t; const ms = ingMatches(el.value); if (ms.length) { addIng(ms[0]); render(); ingInput()?.focus(); } });
 on('click', 'ing-new', () => {
   const q = ingInput().value.trim();
-  sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté au catalogue commun, puis au plat.</p>
+  sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté aux produits du foyer, puis au plat.</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(q.charAt(0).toUpperCase() + q.slice(1))}">
     <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions()}</select></label>
     <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
@@ -190,7 +205,7 @@ on('click', 'tag-add', () => { takeTagInput(); render(); setTimeout(() => docume
 on('click', 'tag-rm', (el) => { ed.tags.splice(Number(el.dataset.i), 1); render(); });
 on('click', 'dish-save', async () => {
   takeTagInput();
-  const ings = (list) => list.map((i) => ({ product_id: i.product_id, qty: i.qty, note: i.note }));
+  const ings = (list) => list.map((i) => ({ product_id: i.product_id, qty: i.qty, unit: i.iunit || null, note: i.note }));
   const body = { ...ed, ingredients: ings(ed.ingredients),
     groups: ed.groups.map((g) => ({ name: g.name, options: g.options.map((o) => ({ id: o.id, name: o.name, ingredients: ings(o.ingredients) })) })) };
   const d = await attempt(() => (ed.id ? put(hp(`/dishes/${ed.id}`), body) : post(hp('/dishes'), body)));
@@ -228,7 +243,7 @@ export async function recipeSheet(dishId, persons, options) {
   if (!d) return;
   const p = persons || d.portions, f = p / d.portions;
   const steps = String(d.steps || '').split('\n').map((s) => s.trim()).filter(Boolean);
-  const row = (i) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>${i.is_base || i.qty == null ? '<span class="pill p-grey">selon goût</span>' : `<b class="price">${fmtQ(i.qty * f)} ${esc(i.unit)}</b>`}</div>`;
+  const row = (i) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>${i.is_base || i.qty == null ? '<span class="pill p-grey">selon goût</span>' : `<b class="price">${esc(amountText(i.qty * f, i))}</b>`}</div>`;
   const groups = d.groups || [], keep = options ? new Set(chosenOf(d, options)) : null;
   const variant = keep ? groups.map((g) => g.options.find((o) => keep.has(o.id)).name).join(', ') : '';
   const ings = keep ? dishIngredients(d, options) : d.ingredients;
@@ -268,7 +283,7 @@ function importSheet() {
     <div class="sec">Ingrédients (${m.ing.length})</div>
     ${m.ing.map((g, i) => `<label class="row line top"><input type="checkbox" class="cb" data-ch="imp-ing" data-i="${i}" ${g.on ? 'checked' : ''}><span class="grow"><span class="muted small">« ${esc(g.raw)} »</span><br>
       ${g.product_id ? `→ ${esc(prod(g.product_id).name)}` : `→ <span class="pill p-carrot">＋ créer</span> ${esc(g.create.name)} <span class="muted small">(${esc(catName(g.create.category_id))})</span>`}${g.base ? ' <span class="pill p-grey">de base</span>' : ''}</span></label>`).join('')}
-    <p class="muted small">Les produits manquants seront créés dans le catalogue (rayon modifiable ensuite). Quantités en emballages : « 400 g » = 1 emballage, gardé en note.</p>
+    <p class="muted small">Les produits manquants seront créés dans les produits (rayon modifiable ensuite). Les quantités en g, ml ou pièces sont converties en emballages dans les listes (contenance du produit).</p>
     <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="imp-ok">Appliquer au plat</button></div>`);
 }
 on('change', 'imp-f', (el) => { imp.f[el.dataset.k] = el.checked; });
@@ -289,7 +304,9 @@ on('click', 'imp-ok', async () => {
       created++;
     }
     if (ed.ingredients.some((i) => i.product_id === p.id)) continue;
-    addIng(p, g.packages || 1, g.unit && /^(k?g|gr|grammes?|mg|l|litres?|cl|ml|dl)$/i.test(g.unit) ? `${String(g.qty).replace('.', ',')} ${g.unit}` : null, 'c');
+    // Sans equivalent (gousse, pincee...) : 1 emballage, la quantite lue gardee en note.
+    if (g.amount != null) addIng(p, g.amount, null, 'c', g.amount_unit);
+    else addIng(p, 1, g.qty != null ? `${String(g.qty).replace('.', ',')}${g.unit ? ' ' + g.unit : ''}` : null, 'c');
   }
   closeSheet();
   await loadProducts();

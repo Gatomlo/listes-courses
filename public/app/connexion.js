@@ -23,7 +23,7 @@ export async function loadInvitation() {
 
 const roleLabel = (r) => (r === 'manager' ? 'Gestionnaire' : 'Membre');
 const inviteCard = (inv) => `<div class="card"><h4>${esc(inv.inviter || 'Quelqu’un')} vous invite à rejoindre « ${esc(inv.household)} »</h4>
-  <p class="muted">Profil proposé : <b>${roleLabel(inv.role)}</b>${inv.role === 'manager' ? ' — gère listes, plats, catalogue, magasins et membres.' : ' — consulte, coche en magasin, scanne les tickets, suggère articles et plats.'}</p></div>`;
+  <p class="muted">Profil proposé : <b>${roleLabel(inv.role)}</b>${inv.role === 'manager' ? ' — gère listes, plats, produits, magasins et membres.' : ' — consulte, coche en magasin, scanne les tickets, suggère articles et plats.'}</p></div>`;
 
 // Champs d'un formulaire de compte.
 const field = (name, label, type = 'text', extra = '') => `<label class="muted" for="f-${name}">${label}</label>

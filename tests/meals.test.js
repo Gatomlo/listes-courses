@@ -153,9 +153,12 @@ test('lien d\'affichage du menu : lecture seule sans connexion, revocable', asyn
 });
 
 test('lecture des ingredients et des recettes', () => {
-  assert.deepEqual(['qty', 'unit', 'name', 'packages'].map((k) => parseIngredient('1,2 kg de pommes de terre')[k]), [1.2, 'kg', 'pommes de terre', 1]);
-  assert.deepEqual(['qty', 'unit', 'name', 'packages'].map((k) => parseIngredient("2 gousses d'ail")[k]), [2, 'gousses', 'ail', 2]);
-  assert.equal(parseIngredient('3 oignons').packages, 3);
+  const ka = (s) => ['qty', 'unit', 'name', 'amount', 'amount_unit'].map((k) => parseIngredient(s)[k]);
+  assert.deepEqual(ka('1,2 kg de pommes de terre'), [1.2, 'kg', 'pommes de terre', 1200, 'g']);
+  assert.deepEqual(ka("2 gousses d'ail"), [2, 'gousses', 'ail', null, null]);
+  assert.deepEqual(ka('3 oignons'), [3, null, 'oignons', 3, 'pc']);
+  assert.deepEqual(ka('2 boîtes de pois chiches'), [2, 'boîtes', 'pois chiches', 2, null]);
+  assert.deepEqual(ka("2 c. à s. d'huile").slice(3), [30, 'ml']);
   assert.equal(parseIngredient('Sel, poivre').base, true);
   assert.equal(parseIngredient('½ litre de lait').qty, 0.5);
   const html = `<html><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage"},{"@type":"Recipe","name":"Gratin dauphinois","recipeYield":"6 personnes","totalTime":"PT1H30M",
@@ -185,7 +188,7 @@ test('import depuis un lien (page servie en local) ; page sans recette', async (
   let r = await thomas.post(`${h}/recipe-import`, { url: `${base}/redir` });
   assert.equal(r.status, 200);
   assert.equal(r.data.name, 'Soupe');
-  assert.equal(r.data.ingredients[0].packages, 3);
+  assert.deepEqual([r.data.ingredients[0].amount, r.data.ingredients[0].amount_unit], [3, 'pc']);
   r = await thomas.post(`${h}/recipe-import`, { url: `${base}/vide` });
   assert.equal(r.status, 422);
   r = await thomas.post(`${h}/recipe-import`, { url: 'ftp://exemple.be/x' });

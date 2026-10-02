@@ -54,7 +54,7 @@ on('click', 'member', (el) => {
   sheet(`<h3>${esc(m.name)}</h3><p class="muted">${esc(m.email)}</p>
     ${mgr ? `<label class="muted">Nom affiché dans ce foyer</label><input class="txt" name="display_name" value="${esc(m.name)}">
     <div class="sec">Profil</div><div class="seg">${['member', 'manager'].map((r) => `<button class="${m.role === r ? 'on' : ''}" data-a="member-role" data-id="${m.id}" data-role="${r}" ${last && r === 'member' ? 'disabled title="Dernier gestionnaire"' : ''}>${roleLabel(r)}</button>`).join('')}</div>
-    <p class="muted small">${m.role === 'manager' ? 'Ajoute directement, valide les suggestions, gère plats, catalogue, magasins et membres.' : 'Consulte, coche en magasin, scanne les tickets et suggère articles et plats.'}${last ? ' Il faut au moins un gestionnaire dans le foyer.' : ''}</p>` : ''}
+    <p class="muted small">${m.role === 'manager' ? 'Ajoute directement, valide les suggestions, gère plats, produits, magasins et membres.' : 'Consulte, coche en magasin, scanne les tickets et suggère articles et plats.'}${last ? ' Il faut au moins un gestionnaire dans le foyer.' : ''}</p>` : ''}
     ${mgr && !m.me ? `<div class="sec">Mot de passe oublié</div><button class="btn sec2 sm" data-a="member-reset" data-id="${m.id}">🔑 Créer un lien de réinitialisation</button><div id="reset-out"></div>` : ''}
     <div class="row end">${!last ? `<button class="btn sec2 danger-t" data-a="member-del" data-id="${m.id}">${m.me ? 'Quitter le foyer' : 'Retirer du foyer'}</button>` : ''}${mgr ? `<button class="btn" data-a="member-save" data-id="${m.id}">Enregistrer</button>` : ''}</div>`);
 });

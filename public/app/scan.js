@@ -112,7 +112,7 @@ async function analyse(text) {
 // ---------- Ecran de validation ----------
 const price = (n) => (n == null ? '' : n.toFixed(2).replace('.', ','));
 function productOptions(cur) {
-  return `<option value="">— à associer —</option><option value="new">＋ Créer dans le catalogue…</option><option value="ignore">Ignorer cette ligne</option>
+  return `<option value="">— à associer —</option><option value="new">＋ Créer un produit…</option><option value="ignore">Ignorer cette ligne</option>
     ${[...S.products].sort((a, b) => a.name.localeCompare(b.name)).map((p) => `<option value="${p.id}" ${p.id === cur ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}`;
 }
 

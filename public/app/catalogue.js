@@ -28,7 +28,7 @@ export function catalogueView() {
     <div class="pills">${p.recurrence ? `<span class="pill p-leaf">🔁 ${REC[p.recurrence]}</span>` : ''}${p.is_base ? '<span class="pill p-grey">de base</span>' : ''}${p.forced_store_id ? `<span class="pill p-plum">toujours ${esc((storeById(p.forced_store_id) || {}).name)}</span>` : ''}</div></div>
     ${p.best_store_id ? stTag(p.best_store_id) : '<span class="muted small">prix ?</span>'}</div>`;
   return {
-    cols: true, title: 'Catalogue', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer`,
+    cols: true, title: 'Produits', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer`,
     right: isManager() ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button>' : '',
     body: `<input class="txt" id="cat-q" placeholder="🔍 Rechercher un produit…" value="${esc(q)}" data-in="cat-q">
       <div class="opt">${[['all', 'Tous'], ['rec', '🔁 Récurrents'], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
@@ -51,7 +51,7 @@ export const unitOptions = (cur) => S.house.units.map((u) => `<option ${u === cu
 export const catOptions = (cur) => categoryOrder().map((cid) => `<option value="${cid}" ${cid === cur ? 'selected' : ''}>${esc(catName(cid))}</option>`).join('');
 
 on('click', 'prod-new', (el) => {
-  sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté au catalogue commun du foyer.</p>
+  sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté aux produits communs du foyer.</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(el.dataset.name || '')}" placeholder="ex. Beurre doux 250 g">
     <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions()}</select></label>
     <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
@@ -72,7 +72,7 @@ on('click', 'csv-open', () => {
   csvText = '';
   sheet(`<h3>⇪ Importer des produits</h3>
     <p class="muted small">Fichier CSV (séparateur « ; » ou « , »), une ligne d'en-tête puis un produit par ligne :<br><code>${CSV_HEAD}</code></p>
-    <p class="muted small">Seul <b>nom</b> est obligatoire. Produit déjà au catalogue : seuls ses prix sont ajoutés. Rayon inconnu : créé. Prix : par emballage, avec le magasin ; <b>promo</b> = oui (hors moyenne) ; <b>prix normal</b> = prix hors promo s'il est connu ; date AAAA-MM-JJ ou JJ/MM/AAAA (défaut : aujourd'hui). Réimporter le même fichier ne double rien.</p>
+    <p class="muted small">Seul <b>nom</b> est obligatoire. Produit déjà connu : seuls ses prix sont ajoutés. Rayon inconnu : créé. Prix : par emballage, avec le magasin ; <b>promo</b> = oui (hors moyenne) ; <b>prix normal</b> = prix hors promo s'il est connu ; date AAAA-MM-JJ ou JJ/MM/AAAA (défaut : aujourd'hui). Réimporter le même fichier ne double rien.</p>
     <button class="btn sec2 sm" data-a="csv-model">Télécharger un modèle</button>
     <label class="muted" style="display:block;margin-top:10px">Fichier</label><input class="txt" type="file" accept=".csv,text/csv,text/plain" data-ch="csv-file">
     <div id="csv-res"></div>`);
@@ -85,7 +85,7 @@ on('click', 'csv-model', () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 const csvSummary = (r) => `<div class="card" style="margin-top:10px">
-  <p><b>${r.created.length}</b> produit${r.created.length > 1 ? 's' : ''} ${r.dry ? 'à créer' : 'créé' + (r.created.length > 1 ? 's' : '')} · <b>${r.existing}</b> déjà au catalogue · <b>${r.records}</b> relevé${r.records > 1 ? 's' : ''} de prix${r.skipped ? ` · ${r.skipped} déjà connu${r.skipped > 1 ? 's' : ''}` : ''}</p>
+  <p><b>${r.created.length}</b> produit${r.created.length > 1 ? 's' : ''} ${r.dry ? 'à créer' : 'créé' + (r.created.length > 1 ? 's' : '')} · <b>${r.existing}</b> déjà connu${r.existing > 1 ? 's' : ''} · <b>${r.records}</b> relevé${r.records > 1 ? 's' : ''} de prix${r.skipped ? ` · ${r.skipped} déjà connu${r.skipped > 1 ? 's' : ''}` : ''}</p>
   ${r.categories.length ? `<p class="small">Nouveaux rayons : ${r.categories.map(esc).join(', ')}</p>` : ''}
   ${r.created.length ? `<p class="muted small">${r.created.map(esc).join(' · ')}</p>` : ''}
   ${r.errors.length ? `<p class="small" style="color:var(--danger)">${r.errors.length} ligne${r.errors.length > 1 ? 's' : ''} ignorée${r.errors.length > 1 ? 's' : ''} :<br>${r.errors.map((e) => `ligne ${e.line} : ${esc(e.msg)}`).join('<br>')}</p>` : ''}</div>`;
@@ -132,7 +132,8 @@ export function productView() {
           <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id" ${dis}>${catOptions(p.category_id)}</select></label>
           <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit" ${dis}>${unitOptions(p.unit)}</select></label></div>
           <label class="muted">Contenance (facultatif)</label><input class="txt" name="contenance" value="${esc(p.contenance || '')}" placeholder="ex. 1 L, 500 g, x12" ${dis}>
-          <p class="muted small">Les prix se comparent par emballage ; la contenance signale un emballage différent d'un magasin à l'autre.</p>
+          <p class="muted small">${p.size ? `Reconnue : 1 ${esc(p.unit)} = <b>${esc(sizeText(p.size))}</b>. ` : p.contenance ? '⚠ Contenance non reconnue (écrire par ex. « 500 g », « 1 L », « 6 x 33 cl », « x12 »). ' : ''}Sert à convertir les quantités des recettes (g, ml, pièces) en emballages.</p>
+          <label class="row"><span class="grow"><b>Poids d'une pièce</b><span class="muted block">Facultatif, en g (ou ml) : relie « 2 oignons » à un filet au kg</span></span><input class="txt w5 c" name="piece_qty" inputmode="decimal" value="${p.piece_qty != null ? String(p.piece_qty).replace('.', ',') : ''}" placeholder="g" ${dis}></label>
           <label class="row"><span class="grow"><b>🔁 Récurrent</b><span class="muted block">Ajouté aux nouvelles listes datées</span></span><select class="txt w12" name="recurrence" ${dis}>
             <option value="">non</option>${[1, 2, 3].map((n) => `<option value="${n}" ${p.recurrence === n ? 'selected' : ''}>${REC[n]}</option>`).join('')}</select></label>
           <label class="row"><span class="grow"><b>Ingrédient de base</b><span class="muted block">Proposé « à vérifier », jamais ajouté d'office</span></span><input type="checkbox" class="cb" name="is_base" ${p.is_base ? 'checked' : ''} ${dis}></label>
@@ -145,6 +146,8 @@ export function productView() {
       ${mgr ? `<div class="row end wide"><button class="btn sec2" data-a="prod-merge">⇄ Fusionner avec…</button><button class="btn sec2 danger-t" data-a="prod-del">Supprimer</button></div>` : ''}`,
   };
 }
+
+const sizeText = ({ n, u }) => (u === 'pc' ? `${n} pièce${n > 1 ? 's' : ''}` : n >= 1000 ? `${String(n / 1000).replace('.', ',')} ${u === 'g' ? 'kg' : 'L'}` : `${String(n).replace('.', ',')} ${u}`);
 
 on('click', 'prod-save', async () => {
   const f = formData(document.getElementById('prod-form'));

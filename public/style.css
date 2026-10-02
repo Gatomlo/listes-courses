@@ -79,7 +79,7 @@ a.card{text-decoration:none}
 .ord .n{width:18px}
 input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:10px 12px}
 input.txt:disabled,select.txt:disabled{background:var(--sunk);opacity:.8}
-.w5,.txt.w5{width:84px;flex:none}.w12,.txt.w12{width:180px;flex:none}
+.w5,.txt.w5{width:84px;flex:none}.txt.w6{width:100px;flex:none}.w12,.txt.w12{width:180px;flex:none}
 input.cb{width:22px;height:22px;flex:none;accent-color:var(--leaf)}
 .form label{display:block;margin-top:8px}
 .form label.row{display:flex;margin-top:12px}

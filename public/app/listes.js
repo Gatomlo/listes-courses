@@ -110,7 +110,7 @@ on('click', 'item-meals', (el) => {
   const i = current.items.find((x) => String(x.id) === el.dataset.id);
   if (!i) return;
   sheet(`<h3>${esc(i.name)}</h3><p class="muted">Nécessaire pour :</p>${i.from.map((d) => `<div class="item">🍽 ${esc(d)}</div>`).join('')}
-    ${i.meal_qty > 0 ? `<p class="muted small">Dont ${qtyText(i.meal_qty)} ${esc(i.unit)} pour les repas.</p>` : ''}
+    ${i.meal_qty > 0 ? `<p class="muted small">Dont ${qtyText(i.meal_qty)} ${esc(i.unit)} pour les repas${i.need ? ` (${esc(i.need)} au total)` : ''}.</p>` : ''}
     <div class="row end"><button class="btn sec2" data-a="meals-menu">Ouvrir le menu</button></div>`);
 });
 
@@ -321,7 +321,7 @@ on('click', 'add-open', () => sheet(`<h3>${isManager() ? 'Ajouter un article' : 
 on('input', 'add-q', (el) => {
   const q = el.value.trim(), ms = matches(q);
   document.getElementById('add-ac').innerHTML = q ? `<div class="ac">${ms.map((p) => `<button data-a="add-item" data-id="${p.id}"><span class="grow">${esc(p.name)}</span><span class="muted">${esc(catName(p.category_id))}</span></button>`).join('')}
-    ${ms.some((p) => norm(p.name) === norm(q)) ? '' : `<button data-a="add-new"><b>＋ Créer « ${esc(q)} » dans le catalogue</b></button>`}</div>` : '';
+    ${ms.some((p) => norm(p.name) === norm(q)) ? '' : `<button data-a="add-new"><b>＋ Créer « ${esc(q)} » dans les produits</b></button>`}</div>` : '';
 });
 async function addItem(product_id) {
   const p = S.products.find((x) => x.id === product_id) || { name: '?' };
@@ -344,7 +344,7 @@ on('click', 'add-first', () => {
 });
 on('click', 'add-new', () => {
   const q = document.getElementById('add-q').value.trim();
-  sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté au catalogue commun, puis à la liste.</p>
+  sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté aux produits du foyer, puis à la liste.</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(q)}">
     <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions()}</select></label>
     <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
@@ -403,7 +403,7 @@ on('click', 'item', async (el) => {
     <div class="row"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="${qtyText(i.qty)}"><button class="btn sm sec2" data-a="qty" data-d="1">＋</button></div>
     <label class="muted" style="display:block;margin-top:8px">Note</label><input class="txt" name="note" value="${esc(i.note || '')}" placeholder="ex. bio, grand format">
     ${current.type === 'dated' ? `<label class="row line" style="margin-top:8px"><input type="checkbox" class="cb" name="unavailable" ${i.status === 'unavailable' ? 'checked' : ''}><span class="grow">Indisponible en magasin</span></label>` : ''}
-    ${i.meal_qty > 0 ? `<div class="row line"><span class="grow">Dont ${qtyText(i.meal_qty)} pour ${esc(i.from.join(', '))}</span><button class="btn sm sec2" data-a="item-stock" data-id="${i.id}">🥫 Déjà en réserve</button></div>` : ''}
+    ${i.meal_qty > 0 ? `<div class="row line"><span class="grow">Dont ${qtyText(i.meal_qty)}${i.need ? ` (${esc(i.need)})` : ''} pour ${esc(i.from.join(', '))}</span><button class="btn sm sec2" data-a="item-stock" data-id="${i.id}">🥫 Déjà en réserve</button></div>` : ''}
     ${i.manual_store ? `<div class="row line"><span class="grow">Magasin choisi : <b>${esc(storeName(i.at_store_id))}</b>${i.best_store_id ? ` (conseil : ${esc(storeName(i.best_store_id))})` : ''}</span><button class="btn sm sec2" data-a="store-advice" data-id="${i.id}">Revenir au conseil</button></div>` : ''}
     ${mgr && others.length ? `<div class="sec">Déplacer vers</div><div class="opt">${others.map((o) => `<button data-a="item-move" data-id="${i.id}" data-to="${o.id}">${o.type === 'backlog' ? 'À prévoir' : 'Liste du ' + esc(fmtDate(o.date))}</button>`).join('')}</div>` : ''}
     ${mgr ? `<div class="row line"><span class="grow"><b>🔁 Récurrent</b><span class="muted block">${p.recurrence ? 'Revient automatiquement' : 'Non'}</span></span><button class="btn sm sec2" data-a="item-rec" data-pid="${i.product_id}" data-rec="${p.recurrence ? '' : 1}">${p.recurrence ? 'Arrêter' : 'Rendre récurrent'}</button></div>` : ''}
