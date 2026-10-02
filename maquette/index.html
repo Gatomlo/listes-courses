@@ -153,6 +153,8 @@ input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);backgr
     <div class="role" id="netSw"></div>
     <p>Coupe le réseau, coche des articles en mode courses, puis rétablis-le.</p>
     <p>En <b>membre</b>, les ajouts deviennent des suggestions à valider.</p>
+    <h3>Écrans d'accès</h3>
+    <div class="role"><button onclick="act.go('login')">Connexion</button><button onclick="act.go('invite')">Invitation</button><button onclick="act.go('households')">Foyers</button></div>
     <h3>À essayer</h3>
     <ul>
       <li>Liste du 3 oct. → onglet <b>Magasins</b> : économie du split et répartition.</li>
@@ -166,6 +168,9 @@ input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);backgr
       <li><b>Plats → ＋ Plat → ⤓ Importer</b> : import d'une recette depuis un lien.</li>
       <li><b>Réseau simulé</b> : hors-ligne, file d'attente, synchronisation.</li>
       <li><b>🏷 sur un article</b> : promo avec prix pour ces courses ou jusqu'à une date.</li>
+      <li><b>Toucher un article</b> d'une liste : quantité, note, déplacer, récurrent, retirer. <b>⋯</b> : date, clôture, suppression.</li>
+      <li><b>Catalogue</b> : recherche, filtres (récurrents…), ＋ Produit, fiche éditable, relevé, fusion, suppression.</li>
+      <li><b>Historique</b> : toucher une liste clôturée.</li>
       <li><b>Foyer</b> : suggestions, ordre des rayons, seuil.</li>
     </ul>
   </aside>
@@ -174,7 +179,12 @@ input.txt,select.txt,textarea.txt{width:100%;border:1px solid var(--line);backgr
 <div id="printArea"></div>
 <script>
 // ---------- Données fictives ----------
-const STORES=[{id:'im',name:'Intermarché'},{id:'co',name:'Colruyt'}];
+const STORES=[{id:'im',name:'Intermarché',color:'#c8313b',active:true},{id:'co',name:'Colruyt',color:'#e08a12',active:true}];
+const ALLSTORES=[...STORES]; // actifs + inactifs
+const UNITS=['bouteille','brique','paquet','boîte','sachet','barquette','pot','flacon','pack','pièce','kg'];
+const COLORS=['#c8313b','#e08a12','#2f7d4f','#5b4bb7','#1f6fb2','#8a5a2b'];
+function storeStyle(id,c){let el=document.getElementById('sty-'+id);if(!el){el=document.createElement('style');el.id='sty-'+id;document.head.appendChild(el)}
+  el.textContent=`.st-${id}{background:color-mix(in srgb,${c} 16%,transparent);color:${c}}:root{--${id}:${c}}`}
 const CATS={fl:'Fruits & légumes',fr:'Frais',bo:'Boucherie',ep:'Épicerie',bs:'Boissons',dr:'Droguerie'};
 const ORDER={im:['fl','fr','bo','ep','bs','dr'],co:['ep','bs','dr','bo','fr','fl']};
 const P={}; // produit : [nom, cat, unité, prix im, prix co, nb relevés, récurrent, base]
@@ -222,6 +232,9 @@ const S={
   members:[{n:'Thomas',e:'thomas@exemple.be',r:'manager'},{n:'Léa',e:'lea@exemple.be',r:'member'},{n:'Noah',e:'noah@exemple.be',r:'member'}],
   promos:[{pid:'hache',sid:'co',price:3.49,list:'l2',note:'Dépliant Colruyt'},{pid:'cafe',sid:'im',price:4.99,until:'2026-10-10',note:'2e à -50 %'}],
   offline:false,outbox:[],syncAt:'2 oct. 08:12',local:{l2:true},
+  qc:'',cfilter:'all',hh:0,loginMail:'',loginSent:false,
+  households:[{n:'Foyer Phoenix',m:3,r:'gestionnaire',i:'🏡'},{n:'Chalet des Ardennes',m:5,r:'membre',i:'🏔'}],
+  hist:{updated:14,bought:[['im','hache',2,4.15],['im','poul',1,7.99],['im','rape',1,2.29],['im','ban',1,1.82],['im','oeuf',1,3.29],['co','lait',3,0.99],['co','yao',2,2.49],['co','cafe',1,5.79],['co','toma',3,0.65],['co','riz',1,2.49],['co','pq',1,5.99],['co','spag',2,1.35]],missing:[['vais','À prévoir'],['coco','liste du 3 oct.']],meals:[['2026-09-19','Lasagnes'],['2026-09-21','Poulet curry coco'],['2026-09-24','Pâtes carbonara'],['2026-09-27','Chili con carne'],['2026-09-30','Soupe carottes-poireaux']]},
   q2:'',q3:'',q4:'',dfilter:'all',acc:{sugg:true}, threshold:5, nbAvg:5, showExtra:false, sheet:null, toast:'', q:'',
   lists:[
     {id:'back',type:'backlog',title:'À prévoir',items:[
@@ -252,13 +265,13 @@ const list=id=>S.lists.find(l=>l.id===id);
 const dated=()=>S.lists.filter(l=>l.type==='dated').sort((a,b)=>a.date<b.date?-1:1);
 const isMgr=()=>S.role==='manager';
 function period(l){const ds=dated(),i=ds.indexOf(l),nx=ds[i+1];return [l.date,nx?addDays(nx.date,-1):addDays(l.date,13)]}
-function mealsOf(l){const [a,b]=period(l);return S.meals.filter(m=>m.d>=a&&m.d<=b).sort((x,y)=>(x.d+x.s)<(y.d+y.s)?-1:1)}
+function mealsOf(l){const [a,b]=period(l);return S.meals.filter(m=>m.list&&list(m.list)?m.list===l.id:(m.d>=a&&m.d<=b)).sort((x,y)=>(x.d+x.s)<(y.d+y.s)?-1:1)}
 // Promos : prix valable pour une sortie de courses précise (list) ou jusqu'à une date (until)
 function promoFor(pid,sid,l=list(S.listId)){const ref=l&&l.date||'2026-10-01';
   return S.promos.find(p=>p.pid===pid&&p.sid===sid&&(p.list?p.list===l?.id:ref<=p.until))}
 function effPrice(pid){const o={};for(const s of STORES){const pr=promoFor(pid,s.id);o[s.id]=pr&&pr.price!=null?pr.price:P[pid].price[s.id]}return o}
 function promoPills(pid){return STORES.map(s=>{const p=promoFor(pid,s.id);return p?`<span class="pill p-carrot" style="cursor:pointer" onclick="act.promo('${pid}','${s.id}')">🏷 ${s.name} ${p.price!=null?eur(p.price):"promo"} ${p.list?'· ces courses':'· jusqu\'au '+fmtD(p.until,{day:'numeric',month:'short'})}</span>`:''}).join(' ')}
-function bestStore(pid){const pr=effPrice(pid);let b=null;for(const s of STORES)if(pr[s.id]!=null&&(b==null||pr[s.id]<pr[b]))b=s.id;return b||'im'}
+function bestStore(pid){if(P[pid].forced&&STORES.some(s=>s.id===P[pid].forced))return P[pid].forced;const pr=effPrice(pid);let b=null;for(const s of STORES)if(pr[s.id]!=null&&(b==null||pr[s.id]<pr[b]))b=s.id;return b||STORES[0].id}
 
 // Lignes de la liste = articles manuels + ingrédients des repas (fusionnés)
 function lines(l){
@@ -304,11 +317,11 @@ function pendingCount(){return S.lists.reduce((n,l)=>n+l.items.filter(i=>i.sugg=
 function render(){
   $('#netSw').innerHTML=[[false,'📶 En ligne'],[true,'📴 Hors-ligne']].map(([k,t])=>`<button class="${S.offline===k?'on':''}" onclick="act.net(${k})">${t}</button>`).join('');
   $('#roleSw').innerHTML=[['manager','Gestionnaire (Thomas)'],['member','Membre (Léa)']].map(([k,t])=>`<button class="${S.role===k?'on':''}" onclick="act.role('${k}')">${t}</button>`).join('');
-  const v=VIEWS[S.view](); const tab=S.view==='list'||S.view==='shop'?'home':S.view==='product'?'cat':S.view==='printMenu'?'menu':S.view==='dishEdit'?'dishes':S.view==='scan'?'home':S.view;
+  const v=VIEWS[S.view](); const tab=S.view==='list'||S.view==='shop'?'home':S.view==='product'?'cat':S.view==='printMenu'?'menu':S.view==='dishEdit'?'dishes':S.view==='scan'||S.view==='hist'||S.view==='households'?'home':S.view;
   const pc=pendingCount();
   $('#phone').innerHTML=`<header class="top">${v.back?`<button class="back" onclick="act.go('${v.back}')">‹</button>`:''}<h2>${v.title}${v.sub?`<small>${v.sub}</small>`:''}</h2>${v.right||''}</header>
-  <main>${S.offline?`<div class="net off">📴 <b>Hors-ligne</b> · données locales du ${S.syncAt}<br>${S.outbox.length?`${S.outbox.length} modification${S.outbox.length>1?'s':''} en attente d'envoi`:'Aucune modification en attente'}</div>`:''}${v.body}</main>
-  <nav class="tabs">${[['home','Listes','list'],['menu','Menu','menu'],['dishes','Plats','book'],['cat','Catalogue','cat'],['foyer','Foyer','home']].map(([k,t,i])=>`<button class="${tab===k?'on':''}" onclick="act.go('${k}')"><svg viewBox="0 0 24 24" fill="none">${ICON[i]}</svg>${t}${k==='foyer'&&pc&&isMgr()?`<span class="badge">${pc}</span>`:''}</button>`).join('')}</nav>
+  <main style="${v.noNav?'padding-bottom:20px':''}">${S.offline?`<div class="net off">📴 <b>Hors-ligne</b> · données locales du ${S.syncAt}<br>${S.outbox.length?`${S.outbox.length} modification${S.outbox.length>1?'s':''} en attente d'envoi`:'Aucune modification en attente'}</div>`:''}${v.body}</main>
+  ${v.noNav?'':`<nav class="tabs">${[['home','Listes','list'],['menu','Menu','menu'],['dishes','Plats','book'],['cat','Catalogue','cat'],['foyer','Foyer','home']].map(([k,t,i])=>`<button class="${tab===k?'on':''}" onclick="act.go('${k}')"><svg viewBox="0 0 24 24" fill="none">${ICON[i]}</svg>${t}${k==='foyer'&&pc&&isMgr()?`<span class="badge">${pc}</span>`:''}</button>`).join('')}</nav>`}
   ${S.sheet?`<div class="sheet-bg" onclick="if(event.target===this)act.close()"><div class="sheet">${S.sheet()}</div></div>`:''}
   ${S.toast?`<div class="toast">${S.toast}</div>`:''}`;
 }
@@ -348,10 +361,11 @@ const VIEWS={
   const ds=dated(),cur=ds.filter(l=>l.status!=='Clôturée'),old=ds.filter(l=>l.status==='Clôturée'),bk=list('back');
   const card=l=>{const L=lines(l),sc=scenarios(L.items),n=mealsOf(l).filter(m=>m.sugg!=='pending').length;return `<div class="card click" onclick="act.open('${l.id}')"><div class="row"><div class="grow"><h4>Courses du ${fmtD(l.date,{weekday:'long',day:'numeric',month:'long'})}</h4><div class="muted">${L.items.length} articles · ${n} repas · ≈ ${eur(sc.split)}</div></div><div style="text-align:right"><span class="pill ${l.status==='En préparation'?'p-leaf':'p-grey'}">${l.status}</span>${S.local[l.id]?'<div class="muted" style="font-size:11px;margin-top:3px">📥 hors-ligne</div>':''}</div></div></div>`};
   return {title:'Listes',sub:S.offline?'Foyer Phoenix · hors-ligne':'Foyer Phoenix · synchronisé à '+S.syncAt.split(' ').pop(),right:`<button class="btn sm sec2" title="Simuler le réseau" onclick="act.net(${!S.offline})">${S.offline?'📴':'📶'}</button>`,body:`
+   <button class="btn sec2 full" style="margin-bottom:10px;text-align:left" onclick="act.go('households')">🏡 ${S.households[S.hh].n} <span class="muted">▾ changer de foyer</span></button>
    <div class="card click" onclick="act.open('back')"><div class="row"><div class="grow"><h4>À prévoir</h4><div class="muted">${bk.items.length} articles en attente d'une sortie</div></div><span class="pill p-grey">permanente</span></div></div>
    <div class="sec">Prochaines courses</div>${cur.map(card).join('')}
    <button class="btn sec2 full" onclick="act.newList()">＋ Nouvelle liste datée</button>
-   <div class="sec">Historique</div>${old.map(l=>`<div class="card"><div class="row"><div class="grow"><h4>Courses du ${fmtD(l.date,{day:'numeric',month:'long'})}</h4><div class="muted">Estimé ${eur(l.est)} · 23 articles achetés · 2 tickets scannés (14 prix mis à jour)</div></div></div></div>`).join('')}`};
+   <div class="sec">Historique</div>${old.map(l=>`<div class="card click" onclick="act.open('${l.id}')"><div class="row"><div class="grow"><h4>Courses du ${fmtD(l.date,{day:'numeric',month:'long'})}</h4><div class="muted">Estimé ${eur(l.est)} · 23 articles achetés · 2 tickets scannés (14 prix mis à jour)</div></div><span class="muted">›</span></div></div>`).join('')}`};
  },
  list(){
   const l=list(S.listId),L=lines(l),sc=scenarios(L.items),bk=l.type==='backlog';
@@ -363,7 +377,7 @@ const VIEWS={
   if(bk||S.listTab==='items'){
    const g={};for(const x of L.items)(g[P[x.pid].c]=g[P[x.pid].c]||[]).push(x);
    body=add+Object.keys(CATS).filter(c=>g[c]).map(c=>`<div class="sec">${CATS[c]}</div><div class="card" style="padding:2px 14px">${g[c].map(x=>`
-     <div class="item ${x.sugg==='pending'?'pending':''}"><div class="grow"><div class="nm">${x.q} × ${P[x.pid].n}</div><div class="muted">${priceHint(x)}</div><div style="margin-top:3px">${srcPill(x)} ${promoPills(x.pid)}</div></div>
+     <div class="item ${x.sugg==='pending'?'pending':''}"><div class="grow" style="cursor:pointer" onclick="${x.sugg==='pending'?'':`act.item('${x.key}')`}"><div class="nm">${x.q} × ${P[x.pid].n}${x.note?` <span class="muted" style="font-weight:400">· ${x.note}</span>`:''}</div><div class="muted">${priceHint(x)}</div><div style="margin-top:3px">${srcPill(x)} ${promoPills(x.pid)}</div></div>
      ${x.sugg==='pending'&&isMgr()?`<button class="btn sm" onclick="act.sugg('${l.id}','${x.pid}','ok')">✓</button><button class="btn sm sec2" onclick="act.sugg('${l.id}','${x.pid}','no')">✕</button>`:`<button class="btn sm sec2" title="Promo" onclick="act.promo('${x.pid}')">🏷</button>${storeBtn(x)}`}</div>`).join('')}</div>`).join('');
    if(!bk&&L.base.length)body+=`<div class="sec">À vérifier dans les placards</div><div class="card" style="padding:2px 14px">${L.base.map(b=>`<div class="item"><button class="chk ${S.baseOn[b.key]?'on':''}" onclick="act.base('${b.key}')">${S.baseOn[b.key]?'✓':''}</button><div class="grow"><div class="nm">${P[b.pid].n}</div><div class="muted">pour ${b.from.join(', ')} · cocher = à acheter</div></div></div>`).join('')}</div>`;
   } else if(S.listTab==='meals'){
@@ -379,10 +393,10 @@ const VIEWS={
    <div><b>Répartition actuelle</b><div class="bar"><i style="width:${sc.split/max*100}%;background:var(--leaf)"></i></div></div><div class="price">${eur(sc.split)}</div></div></div>
    <div class="sec">Listes par magasin</div>
    ${STORES.map(s=>{const its=L.items.filter(x=>x.store===s.id&&(!x.sugg||x.sugg==='ok'));const t=its.reduce((n,x)=>n+(effPrice(x.pid)[s.id]??0)*x.q,0);return `<div class="card click" onclick="act.shop('${s.id}')"><div class="row"><span class="st st-${s.id}">${s.name}</span><div class="grow muted">${its.length} articles · triés par rayon</div><span class="price">${eur(t)}</span></div></div>`}).join('')}
-   <div class="row" style="gap:8px"><button class="btn sec2 grow" onclick="act.allTo('im')">Tout IM</button><button class="btn sec2 grow" onclick="act.allTo('co')">Tout Colruyt</button><button class="btn sec2 grow" onclick="act.allTo(null)">Conseil</button></div>
+   <div class="row" style="gap:8px">${STORES.map(s=>`<button class="btn sec2 grow" onclick="act.allTo('${s.id}')">Tout ${s.name.split(' ')[0]}</button>`).join('')}<button class="btn sec2 grow" onclick="act.allTo(null)">Conseil</button></div>
    <p class="muted">Astuce : dans « Articles », toucher l'étiquette d'un magasin le déplace. Les choix manuels sont en pointillé.</p>`;
   }
-  const right=!bk&&isMgr()?`<button class="btn sm sec2" onclick="act.closeList()">Clôturer</button>`:'';
+  const right=!bk&&isMgr()?`<button class="btn sm sec2" title="Actions de la liste" onclick="act.listMenu()">⋯</button>`:'';
   return {title,sub:bk?'Liste permanente':`${l.status} · repas du ${fmtD(a,{day:'numeric',month:'short'})} au ${fmtD(b,{day:'numeric',month:'short'})}`,back:'home',right,body:tabs+body};
  },
  shop(){
@@ -460,18 +474,37 @@ const VIEWS={
    <div class="row" style="gap:8px;margin-top:8px"><button class="btn sec2 grow" onclick="act.toastMsg('Image PNG du menu (fond d\\'écran, envoi par message)')">🖼 Image</button><button class="btn sec2 grow" onclick="act.toastMsg('Lien d\\'affichage en lecture seule copié · se met à jour tout seul')">🔗 Lien d'affichage</button></div>`};
  },
  cat(){
-  const g={};for(const p of Object.values(P))(g[p.c]=g[p.c]||[]).push(p);
-  return {title:'Catalogue',sub:Object.keys(P).length+' produits communs au foyer',body:Object.keys(CATS).map(c=>`<div class="sec">${CATS[c]}</div><div class="card" style="padding:2px 14px">${g[c].map(p=>{const b=bestStore(p.id);return `<div class="item" style="cursor:pointer" onclick="act.product('${p.id}')"><div class="grow"><div class="nm">${p.n}</div><div class="muted">${STORES.map(s=>`${s.name} ${eur(p.price[s.id])}`).join(' · ')}</div><div style="margin-top:3px">${p.rec?`<span class="pill p-leaf">récurrent : ${p.rec}</span> `:''}${p.base?'<span class="pill p-grey">ingrédient de base</span>':''}</div></div><span class="st st-${b}">${STORES.find(s=>s.id===b).name}</span></div>`}).join('')}</div>`).join('')};
+  const q=S.qc.toLowerCase().trim(),f=S.cfilter;
+  const ok=p=>(!q||p.n.toLowerCase().includes(q))&&(f==='all'||(f==='rec'&&p.rec)||(f==='base'&&p.base)||(f==='noprice'&&STORES.some(s=>p.price[s.id]==null)));
+  const g={};for(const p of Object.values(P))if(ok(p))(g[p.c]=g[p.c]||[]).push(p);
+  const n=Object.values(g).reduce((a,x)=>a+x.length,0);
+  return {title:'Catalogue',sub:Object.keys(P).length+' produits communs au foyer',right:isMgr()?`<button class="btn sm" onclick="act.newProd('','cat')">＋ Produit</button>`:'',body:`
+   <input class="txt" id="qc" placeholder="🔍 Rechercher un produit…" value="${S.qc}" oninput="act.searchC(this.value)">
+   <div class="opt">${[['all','Tous'],['rec','🔁 Récurrents'],['base','De base'],['noprice','Prix manquant']].map(([k,t])=>`<button class="${f===k?'on':''}" onclick="S.cfilter='${k}';render()">${t}</button>`).join('')}</div>
+   ${f==='rec'?'<p class="muted" style="margin-top:0">Ajoutés automatiquement à chaque nouvelle liste datée selon leur fréquence.</p>':''}
+   ${Object.keys(CATS).filter(c=>g[c]).map(c=>`<div class="sec">${CATS[c]}</div><div class="card" style="padding:2px 14px">${g[c].map(p=>{const b=bestStore(p.id);return `<div class="item" style="cursor:pointer" onclick="act.product('${p.id}')"><div class="grow"><div class="nm">${p.n}</div><div class="muted">${p.u}${p.fmt?' · '+p.fmt:''} · ${STORES.map(s=>`${s.name} ${eur(p.price[s.id])}`).join(' · ')}</div><div style="margin-top:3px">${p.rec?`<span class="pill p-leaf">🔁 ${p.rec}</span> `:''}${p.base?'<span class="pill p-grey">de base</span> ':''}${p.forced?`<span class="pill p-plum">toujours ${STORES.find(s=>s.id===p.forced)?.name||''}</span>`:''}</div></div><span class="st st-${b}">${STORES.find(s=>s.id===b)?.name||''}</span></div>`}).join('')}</div>`).join('')||`<p class="muted">Aucun produit.</p>${isMgr()&&q?`<button class="btn full" onclick="act.newProd(S.qc,'cat')">＋ Créer « ${S.qc} »</button>`:''}`}
+   <p class="muted">${n} produit${n>1?'s':''} affiché${n>1?'s':''}</p>`};
  },
  product(){
-  const p=P[S.pid],hist=[['2026-09-19','co',p.price.co],['2026-09-19','im',p.price.im],['2026-09-05','co',p.price.co&&p.price.co+0.06],['2026-08-22','im',p.price.im&&p.price.im-0.04],['2026-08-22','co',p.price.co&&p.price.co-0.05]].filter(h=>h[2]);
-  return {title:p.n,sub:CATS[p.c]+' · par '+p.u,back:'cat',body:`
-   <div class="card"><div class="sec" style="margin-top:0">Prix moyen (${S.nbAvg} derniers relevés)</div>${STORES.map(s=>`<div class="row" style="padding:4px 0"><span class="st st-${s.id}">${s.name}</span><span class="grow muted">${p.price[s.id]==null?'aucun relevé':Math.min(p.nb,S.nbAvg)+' relevés'}</span><span class="price">${eur(p.price[s.id])}</span>${bestStore(p.id)===s.id?'<span class="pill p-leaf">conseillé</span>':''}</div>`).join('')}</div>
-   <div class="card"><div class="row"><div class="grow"><b>Récurrent</b><div class="muted">Ajouté automatiquement aux nouvelles listes</div></div><select class="txt" style="width:auto"><option>${p.rec||'non'}</option><option>chaque liste</option><option>toutes les 2 listes</option><option>non</option></select></div>
-   <div class="row" style="margin-top:10px"><div class="grow"><b>Ingrédient de base</b><div class="muted">Proposé « à vérifier », jamais ajouté d'office</div></div><span class="pill ${p.base?'p-leaf':'p-grey'}">${p.base?'oui':'non'}</span></div>
-   <div class="row" style="margin-top:10px"><div class="grow"><b>Magasin forcé</b><div class="muted">Ignore le conseil prix</div></div><select class="txt" style="width:auto"><option>aucun</option>${STORES.map(s=>`<option>${s.name}</option>`).join('')}</select></div></div>
-   <div class="sec">Derniers relevés</div><div class="card" style="padding:2px 14px">${hist.map(h=>`<div class="item"><span class="muted" style="width:70px">${fmtD(h[0],{day:'numeric',month:'short'})}</span><span class="st st-${h[1]}">${STORES.find(s=>s.id===h[1]).name}</span><span class="grow muted">coché en magasin</span><span class="price">${eur(h[2])}</span></div>`).join('')}</div>
-   <button class="btn sec2 full" onclick="act.toastMsg('Saisie manuelle d\\'un prix (magasin, date, promo oui/non)')">＋ Ajouter un relevé</button>`};
+  const p=P[S.pid],ro=!isMgr();
+  if(!p.hist)p.hist=[['2026-09-19','co',p.price.co,'scan'],['2026-09-19','im',p.price.im,'scan'],['2026-09-05','co',p.price.co&&+(p.price.co+0.06).toFixed(2),'coché'],['2026-08-22','im',p.price.im&&+(p.price.im-0.04).toFixed(2),'coché']].filter(h=>h[2]);
+  const used=S.lists.filter(l=>l.items.some(i=>i.pid===p.id)).length,usedD=Object.values(DISHES).filter(d=>d.ing.some(i=>i[0]===p.id));
+  const dis=ro?'disabled':'';
+  return {title:p.n,sub:CATS[p.c]+' · prix par '+p.u,back:'cat',body:`
+   <div class="card"><div class="sec" style="margin-top:0">Prix moyen par ${p.u} (${S.nbAvg} derniers relevés)</div>${STORES.map(s=>`<div class="row" style="padding:4px 0"><span class="st st-${s.id}">${s.name}</span><span class="grow muted">${p.price[s.id]==null?'aucun relevé':Math.min(p.nb,S.nbAvg)+' relevés'}</span><span class="price">${eur(p.price[s.id])}</span>${bestStore(p.id)===s.id?`<span class="pill p-leaf">${p.forced?'imposé':'conseillé'}</span>`:''}</div>`).join('')}</div>
+   <div class="card">
+    <label class="muted">Nom</label><input class="txt" value="${p.n}" ${dis} onchange="P['${p.id}'].n=this.value;render()">
+    <div class="row" style="gap:8px;margin-top:8px"><div class="grow"><label class="muted">Rayon</label><select class="txt" ${dis} onchange="P['${p.id}'].c=this.value;render()">${Object.entries(CATS).map(([k,t])=>`<option value="${k}" ${p.c===k?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="grow"><label class="muted">Emballage</label><select class="txt" ${dis} onchange="P['${p.id}'].u=this.value;render()">${UNITS.map(u=>`<option ${p.u===u?'selected':''}>${u}</option>`).join('')}</select></div></div>
+    <label class="muted" style="display:block;margin-top:8px">Contenance (facultatif)</label><input class="txt" value="${p.fmt||''}" placeholder="ex. 1 L, 500 g, x12" ${dis} onchange="P['${p.id}'].fmt=this.value">
+    <p class="muted" style="margin:4px 0 0">Les prix se comparent par emballage. La contenance ne sert qu'à signaler un emballage différent d'un magasin à l'autre (comparaison au kg/L).</p>
+    <div class="row" style="margin-top:12px"><div class="grow"><b>🔁 Récurrent</b><div class="muted">Ajouté aux nouvelles listes datées</div></div><select class="txt" style="width:auto" ${dis} onchange="P['${p.id}'].rec=this.value==='non'?null:this.value;render()">${['non','chaque liste','toutes les 2 listes','toutes les 3 listes'].map(o=>`<option ${(p.rec||'non')===o?'selected':''}>${o}</option>`).join('')}</select></div>
+    <div class="row" style="margin-top:10px"><div class="grow"><b>Ingrédient de base</b><div class="muted">Proposé « à vérifier », jamais ajouté d'office</div></div><input type="checkbox" style="width:22px;height:22px" ${p.base?'checked':''} ${dis} onchange="P['${p.id}'].base=this.checked;render()"></div>
+    <div class="row" style="margin-top:10px"><div class="grow"><b>Magasin imposé</b><div class="muted">Ignore le conseil prix (qualité, habitude)</div></div><select class="txt" style="width:auto" ${dis} onchange="P['${p.id}'].forced=this.value||null;render()"><option value="">aucun</option>${STORES.map(s=>`<option value="${s.id}" ${p.forced===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div></div>
+   <div class="sec">Derniers relevés</div><div class="card" style="padding:2px 14px">${p.hist.map(h=>`<div class="item"><span class="muted" style="width:62px">${fmtD(h[0],{day:'numeric',month:'short'})}</span><span class="st st-${h[1]}">${ALLSTORES.find(s=>s.id===h[1]).name}</span><span class="grow muted">${h[3]}${h[4]?' · 🏷 promo':''}</span><span class="price">${eur(h[2])}</span></div>`).join('')||'<p class="muted">Aucun relevé.</p>'}</div>
+   <button class="btn sec2 full" onclick="act.addRecord('${p.id}')">＋ Ajouter un relevé</button>
+   ${ro?'':`<div class="row" style="gap:8px;margin-top:8px"><button class="btn sec2 grow" onclick="act.mergeProd('${p.id}')">⇄ Fusionner avec…</button><button class="btn sec2 grow" style="color:var(--im)" onclick="act.delProd('${p.id}')">Supprimer</button></div>
+   <p class="muted">Utilisé dans ${used} liste${used>1?'s':''} et ${usedD.length} plat${usedD.length>1?'s':''}${usedD.length?' ('+usedD.map(d=>d.n).join(', ')+')':''}.</p>`}`};
  },
  foyer(){
   const sug=[];S.lists.forEach(l=>l.items.forEach(i=>{if(i.sugg==='pending')sug.push(`<div class="item"><div class="grow"><div class="nm">${i.q} × ${P[i.pid].n}</div><div class="muted">${i.by} → ${l.type==='backlog'?'À prévoir':'liste du '+fmtD(l.date,{day:'numeric',month:'short'})}</div></div>${isMgr()?`<button class="btn sm" onclick="act.sugg('${l.id}','${i.pid}','ok')">Accepter</button><button class="btn sm sec2" onclick="act.sugg('${l.id}','${i.pid}','no')">✕</button>`:'<span class="pill p-carrot">en attente</span>'}</div>`)}));
@@ -481,21 +514,122 @@ const VIEWS={
   const mem=S.members.map(m=>[m.n,m.r==='manager'?'Gestionnaire':'Membre']);
   return {title:'Foyer Phoenix',sub:isMgr()?'Vous êtes gestionnaire':'Vous êtes membre',right:`<button class="btn sm sec2" onclick="act.accAll()">${Object.values(S.acc).some(Boolean)?'Tout replier':'Tout ouvrir'}</button>`,body:`
    ${acc('sugg','💡','Suggestions en attente',sug.length?`<span class="badge" style="margin-left:6px">${sug.length}</span>`:' · rien en attente',sug.join('')||'<p class="muted">Rien en attente.</p>')}
-   ${acc('mem','👥','Membres',` · ${mem.length} personnes`,mem.map(([n,r],i)=>`<div class="item" ${isMgr()?`style="cursor:pointer" onclick="act.member(${i})"`:''}><span class="grow nm">${n}<div class="muted" style="font-weight:400">${S.members[i].e}</div></span><span class="pill ${r==='Gestionnaire'?'p-leaf':'p-grey'}">${r}</span>${isMgr()?'<span class="muted">✎</span>':''}</div>`).join('')+(isMgr()?`<button class="btn sec2 full" style="margin:8px 0" onclick="act.toastMsg('Lien d\\'invitation copié')">＋ Inviter un membre</button>`:''))}
+   ${acc('mem','👥','Membres',` · ${mem.length} personnes`,mem.map(([n,r],i)=>`<div class="item" ${isMgr()?`style="cursor:pointer" onclick="act.member(${i})"`:''}><span class="grow nm">${n}<div class="muted" style="font-weight:400">${S.members[i].e}</div></span><span class="pill ${r==='Gestionnaire'?'p-leaf':'p-grey'}">${r}</span>${isMgr()?'<span class="muted">✎</span>':''}</div>`).join('')+(isMgr()?`<button class="btn sec2 full" style="margin:8px 0" onclick="act.invite()">＋ Inviter un membre</button>`:''))}
    ${acc('set','⚙️','Réglages',` · seuil ${eur(S.threshold)}, ${S.nbAvg} relevés, 15 jours`,`<div style="padding:10px 0">
     <div class="row"><div class="grow"><b>Seuil « 2 magasins »</b><div class="muted">Économie minimale pour conseiller de faire les deux</div></div><input class="txt" type="number" style="width:80px" value="${S.threshold}" ${isMgr()?'':'disabled'} onchange="act.thr(this.value)"></div>
     <div class="row" style="margin-top:10px"><div class="grow"><b>Prix moyen</b><div class="muted">Nombre de derniers relevés pris en compte</div></div><input class="txt" type="number" style="width:80px" value="${S.nbAvg}" ${isMgr()?'':'disabled'} onchange="S.nbAvg=+this.value"></div>
     <div class="row" style="margin-top:10px"><div class="grow"><b>Rythme des courses</b><div class="muted">Date proposée pour une nouvelle liste</div></div><span class="pill p-grey">15 jours</span></div></div>`)}
-   ${STORES.map(s=>acc('st_'+s.id,'🏪',s.name,` · ordre des rayons : ${ORDER[s.id].slice(0,2).map(c=>CATS[c]).join(', ')}…`,ord(s.id))).join('')}
-   ${isMgr()?`<button class="btn sec2 full" onclick="act.toastMsg('Ajout d\\'un magasin (nom, couleur)')">＋ Ajouter un magasin</button>`:''}`};
+   ${ALLSTORES.map(s=>acc('st_'+s.id,`<span style="width:12px;height:12px;border-radius:99px;background:${s.color}"></span>`,s.name+(s.active?'':' (inactif)'),s.active?` · ordre des rayons : ${ORDER[s.id].slice(0,2).map(c=>CATS[c]).join(', ')}…`:' · masqué des listes et conseils',(isMgr()?`<button class="btn sec2 full" style="margin-top:8px" onclick="act.storeEdit('${s.id}')">✎ Nom, couleur, actif / inactif</button>`:'')+(s.active?ord(s.id):''))).join('')}
+   ${isMgr()?`<button class="btn sec2 full" onclick="act.storeEdit()">＋ Ajouter un magasin</button>`:''}`};
  }
+ ,
+ hist(){
+  const l=list(S.listId),H=S.hist,ms=mealsOf(l).filter(m=>m.sugg!=='pending');
+  const store=sid=>{const st=ALLSTORES.find(s=>s.id===sid),its=H.bought.filter(b=>b[0]===sid);return `<div class="sec"><span class="st st-${sid}">${st.name}</span> · ${its.length} articles · ticket scanné</div><div class="card" style="padding:2px 14px">${its.map(([s,pid,q,paid])=>{const avg=P[pid].price[sid],d=avg?(paid-avg)/avg*100:0;return `<div class="item"><span class="grow">${q} × ${P[pid].n}</span><span class="muted">${Math.abs(d)>=1?`<b style="color:var(${d>0?'--im':'--leaf'})">${d>0?'+':''}${d.toFixed(0)} %</b> `:''}</span><span class="price">${eur(paid)}</span></div>`}).join('')}</div>`};
+  return {title:'Courses du '+fmtD(l.date,{day:'numeric',month:'long'}),sub:'Clôturée · lecture seule',back:'home',body:`
+   <div class="card row"><div class="grow"><b>${H.bought.length} articles achetés</b><div class="muted">${H.updated} prix mis à jour par scan · ${H.missing.length} non trouvé${H.missing.length>1?'s':''}</div></div></div>
+   ${['im','co'].map(store).join('')}
+   <div class="sec">Non trouvés → reportés</div><div class="card" style="padding:2px 14px">${H.missing.map(([pid,to])=>`<div class="item"><span class="grow">${P[pid].n}</span><span class="pill p-grey">→ ${to}</span></div>`).join('')}</div>
+   <div class="sec">Repas de la période</div><div class="card" style="padding:2px 14px">${H.meals.map(([d,n])=>`<div class="item"><span class="muted" style="width:70px">${fmtD(d,{weekday:'short',day:'numeric'})}</span><span class="grow">${n}</span></div>`).join('')}</div>
+   ${isMgr()?`<button class="btn sec2 full" onclick="act.histCopy()">⧉ Copier les articles dans « À prévoir »</button>`:''}`};
+ },
+ login(){
+  return {noNav:true,title:'Le Cabas',sub:'Listes de courses du foyer',body:`
+   <div style="text-align:center;margin:30px 0 20px"><div style="font-size:56px">🧺</div><h2 style="font:800 30px var(--display);margin:6px 0">Le Cabas</h2><p class="muted">Courses partagées, bons prix, menus.</p></div>
+   ${S.loginSent?`<div class="card"><b>📧 Lien envoyé</b><p class="muted">Un lien de connexion a été envoyé à <b>${S.loginMail}</b>. Il est valable 15 minutes et ne sert qu'une fois.</p><button class="btn full" onclick="S.loginSent=false;act.go('home')">Ouvrir le lien (démo)</button><button class="btn sec2 full" style="margin-top:8px" onclick="S.loginSent=false;render()">Changer d'adresse</button></div>`
+   :`<div class="card"><label class="muted">Adresse e-mail</label><input class="txt" id="lm" type="email" placeholder="prenom@exemple.be" value="${S.loginMail}"><button class="btn full" style="margin-top:10px" onclick="S.loginMail=$('#lm').value||'thomas@exemple.be';S.loginSent=true;render()">Recevoir un lien de connexion</button><p class="muted" style="margin-bottom:0">Pas de mot de passe : un lien arrive par e-mail. La session reste ouverte 90 jours sur cet appareil.</p></div>`}`};
+ },
+ invite(){
+  return {noNav:true,title:'Invitation',sub:'Le Cabas',body:`
+   <div style="text-align:center;margin:30px 0 16px"><div style="font-size:52px">🏡</div></div>
+   <div class="card"><h4>Thomas vous invite à rejoindre « Foyer Phoenix »</h4><p class="muted">Rôle proposé : <b>Membre</b> — consulter les listes et le menu, cocher en magasin, scanner les tickets, suggérer des articles et des plats.</p>
+   <label class="muted">Votre prénom</label><input class="txt" value="Noah">
+   <p class="muted">Invitation valable jusqu'au ${fmtD('2026-10-09',{day:'numeric',month:'long'})}.</p>
+   <button class="btn full" onclick="act.go('home');act.toastMsg('Bienvenue dans Foyer Phoenix')">Rejoindre le foyer</button>
+   <button class="btn sec2 full" style="margin-top:8px" onclick="act.go('login')">Refuser</button></div>`};
+ },
+ households(){
+  return {title:'Mes foyers',sub:'Choisir le foyer affiché',back:'home',body:`
+   ${S.households.map((h,i)=>`<div class="card click" onclick="S.hh=${i};act.go('home');act.toastMsg('Foyer : ${h.n}')"><div class="row"><span class="acc-i">${h.i}</span><div class="grow"><h4>${h.n}</h4><div class="muted">${h.m} membres · ${h.r}</div></div>${S.hh===i?'<span class="pill p-leaf">actuel</span>':''}</div></div>`).join('')}
+   <button class="btn sec2 full" onclick="act.newHousehold()">＋ Créer un foyer</button>
+   <div class="sec">Compte</div><div class="card"><div class="row"><div class="grow"><b>Thomas</b><div class="muted">thomas@exemple.be</div></div><button class="btn sm sec2" onclick="act.go('login')">Se déconnecter</button></div></div>`};
+ }
+
 };
 // ---------- Actions ----------
 let tt;
 const act={
+ searchC(v){S.qc=v;render();const q=$('#qc');q.focus();q.setSelectionRange(v.length,v.length)},
+ // ----- Catalogue : relevé manuel, fusion, suppression
+ addRecord(pid){S.rec={sid:STORES[0].id,price:'',date:'2026-10-02',promo:false};
+  S.sheet=()=>`<h3>Nouveau relevé</h3><p class="muted">${P[pid].n} · prix par ${P[pid].u}</p><div class="seg">${STORES.map(s=>`<button class="${S.rec.sid===s.id?'on':''}" onclick="S.rec.sid='${s.id}';render()">${s.name}</button>`).join('')}</div>
+   <div class="row" style="gap:8px"><div class="grow"><label class="muted">Prix</label><input class="txt" id="rp" inputmode="decimal" placeholder="${P[pid].price[S.rec.sid]??'0,00'}"></div><div class="grow"><label class="muted">Date</label><input class="txt" type="date" id="rd" value="${S.rec.date}"></div></div>
+   <label class="item"><input type="checkbox" id="rpr"><span class="grow">Prix en promo (exclu de la moyenne)</span></label>
+   <button class="btn full" onclick="act.addRecordOk('${pid}')">Enregistrer</button>`;render()},
+ addRecordOk(pid){const v=parseFloat(($('#rp').value||'').replace(',','.'));if(!v)return;const p=P[pid],sid=S.rec.sid,promo=$('#rpr').checked;
+  p.hist.unshift([$('#rd').value,sid,v,'saisie manuelle',promo]);
+  if(!promo){const k=Math.min(p.nb,S.nbAvg);p.price[sid]=p.price[sid]==null?v:+((p.price[sid]*k+v)/(k+1)).toFixed(2);p.nb++}
+  S.sheet=null;act.toastMsg(promo?'Relevé promo enregistré (hors moyenne)':'Relevé enregistré · moyenne recalculée')},
+ mergeProd(pid){S.sheet=()=>`<h3>Fusionner « ${P[pid].n} »</h3><p class="muted">Pour supprimer un doublon : ses relevés de prix, sa présence dans les listes, plats et promos sont transférés vers le produit choisi, puis il est supprimé.</p>
+   <select class="txt" id="mt">${Object.values(P).filter(p=>p.id!==pid).sort((a,b)=>a.n.localeCompare(b.n)).map(p=>`<option value="${p.id}">${p.n}</option>`).join('')}</select>
+   <button class="btn full" style="margin-top:10px" onclick="act.mergeOk('${pid}',$('#mt').value)">Fusionner</button>`;render()},
+ mergeOk(from,to){S.lists.forEach(l=>l.items.forEach(i=>{if(i.pid===from)i.pid=to}));Object.values(DISHES).forEach(d=>d.ing.forEach(i=>{if(i[0]===from)i[0]=to}));
+  S.promos.forEach(p=>{if(p.pid===from)p.pid=to});P[to].nb+=P[from].nb;const n=P[from].n;delete P[from];S.pid=to;S.sheet=null;S.view='product';act.toastMsg(`« ${n} » fusionné dans « ${P[to].n} »`)},
+ delProd(pid){const p=P[pid],ls=S.lists.filter(l=>l.items.some(i=>i.pid===pid)),ds=Object.values(DISHES).filter(d=>d.ing.some(i=>i[0]===pid));
+  S.sheet=()=>`<h3>Supprimer « ${p.n} » ?</h3><p class="muted">${ls.length||ds.length?`Retiré de ${ls.length} liste${ls.length>1?'s':''} non clôturée${ls.length>1?'s':''} et des plats : ${ds.map(d=>d.n).join(', ')||'aucun'}.`:'Il n\'est utilisé nulle part.'} Ses relevés de prix sont supprimés ; l'historique des listes clôturées garde son nom.</p>
+   <div class="row" style="gap:8px"><button class="btn sec2 grow" onclick="act.close()">Annuler</button><button class="btn grow" style="background:var(--im)" onclick="act.delProdOk('${pid}')">Supprimer</button></div>`;render()},
+ delProdOk(pid){S.lists.forEach(l=>l.items=l.items.filter(i=>i.pid!==pid));Object.values(DISHES).forEach(d=>d.ing=d.ing.filter(i=>i[0]!==pid));S.promos=S.promos.filter(p=>p.pid!==pid);const n=P[pid].n;delete P[pid];act.go('cat');act.toastMsg(n+' supprimé')},
+ // ----- Article d'une liste
+ item(key){const [lid,pid]=key.split(':'),l=list(lid),x=lines(l).items.find(x=>x.key===key),own=l.items.find(i=>i.pid===pid&&i.sugg!=='pending'),p=P[pid];
+  const others=S.lists.filter(o=>o.id!==lid&&o.status!=='Clôturée');
+  S.sheet=()=>`<h3>${p.n}</h3><p class="muted">${CATS[p.c]} · ${p.u}${x.from&&x.from.length?` · dont ${x.q-(own?own.q:0)} pour ${x.from.join(', ')}`:''}</p>
+   ${own||!x.from.length?`<div class="row" style="margin-bottom:10px"><span class="grow">Quantité ajoutée à la main</span><button class="btn sm sec2" onclick="act.iq('${key}',-1)">−</button><b style="width:30px;text-align:center">${own?own.q:0}</b><button class="btn sm sec2" onclick="act.iq('${key}',1)">＋</button></div>
+   <label class="muted">Note</label><input class="txt" value="${own?.note||''}" placeholder="ex. bio, grand format" onchange="act.inote('${key}',this.value)">`:`<div class="row" style="margin-bottom:10px"><span class="grow">Ajouter en plus des repas</span><button class="btn sm sec2" onclick="act.iq('${key}',1)">＋ 1</button></div>`}
+   ${x.from&&x.from.length?`<button class="btn sec2 full" style="margin-top:10px" onclick="act.inStock('${key}')">🥫 Déjà en réserve : ne pas acheter pour ${x.from.join(', ')}</button>`:''}
+   <div class="sec">Déplacer vers</div><div class="opt">${others.map(o=>`<button onclick="act.imove('${key}','${o.id}')">${o.type==='backlog'?'À prévoir':'Liste du '+fmtD(o.date,{day:'numeric',month:'short'})}</button>`).join('')}</div>
+   <div class="row" style="margin-top:6px"><div class="grow"><b>🔁 Récurrent</b><div class="muted">${p.rec?'Revient : '+p.rec:'Non'}</div></div><button class="btn sm sec2" onclick="P['${pid}'].rec=P['${pid}'].rec?null:'chaque liste';act.item('${key}')">${p.rec?'Arrêter':'Rendre récurrent'}</button></div>
+   <div class="row" style="gap:8px;margin-top:12px"><button class="btn sec2 grow" onclick="act.product('${pid}')">Fiche produit</button>${own?`<button class="btn sec2 grow" style="color:var(--im)" onclick="act.idel('${key}')">Retirer de la liste</button>`:''}</div>`;render()},
+ iq(key,n){const [lid,pid]=key.split(':'),l=list(lid);let own=l.items.find(i=>i.pid===pid&&i.sugg!=='pending');
+  if(!own){own={pid,q:0,o:'manual'};l.items.push(own)}own.q=Math.max(0,own.q+n);if(!own.q&&!lines(l).items.find(x=>x.key===key)?.from.length)l.items=l.items.filter(i=>i!==own);q_('quantité');act.item(key)},
+ inote(key,v){const [lid,pid]=key.split(':'),own=list(lid).items.find(i=>i.pid===pid);if(own)own.note=v},
+ inStock(key){const [lid,pid]=key.split(':'),l=list(lid);mealsOf(l).forEach(m=>{if(DISHES[m.dish].ing.some(i=>i[0]===pid)){m.skip=m.skip||[];if(!m.skip.includes(pid))m.skip.push(pid)}});S.sheet=null;act.toastMsg(P[pid].n+' marqué en réserve pour ces repas')},
+ imove(key,to){const [lid,pid]=key.split(':'),l=list(lid),own=l.items.find(i=>i.pid===pid&&i.sugg!=='pending');if(!own){act.toastMsg('Article issu des repas : déplacer le repas vers une autre liste');return}
+  l.items=l.items.filter(i=>i!==own);list(to).items.push(own);q_('déplacement');S.sheet=null;act.toastMsg('Déplacé vers '+(list(to).type==='backlog'?'À prévoir':'la liste du '+fmtD(list(to).date,{day:'numeric',month:'short'})))},
+ idel(key){const [lid,pid]=key.split(':'),l=list(lid);l.items=l.items.filter(i=>!(i.pid===pid&&i.sugg!=='pending'));q_('suppression');S.sheet=null;act.toastMsg(P[pid].n+' retiré')},
+ // ----- Liste : menu ⋯
+ listMenu(){const l=list(S.listId),hasChecked=lines(l).items.some(x=>S.checked[x.key]);
+  S.sheet=()=>`<h3>Liste du ${fmtD(l.date,{day:'numeric',month:'long'})}</h3>
+   <label class="muted">Date des courses</label><input class="txt" type="date" value="${l.date}" onchange="act.setDate(this.value)">
+   <p class="muted">Changer la date déplace aussi la période des repas rattachés.</p>
+   ${l.status==='En préparation'?`<button class="btn full" onclick="list(S.listId).status='En courses';act.close();act.toastMsg('Statut : en courses')">🛒 Commencer les courses</button>`:''}
+   <button class="btn sec2 full" style="margin-top:8px" onclick="act.closeList()">✔ Clôturer la liste</button>
+   <button class="btn sec2 full" style="margin-top:8px;color:var(--im)" ${hasChecked?'disabled title="Des articles sont déjà cochés"':''} onclick="act.delList()">Supprimer la liste</button>`;render()},
+ setDate(v){const l=list(S.listId);if(dated().some(o=>o!==l&&o.date===v)){act.toastMsg('Une liste existe déjà à cette date');return}l.date=v;S.sheet=null;act.toastMsg('Date modifiée · repas recalculés')},
+ delList(){const l=list(S.listId),n=l.items.filter(i=>i.o==='manual').length;
+  S.sheet=()=>`<h3>Supprimer la liste ?</h3><p class="muted">${n} article${n>1?'s':''} ajouté${n>1?'s':''} à la main ser${n>1?'ont':'a'} déplacé${n>1?'s':''} vers « À prévoir ». Les repas restent au menu et rejoignent la liste précédente ou suivante.</p><div class="row" style="gap:8px"><button class="btn sec2 grow" onclick="act.close()">Annuler</button><button class="btn grow" style="background:var(--im)" onclick="act.delListOk()">Supprimer</button></div>`;render()},
+ delListOk(){const l=list(S.listId);list('back').items.push(...l.items.filter(i=>i.o==='manual'));S.lists=S.lists.filter(o=>o!==l);S.meals.forEach(m=>{if(m.list===l.id)delete m.list});act.go('home');act.toastMsg('Liste supprimée')},
+ histCopy(){const b=list('back');S.hist.bought.forEach(([s,pid,q])=>{if(!b.items.some(i=>i.pid===pid))b.items.push({pid,q,o:'manual'})});act.toastMsg(S.hist.bought.length+' articles copiés dans « À prévoir »')},
+ // ----- Repas : rattachement à une autre liste
+ mealList(ix,lid){const m=S.meals[ix];if(lid==='auto')delete m.list;else m.list=lid;act.meal(ix);act.toastMsg('Repas rattaché · ingrédients déplacés')},
+ // ----- Magasins
+ storeEdit(sid){const s=sid?ALLSTORES.find(x=>x.id===sid):{id:null,name:'',color:'#5b4bb7',active:true};S.se={...s};
+  S.sheet=()=>`<h3>${sid?'Modifier le magasin':'Nouveau magasin'}</h3><label class="muted">Nom</label><input class="txt" value="${S.se.name}" placeholder="ex. Aldi Jambes" oninput="S.se.name=this.value">
+   <div class="sec">Couleur</div><div class="opt">${COLORS.map(c=>`<button style="width:36px;height:36px;padding:0;background:${c};border:3px solid ${S.se.color===c?'var(--ink)':'transparent'}" onclick="S.se.color='${c}';render()"></button>`).join('')}</div>
+   ${sid?`<div class="row" style="margin:6px 0 10px"><div class="grow"><b>Actif</b><div class="muted">Inactif : masqué des conseils et listes, prix conservés</div></div><input type="checkbox" style="width:22px;height:22px" ${S.se.active?'checked':''} onchange="S.se.active=this.checked"></div>`:'<p class="muted">Les rayons sont repris dans l\'ordre par défaut, à ajuster ensuite. Prix inconnus jusqu\'aux premiers relevés.</p>'}
+   <button class="btn full" onclick="act.storeSave()">Enregistrer</button>`;render()},
+ storeSave(){const e=S.se;if(!e.name.trim())return;
+  if(!e.id){e.id='s'+Date.now();ALLSTORES.push(e);STORES.push(e);ORDER[e.id]=Object.keys(CATS);Object.values(P).forEach(p=>p.price[e.id]=null);storeStyle(e.id,e.color);S.sheet=null;act.toastMsg(e.name+' ajouté');return}
+  const s=ALLSTORES.find(x=>x.id===e.id);Object.assign(s,{name:e.name.trim(),color:e.color});storeStyle(s.id,s.color);
+  if(s.active!==e.active){s.active=e.active;if(e.active)STORES.push(s);else{if(STORES.length<2){s.active=true;act.toastMsg('Il faut au moins un magasin actif');return}STORES.splice(STORES.indexOf(s),1);for(const k in S.assign)if(S.assign[k]===s.id)delete S.assign[k];if(S.shopStore===s.id)S.shopStore=STORES[0].id}}
+  S.sheet=null;act.toastMsg('Magasin mis à jour')},
+ // ----- Foyer, invitations
+ invite(){S.sheet=()=>`<h3>Inviter un membre</h3><label class="muted">E-mail</label><input class="txt" type="email" placeholder="prenom@exemple.be"><div class="sec">Profil</div><div class="seg"><button class="on">Membre</button><button>Gestionnaire</button></div>
+   <button class="btn full" onclick="act.close();act.toastMsg('Invitation envoyée (valable 7 jours)')">Envoyer l'invitation</button><button class="btn sec2 full" style="margin-top:8px" onclick="act.close();act.toastMsg('Lien d\\'invitation copié')">🔗 Copier un lien d'invitation</button>
+   <p class="muted">Aperçu de l'écran reçu : <a href="#" onclick="act.go('invite');return false">voir</a></p>`;render()},
+ newHousehold(){S.sheet=()=>`<h3>Nouveau foyer</h3><label class="muted">Nom</label><input class="txt" id="hn" placeholder="ex. Chalet"><p class="muted">Vous en serez gestionnaire. Catalogue, magasins, listes et plats sont propres à chaque foyer.</p><button class="btn full" onclick="S.households.push({n:$('#hn').value||'Nouveau foyer',m:1,r:'gestionnaire',i:'🏠'});act.close();act.toastMsg('Foyer créé')">Créer</button>`;render()},
  role(r){S.role=r;S.q='';render()},
  go(v){S.view=v;S.sheet=null;S.q='';render();$('main').scrollTop=0},
- open(id){S.local[id]=true;S.listId=id;S.listTab='items';act.go('list')},
+ open(id){if(list(id).status==='Clôturée'){S.listId=id;act.go('hist');return}S.local[id]=true;S.listId=id;S.listTab='items';act.go('list')},
  tab(t){S.listTab=t;render()},
  search(v){S.q=v;render();const q=$('#q');q.focus();q.setSelectionRange(v.length,v.length)},
  add(pid){q_('ajout '+P[pid].n);const l=list(S.listId),ex=l.items.find(i=>i.pid===pid&&!i.sugg);
@@ -552,15 +686,15 @@ const act={
  search2(v){S.q2=v;render();const q=$('#q2');q.focus();q.setSelectionRange(v.length,v.length)},
  search3(v){S.q3=v;render();const q=$('#q3');q.focus();q.setSelectionRange(v.length,v.length)},
  search4(v){S.q4=v;render();const q=$('#q4');q.focus();q.setSelectionRange(v.length,v.length)},
- newProd(name,ctx){S.np={n:name,c:'ep',u:'pièce',base:false,ctx};S.sheet=()=>`<h3>Nouveau produit</h3><p class="muted">Ajouté au catalogue commun du foyer.</p>
-  <label class="muted">Nom</label><input class="txt" value="${S.np.n}" oninput="S.np.n=this.value">
+ newProd(name,ctx){S.np={n:name,c:'ep',u:'paquet',base:false,ctx};S.sheet=()=>`<h3>Nouveau produit</h3><p class="muted">Ajouté au catalogue commun du foyer.</p>
+  <label class="muted">Nom</label><input class="txt" value="${S.np.n}" placeholder="ex. Beurre doux" oninput="S.np.n=this.value">
   <div class="row" style="gap:8px;margin-top:8px"><div class="grow"><label class="muted">Catégorie</label><select class="txt" onchange="S.np.c=this.value">${Object.entries(CATS).map(([k,t])=>`<option value="${k}" ${S.np.c===k?'selected':''}>${t}</option>`).join('')}</select></div>
-  <div class="grow"><label class="muted">Unité d'achat</label><select class="txt" onchange="S.np.u=this.value">${['pièce','kg','paquet','boîte','bouteille','sachet','barquette','pot'].map(u=>`<option>${u}</option>`).join('')}</select></div></div>
+  <div class="grow"><label class="muted">Emballage</label><select class="txt" onchange="S.np.u=this.value">${UNITS.map(u=>`<option ${S.np.u===u?'selected':''}>${u}</option>`).join('')}</select></div></div>
   <label class="item" style="margin-top:6px"><input type="checkbox" onchange="S.np.base=this.checked"><span class="grow">Ingrédient de base (sel, huile, épices…)</span></label>
   <p class="muted">Prix : inconnus pour l'instant, ils viendront des relevés (cochage, scan du ticket).</p>
   <button class="btn full" onclick="act.newProdOk()">Créer et ajouter</button>`;render()},
  newProdOk(){const n=S.np;if(!n.n.trim())return;const id='p'+Date.now();P[id]={id,n:n.n.trim(),c:n.c,u:n.u,price:{im:null,co:null},nb:0,rec:null,base:n.base};S.sheet=null;
-  if(n.ctx==='dish'){act.ingAdd(id)}else{const l=list(S.listId);if(isMgr())l.items.push({pid:id,q:1,o:'manual'});else l.items.push({pid:id,q:1,o:'suggestion',by:'Léa',sugg:'pending'});S.q=''}
+  if(n.ctx==='cat'){S.qc='';act.product(id)}else if(n.ctx==='dish'){act.ingAdd(id)}else{const l=list(S.listId);if(isMgr())l.items.push({pid:id,q:1,o:'manual'});else l.items.push({pid:id,q:1,o:'suggestion',by:'Léa',sugg:'pending'});S.q=''}
   act.toastMsg(P[id].n+' créé dans le catalogue')},
  ingAdd(pid){S.ed.ing.push(P[pid].base?[pid]:[pid,1]);S.q2='';render()},
  ingDel(i){S.ed.ing.splice(i,1);render()},
@@ -575,6 +709,7 @@ const act={
  meal(ix){const m=S.meals[ix],d=DISHES[m.dish],sl=SLOTS.find(s=>s[0]===m.s)[1];
   S.sheet=()=>`<h3>${d.n}</h3><p class="muted">${fmtD(m.d,{weekday:'long',day:'numeric',month:'long'})} · ${sl}${m.sugg==='pending'?` · suggéré par ${m.by}`:''}</p>
    <div class="row" style="margin-bottom:12px"><span class="grow">Personnes</span>${isMgr()?`<button class="btn sm sec2" onclick="act.mp(${ix},-1)">−</button><b style="width:30px;text-align:center">${m.p}</b><button class="btn sm sec2" onclick="act.mp(${ix},1)">＋</button>`:`<b>${m.p}</b>`}</div>
+   ${isMgr()?`<div class="row" style="margin-bottom:10px"><span class="grow">Liste de courses</span><select class="txt" style="width:auto" onchange="act.mealList(${ix},this.value)"><option value="auto" ${m.list?'':'selected'}>Automatique (période)</option>${dated().filter(l=>l.status!=='Clôturée').map(l=>`<option value="${l.id}" ${m.list===l.id?'selected':''}>Liste du ${fmtD(l.date,{day:'numeric',month:'short'})}</option>`).join('')}</select></div>`:''}
    <button class="btn full" onclick="act.recipe('${m.dish}',${m.p})">📖 ${hasRecipe(d)?'Voir la recette':'Ingrédients (pas de recette)'}</button>
    ${isMgr()&&d.ing.some(([p])=>!P[p].base)?`<button class="btn sec2 full" style="margin-top:8px" onclick="act.mealStock(${ix})">🥫 Ingrédients en réserve${m.skip&&m.skip.length?` (${m.skip.length})`:''}</button>`:''}
    ${m.skip&&m.skip.length?`<p class="muted">Non achetés (en réserve) : ${m.skip.map(p=>P[p].n).join(', ')}</p>`:''}

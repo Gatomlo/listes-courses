@@ -1,6 +1,6 @@
 # Le Cabas — Cahier des charges (v0.1)
 
-> Nom de travail. Outil privé du foyer pour préparer les courses, choisir le bon magasin selon les prix et planifier les repas.
+> Nom : **Le Cabas**. Outil privé du foyer pour préparer les courses, choisir le bon magasin selon les prix et planifier les repas.
 > Maquette cliquable : `maquette/index.html` (publiée : https://claude.ai/artifact/PFxn57TQBfrCebd4mEvCtw).
 
 ## 1. Objectif
@@ -19,6 +19,10 @@
 - Invitation par lien/e-mail émis par un gestionnaire.
 - **Gestion des membres** (gestionnaire) : modifier le nom affiché et l'e-mail, **changer le profil** Membre ↔ Gestionnaire, **retirer du foyer** (le compte n'est pas supprimé ; ses suggestions en attente sont refusées ; son nom reste dans l'historique). Le foyer garde toujours au moins un gestionnaire : le dernier ne peut être ni rétrogradé ni retiré.
 - Écran **Foyer** organisé en **accordéons** (en-tête avec résumé : nombre, valeurs clés) : Suggestions en attente (ouvert par défaut s'il y en a), Membres, Réglages, puis un accordéon par magasin (ordre des rayons). Bouton « Tout ouvrir / Tout replier » ; état mémorisé par appareil.
+- **Accès** :
+  - **Connexion** par lien magique : saisie de l'e-mail, lien valable 15 min et à usage unique, session de 90 jours sur l'appareil ; déconnexion depuis « Mes foyers ».
+  - **Invitation** (gestionnaire) : par e-mail ou lien copiable, avec le profil proposé (membre ou gestionnaire), valable 7 jours ; l'invité voit qui l'invite, dans quel foyer et avec quel rôle, puis rejoint ou refuse.
+  - **Mes foyers** : sélecteur en haut de l'écran Listes, créer un foyer (on en devient gestionnaire). Catalogue, magasins, listes et plats sont propres à chaque foyer.
 
 ## 3. Catalogue commun du foyer
 
@@ -28,19 +32,22 @@ Base unique de produits partagée par le foyer, réutilisée par les listes et l
 |---|---|---|
 | Nom | Lait demi-écrémé | Autocomplétion |
 | Catégorie | Frais | Tri par rayon |
-| Format / contenance | 1 L | Comparaison au litre/kg si formats différents |
-| Unité d'achat | bouteille, pièce, kg | Quantités et fusion |
+| Emballage | bouteille, paquet, barquette… | **Format par défaut** : les prix se comparent par emballage |
+| Contenance (facultatif) | 1 L, 500 g, x12 | Sert seulement si l'emballage diffère d'un magasin à l'autre (comparaison au kg/L) |
 | Récurrent | chaque liste / toutes les 2 listes / non | Ajout automatique |
 | Ingrédient de base | oui (sel, huile, épices) | Proposé « à vérifier », jamais ajouté d'office |
 | Magasin préféré forcé | — | Outrepasse le conseil prix (qualité, habitude) |
 
 - Ajout à la volée depuis une liste (« Créer “xxx” dans le catalogue »).
-- Fusion de doublons par le gestionnaire.
+- Écran **Catalogue** : recherche, filtres (Tous, Récurrents, De base, Prix manquant), magasin conseillé par produit, bouton « ＋ Produit ».
+- **Fiche produit** éditable (gestionnaire) : nom, rayon, emballage, contenance, récurrence (non / chaque liste / toutes les 2 ou 3 listes), ingrédient de base, magasin imposé ; prix moyens par magasin ; derniers relevés ; **ajout d'un relevé** manuel (magasin, prix, date, promo).
+- **Fusion de doublons** : relevés, articles de listes, ingrédients de plats et promos transférés vers le produit gardé.
+- **Suppression** : retiré des listes non clôturées et des plats (avec confirmation listant les usages) ; l'historique garde le nom.
 
 ## 4. Magasins et prix
 
 ### 4.1 Magasins
-- Liste libre (au départ : **Intermarché**, **Colruyt**), couleur, actif/inactif.
+- Liste libre (au départ : **Intermarché**, **Colruyt**). Ajout et modification par le gestionnaire (écran Foyer) : nom, **couleur** (étiquettes et graphiques), **actif/inactif**. Un magasin inactif disparaît des conseils, scénarios et listes (ses prix sont conservés, les articles qui y étaient affectés reviennent au conseil). Un nouveau magasin démarre sans prix et avec l'ordre des rayons par défaut. Au moins un magasin actif.
 - **Rayons** = catégories du catalogue, communs au foyer. Dans l'accordéon de chaque magasin (écran Foyer), le gestionnaire peut :
   - **réordonner** les rayons selon le parcours du magasin (↑ ↓, glisser-déposer dans l'app) : l'ordre est propre à chaque magasin ;
   - **ajouter** un rayon (placé en fin de parcours dans tous les magasins, à repositionner) ;
@@ -57,7 +64,7 @@ Aucun suivi des dépenses (total payé) : géré dans un autre outil.
 ### 4.3 Prix moyen
 - Moyenne des **N derniers relevés** (N = 5, paramétrable) de moins de 6 mois, par produit et par magasin.
 - Indicateur de fiabilité : nombre de relevés et date du dernier.
-- Comparaison sur le **prix au kg/L** quand les contenances sont renseignées, sinon sur le prix unitaire.
+- **Comparaison par emballage** (format par défaut). Si une contenance différente est indiquée pour un magasin, comparaison au kg/L pour ce produit.
 - **Promotions saisies à la main** (pas de récupération automatique : aucune API publique Intermarché/Colruyt connue, scraping fragile et contraire aux CGU). Bouton 🏷 sur un article (tout membre) :
   - magasin concerné, **prix promo facultatif** (sans prix = simple rappel « devrait être moins cher »), note (ex. « 2e à -50 % ») ;
   - validité : **uniquement pour une sortie de courses précise** (la liste en cours) **ou jusqu'à une date** ; expiration automatique ensuite ;
@@ -95,10 +102,13 @@ Lecture : **Tesseract.js** (gratuit, open source), exécuté **sur le téléphon
   - les **ingrédients des repas** prévus sur sa période.
 - **Période d'une liste** = de sa date jusqu'à la veille de la liste suivante. Les repas planifiés dans cette période lui sont rattachés (déplaçables manuellement).
 - **Clôture** : les articles non achetés sont reportés vers la liste suivante ou vers À prévoir (choix global ou article par article).
-- Historique consultable (montants estimés vs tickets).
+- **Historique** : une liste clôturée s'ouvre en lecture seule : articles achetés par magasin avec le prix payé et l'écart à la moyenne, articles non trouvés et où ils ont été reportés, repas de la période ; action « Copier les articles dans À prévoir ».
+- **Actions d'une liste** (menu ⋯, gestionnaire) : changer la date (la période des repas suit ; une seule liste par date), commencer les courses, clôturer, supprimer (impossible si des articles sont cochés ; articles manuels renvoyés vers À prévoir, repas rattachés à la liste voisine).
 
 ### 5.3 Article de liste
 Produit du catalogue (ou texte libre non rattaché), quantité, note, **origine** (manuel, récurrent, repas X, suggestion de Y), magasin conseillé, magasin affecté (libre), statut (à acheter / acheté / indisponible).
+
+**Fiche article** (toucher un article) : quantité ajoutée à la main, note (« bio », « grand format »), déplacer vers À prévoir ou une autre liste, rendre récurrent / arrêter, accès à la fiche produit, retirer de la liste. Pour un article venant des repas : quantité en plus possible, et « déjà en réserve » qui le retire des repas concernés.
 
 ## 6. Répartition par magasin
 
@@ -106,7 +116,7 @@ Produit du catalogue (ou texte libre non rattaché), quantité, note, **origine*
 - **Scénarios comparés** pour la liste :
   - tout chez Intermarché, tout chez Colruyt (un seul magasin),
   - répartition conseillée (chaque article au moins cher).
-- **Économie estimée** = (meilleur scénario un seul magasin) − (répartition). Si elle est sous un **seuil** (par défaut 5 €, paramétrable), l'app recommande de ne faire qu'un magasin.
+- **Économie estimée** = (meilleur scénario un seul magasin) − (répartition). Si elle est sous un **seuil** (**5 €** par défaut, paramétrable), l'app recommande de ne faire qu'un magasin.
 - Articles sans prix connu dans un magasin : signalés, comptés « non estimés », affectés au magasin principal.
 - Le gestionnaire (ou membre en magasin) peut **déplacer** n'importe quel article d'un magasin à l'autre ; l'affectation manuelle est conservée et le gain/perte affiché.
 - **Liste par magasin** : articles triés selon l'ordre des catégories du magasin, avec total estimé.
@@ -132,6 +142,7 @@ Produit du catalogue (ou texte libre non rattaché), quantité, note, **origine*
 - **Ajout d'un plat au menu** : choix du nombre de personnes et de la liste des ingrédients à acheter ; on **décoche ceux encore en réserve**, qui ne seront pas ajoutés à la liste. Modifiable ensuite depuis le repas (« Ingrédients en réserve »).
 - Un membre peut **suggérer** un plat à une date (validation par le gestionnaire).
 - Depuis une liste : onglet **Repas** = plats prévus sur sa période.
+- Un repas peut être **rattaché manuellement à une autre liste** (ex. dîner du jeudi acheté aux courses suivantes) ; sinon rattachement automatique par période.
 - Toucher un repas du menu : **voir la recette** (quantités ajustées au nombre de personnes), changer le nombre de personnes, changer de plat, modifier le plat, retirer du menu. Un 📖 signale les plats qui ont une recette.
 
 ### 7.3 Génération des ingrédients
@@ -181,7 +192,7 @@ Pour afficher le menu (frigo, cuisine) ou le partager.
 - Hors-ligne : IndexedDB (via Dexie) pour les données locales et la file d'opérations ; chaque opération porte un `op_id` unique (table `AppliedOp` côté serveur pour l'idempotence) ; endpoint `GET /sync?since=<version>` pour rattraper les changements.
 - Import de recette : extraction JSON-LD/microdonnées côté serveur (parseur HTML léger, ex. `cheerio`), analyse des lignes d'ingrédients par règles (quantités, fractions, unités françaises).
 - Authentification : lien magique e-mail (comme La Hotte), session cookie.
-- Sous-domaine envisagé : `courses.ranchduphoenix.be` (à router vers la passerelle).
+- Sous-domaine envisagé : `cabas.ranchduphoenix.be` (à router vers la passerelle).
 
 ### Modèle de données (simplifié)
 
@@ -222,6 +233,5 @@ PlannedMealSkip(planned_meal, product)                     -- ingrédients en r�
 7. Plus tard : photo/PDF de recette.
 
 ## 12. Points ouverts
-- Nom définitif de l'app et sous-domaine.
-- Seuil d'économie par défaut (5 € ?) et éventuel coût fixe « 2e magasin » (temps/trajet).
-- Gestion des formats différents (kg vs pièce) : niveau de détail souhaité dans le catalogue.
+- Sous-domaine : `cabas.ranchduphoenix.be` ou `courses.ranchduphoenix.be` ?
+- Prendre en compte un coût fixe pour le 2e magasin (trajet, temps) en plus du seuil ? (par défaut : non)
