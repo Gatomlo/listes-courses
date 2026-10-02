@@ -48,7 +48,7 @@ export function newDishFrom(name, ret) { pendingName = name || ''; S.dishReturn 
 export async function loadDish(id) {
   if (!S.products) await loadProducts();
   if (id === 'nouveau') {
-    ed = { id: null, name: pendingName || '', portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], upcoming: [], past: [], times: 0 };
+    ed = { id: null, name: pendingName || '', portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], groups: [], upcoming: [], past: [], times: 0 };
     pendingName = '';
   } else {
     S.dishReturn = null;
@@ -61,9 +61,19 @@ export const currentDish = () => ed;
 export function dishView() {
   const ro = !isManager(), dis = ro ? 'disabled' : '';
   const nIng = ed.ingredients.length;
-  const ingRows = ed.ingredients.map((i, k) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>
-    ${i.is_base ? '<span class="pill p-grey">de base</span>' : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" ${dis} data-ch="ing-qty" data-k="${k}"><span class="muted small w5">${esc(i.unit)}</span>`}
-    ${ro ? '' : `<button class="ic" data-a="ing-del" data-k="${k}" title="Retirer">✕</button>`}</div>`).join('') || '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>';
+  const ingRows = (t, empty) => ingsOf(t).map((i, k) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>
+    ${i.is_base ? '<span class="pill p-grey">de base</span>' : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" ${dis} data-ch="ing-qty" data-t="${t}" data-k="${k}"><span class="muted small w5">${esc(i.unit)}</span>`}
+    ${ro ? '' : `<button class="ic" data-a="ing-del" data-t="${t}" data-k="${k}" title="Retirer">✕</button>`}</div>`).join('') || empty;
+  const ingAdd = (t, ph) => (ro ? '' : `<div class="addbox" style="margin:8px 0"><input class="txt" id="ing-q-${t}" autocomplete="off" placeholder="${ph}" data-in="ing-q" data-t="${t}" data-enter="ing-first"><div id="ing-ac-${t}"></div></div>`);
+  const variants = acc('d_var', {
+    icon: '🔀', title: 'Variantes', sum: ed.groups.length ? ` · ${ed.groups.map((g) => esc(g.name)).join(', ')}` : ' · facultatives',
+    body: `<p class="muted small" style="margin-top:8px">Un choix par groupe au moment de mettre le plat au menu (ex. Légume : carottes / épinards ; Viande : saucisse / pain de viande). Les ingrédients ci-dessus sont communs à toutes les variantes.</p>
+      ${ed.groups.map((g, gk) => `<div class="vgrp"><div class="row gap"><input class="txt grow" value="${esc(g.name)}" placeholder="Nom du groupe (ex. Viande)" ${dis} data-ch="grp-name" data-g="${gk}">${ro ? '' : `<button class="ic" data-a="grp-del" data-g="${gk}" title="Retirer le groupe">✕</button>`}</div>
+        ${g.options.map((o, ok) => `<div class="vopt"><div class="row gap"><input class="txt grow" value="${esc(o.name)}" placeholder="Option (ex. saucisse)" ${dis} data-ch="opt-name" data-g="${gk}" data-o="${ok}">${ro ? '' : `<button class="ic" data-a="opt-del" data-g="${gk}" data-o="${ok}" title="Retirer l’option">✕</button>`}</div>
+          ${ingRows(`${gk}-${ok}`, '<p class="muted small">Pas d’ingrédient propre à cette option.</p>')}${ingAdd(`${gk}-${ok}`, `＋ Ingrédient pour « ${esc(o.name || 'cette option')} »…`)}</div>`).join('')}
+        ${ro ? '' : `<button class="btn sec2 sm" data-a="opt-add" data-g="${gk}">＋ Option</button>`}</div>`).join('')}
+      ${ro ? '' : `<button class="btn sec2 sm" style="margin:8px 0" data-a="grp-add">＋ Groupe de variantes</button>`}`,
+  });
   const plan = ed.id ? acc('d_menu', {
     icon: '📅', title: 'Au menu', def: true,
     sum: `${ed.upcoming.length ? ` · prévu ${esc(fmtDate(ed.upcoming[0].date, { weekday: 'short', day: 'numeric', month: 'short' }))}` : ' · rien de prévu'}${ed.times ? ` · ${ed.times} fois` : ''}`,
@@ -80,8 +90,9 @@ export function dishView() {
           <div class="row gap"><label class="grow"><span class="muted">Portions de référence</span><input class="txt" type="number" min="1" value="${ed.portions}" ${dis} data-ch="ed" data-f="portions"></label>
           <label class="grow"><span class="muted">Temps</span><input class="txt" value="${esc(ed.time_text)}" placeholder="ex. 45 min" ${dis} data-ch="ed" data-f="time_text"></label></div></div>` })}
       ${acc('d_ing', { icon: '🥕', title: 'Ingrédients', def: true, sum: ` · ${nIng || 'aucun'}`,
-        body: `${ingRows}${ro ? '' : `<div class="addbox" style="margin:8px 0"><input class="txt" id="ing-q" autocomplete="off" placeholder="＋ Ajouter un ingrédient du catalogue…" data-in="ing-q" data-enter="ing-first"><div id="ing-ac"></div></div>
+        body: `${ingRows('c', '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient du catalogue…')}${ro ? '' : `
           <p class="muted small">Quantités en emballages, facultatives, ajustées au nombre de personnes du repas.</p>`}` })}
+      ${variants}
       ${acc('d_rec', { icon: '📖', title: 'Recette', sum: ed.url || ed.steps || ed.notes ? ' · renseignée' : ' · facultative, vide',
         body: `<div class="form"><label class="muted">Lien vers une recette en ligne</label><div class="row gap"><input class="txt grow" value="${esc(ed.url)}" placeholder="https://…" ${dis} data-ch="ed" data-f="url">${ro ? '' : '<button class="btn sm" data-a="rec-import">⤓ Importer</button>'}</div>
           ${ro ? '' : '<p class="muted small">Importer lit nom, portions, temps, ingrédients et étapes quand le site les publie.</p>'}
@@ -95,25 +106,47 @@ export function dishView() {
 const mealRow = (m) => `<div class="item click" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted w8">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span><span class="grow">${SLOT[m.slot]} · ${m.persons} pers.</span><span class="muted">›</span></div>`;
 
 on('change', 'ed', (el) => { ed[el.dataset.f] = el.dataset.f === 'portions' ? Math.max(1, parseInt(el.value, 10) || 4) : el.value; });
-on('change', 'ing-qty', (el) => { ed.ingredients[Number(el.dataset.k)].qty = num(el.value); });
-on('click', 'ing-del', (el) => { ed.ingredients.splice(Number(el.dataset.k), 1); render(); });
+// Ingredients d'une cible : 'c' = communs, 'g-o' = option o du groupe g.
+function ingsOf(t) {
+  if (t === 'c' || !t) return ed.ingredients;
+  const [g, o] = t.split('-').map(Number);
+  return ed.groups[g].options[o].ingredients;
+}
+on('change', 'ing-qty', (el) => { ingsOf(el.dataset.t)[Number(el.dataset.k)].qty = num(el.value); });
+on('click', 'ing-del', (el) => { ingsOf(el.dataset.t).splice(Number(el.dataset.k), 1); render(); });
 
+// Variantes : groupes et options.
+on('click', 'grp-add', () => { ed.groups.push({ name: '', options: [{ name: '', ingredients: [] }, { name: '', ingredients: [] }] }); render(); });
+on('click', 'grp-del', (el) => { ed.groups.splice(Number(el.dataset.g), 1); render(); });
+on('change', 'grp-name', (el) => { ed.groups[Number(el.dataset.g)].name = el.value; });
+on('click', 'opt-add', (el) => { ed.groups[Number(el.dataset.g)].options.push({ name: '', ingredients: [] }); render(); });
+on('click', 'opt-del', (el) => {
+  const g = ed.groups[Number(el.dataset.g)];
+  g.options.splice(Number(el.dataset.o), 1);
+  if (!g.options.length) ed.groups.splice(Number(el.dataset.g), 1);
+  render();
+});
+on('change', 'opt-name', (el) => { ed.groups[Number(el.dataset.g)].options[Number(el.dataset.o)].name = el.value; });
+
+let ingT = 'c'; // cible de la derniere recherche d'ingredient
+const ingInput = () => document.getElementById(`ing-q-${ingT}`);
 function ingMatches(q) {
   const n = norm(q).trim();
-  return n ? S.products.filter((p) => norm(p.name).includes(n) && !ed.ingredients.some((i) => i.product_id === p.id)).slice(0, 6) : [];
+  return n ? S.products.filter((p) => norm(p.name).includes(n) && !ingsOf(ingT).some((i) => i.product_id === p.id)).slice(0, 6) : [];
 }
 on('input', 'ing-q', (el) => {
+  ingT = el.dataset.t;
   const q = el.value.trim(), ms = ingMatches(q);
-  document.getElementById('ing-ac').innerHTML = q ? `<div class="ac">${ms.map((p) => `<button data-a="ing-add" data-id="${p.id}"><span class="grow">${esc(p.name)}</span><span class="muted">${esc(catName(p.category_id))}</span></button>`).join('')}
+  document.getElementById(`ing-ac-${ingT}`).innerHTML = q ? `<div class="ac">${ms.map((p) => `<button data-a="ing-add" data-id="${p.id}"><span class="grow">${esc(p.name)}</span><span class="muted">${esc(catName(p.category_id))}</span></button>`).join('')}
     ${S.products.some((p) => norm(p.name) === norm(q)) ? '' : `<button data-a="ing-new"><b>＋ Créer « ${esc(q)} » dans le catalogue</b></button>`}</div>` : '';
 });
-const addIng = (p, qty = 1, note = null) => {
-  ed.ingredients.push({ product_id: p.id, name: p.name, unit: p.unit, is_base: !!p.is_base, qty: p.is_base ? null : qty, note });
+const addIng = (p, qty = 1, note = null, t = ingT) => {
+  ingsOf(t).push({ product_id: p.id, name: p.name, unit: p.unit, is_base: !!p.is_base, qty: p.is_base ? null : qty, note });
 };
-on('click', 'ing-add', (el) => { addIng(S.products.find((p) => p.id === Number(el.dataset.id))); render(); document.getElementById('ing-q')?.focus(); });
-on('click', 'ing-first', () => { const ms = ingMatches(document.getElementById('ing-q').value); if (ms.length) { addIng(ms[0]); render(); document.getElementById('ing-q')?.focus(); } });
+on('click', 'ing-add', (el) => { addIng(S.products.find((p) => p.id === Number(el.dataset.id))); render(); ingInput()?.focus(); });
+on('click', 'ing-first', (el) => { ingT = el.dataset.t; const ms = ingMatches(el.value); if (ms.length) { addIng(ms[0]); render(); ingInput()?.focus(); } });
 on('click', 'ing-new', () => {
-  const q = document.getElementById('ing-q').value.trim();
+  const q = ingInput().value.trim();
   sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté au catalogue commun, puis au plat.</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(q.charAt(0).toUpperCase() + q.slice(1))}">
     <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions()}</select></label>
@@ -131,7 +164,9 @@ on('click', 'ing-new-ok', async () => {
 });
 
 on('click', 'dish-save', async () => {
-  const body = { ...ed, ingredients: ed.ingredients.map((i) => ({ product_id: i.product_id, qty: i.qty, note: i.note })) };
+  const ings = (list) => list.map((i) => ({ product_id: i.product_id, qty: i.qty, note: i.note }));
+  const body = { ...ed, ingredients: ings(ed.ingredients),
+    groups: ed.groups.map((g) => ({ name: g.name, options: g.options.map((o) => ({ id: o.id, name: o.name, ingredients: ings(o.ingredients) })) })) };
   const d = await attempt(() => (ed.id ? put(hp(`/dishes/${ed.id}`), body) : post(hp('/dishes'), body)));
   if (!d) return;
   const isNew = !ed.id;
@@ -147,18 +182,36 @@ on('click', 'dish-del', async () => {
   if (ok && await attempt(() => del(hp(`/dishes/${ed.id}`)))) { S.dishes = null; toast('Plat supprimé'); go('#/plats'); }
 });
 
+// ---------- Variantes ----------
+// Option retenue par groupe : celle demandee si elle existe, sinon la premiere.
+export function chosenOf(d, options) {
+  const want = new Set(options || []);
+  return (d.groups || []).map((g) => (g.options.find((o) => want.has(o.id)) || g.options[0]).id);
+}
+// Ingredients communs + ceux des options retenues.
+export function dishIngredients(d, options) {
+  const keep = new Set(chosenOf(d, options));
+  return [...d.ingredients, ...(d.groups || []).flatMap((g) => g.options.filter((o) => keep.has(o.id)).flatMap((o) => o.ingredients))];
+}
+
 // ---------- Recette (lecture, quantites ajustees) ----------
-export async function recipeSheet(dishId, persons) {
+// options : variantes du repas ; sans repas, toutes les options sont listees par groupe.
+export async function recipeSheet(dishId, persons, options) {
   const d = ed && ed.id === dishId ? ed : await attempt(() => get(hp(`/dishes/${dishId}`)));
   if (!d) return;
   const p = persons || d.portions, f = p / d.portions;
   const steps = String(d.steps || '').split('\n').map((s) => s.trim()).filter(Boolean);
-  sheet(`<h3>📖 ${esc(d.name)}</h3><p class="muted">${d.time_text ? '⏱ ' + esc(d.time_text) + ' · ' : ''}pour ${p} personne${p > 1 ? 's' : ''}</p>
-    ${d.ingredients.length ? `<div class="sec">Ingrédients</div>${d.ingredients.map((i) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>${i.is_base || i.qty == null ? '<span class="pill p-grey">selon goût</span>' : `<b class="price">${fmtQ(i.qty * f)} ${esc(i.unit)}</b>`}</div>`).join('')}` : ''}
+  const row = (i) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>${i.is_base || i.qty == null ? '<span class="pill p-grey">selon goût</span>' : `<b class="price">${fmtQ(i.qty * f)} ${esc(i.unit)}</b>`}</div>`;
+  const groups = d.groups || [], keep = options ? new Set(chosenOf(d, options)) : null;
+  const variant = keep ? groups.map((g) => g.options.find((o) => keep.has(o.id)).name).join(', ') : '';
+  const ings = keep ? dishIngredients(d, options) : d.ingredients;
+  sheet(`<h3>📖 ${esc(d.name)}${variant ? ` · ${esc(variant)}` : ''}</h3><p class="muted">${d.time_text ? '⏱ ' + esc(d.time_text) + ' · ' : ''}pour ${p} personne${p > 1 ? 's' : ''}</p>
+    ${ings.length ? `<div class="sec">Ingrédients</div>${ings.map(row).join('')}` : ''}
+    ${keep ? '' : groups.map((g) => `<div class="sec">${esc(g.name)} · au choix</div>${g.options.map((o) => `<div class="item"><b class="grow">${esc(o.name)}</b></div>${o.ingredients.map(row).join('')}`).join('')}`).join('')}
     ${steps.length ? `<div class="sec">Préparation</div><ol class="steps">${steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}
     ${d.notes ? `<div class="sec">Notes</div><p>${esc(d.notes)}</p>` : ''}
     ${d.url ? `<a class="btn sec2 full" href="${esc(d.url)}" target="_blank" rel="noopener">🔗 Ouvrir la recette en ligne</a>` : ''}
-    ${!d.ingredients.length && !steps.length && !d.notes && !d.url ? '<p class="muted">Aucune recette renseignée pour ce plat.</p>' : ''}
+    ${!ings.length && !groups.length && !steps.length && !d.notes && !d.url ? '<p class="muted">Aucune recette renseignée pour ce plat.</p>' : ''}
     <div class="row end"><button class="btn sec2" data-a="close">Fermer</button></div>`);
 }
 on('click', 'recipe-view', (el) => recipeSheet(Number(el.dataset.id)));
@@ -209,7 +262,7 @@ on('click', 'imp-ok', async () => {
       created++;
     }
     if (ed.ingredients.some((i) => i.product_id === p.id)) continue;
-    addIng(p, g.packages || 1, g.unit && /^(k?g|gr|grammes?|mg|l|litres?|cl|ml|dl)$/i.test(g.unit) ? `${String(g.qty).replace('.', ',')} ${g.unit}` : null);
+    addIng(p, g.packages || 1, g.unit && /^(k?g|gr|grammes?|mg|l|litres?|cl|ml|dl)$/i.test(g.unit) ? `${String(g.qty).replace('.', ',')} ${g.unit}` : null, 'c');
   }
   closeSheet();
   await loadProducts();

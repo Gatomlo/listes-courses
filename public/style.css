@@ -205,10 +205,16 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
 .acc-c{font-size:22px;color:var(--muted);transition:transform .2s}
 .acc.open .acc-c{transform:rotate(90deg)}
 .acc-b{padding:0 14px 12px;border-top:1px solid var(--line)}
+.vgrp{border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0}
+.vopt{margin:10px 0 4px 6px;padding-left:10px;border-left:3px solid var(--line)}
 
 /* ---------- Panneau et message ---------- */
 .sheet-bg{position:fixed;inset:0;z-index:10;background:#0006;display:flex;align-items:flex-end}
-.sheet{background:var(--surface);width:100%;border-radius:22px 22px 0 0;padding:16px 16px calc(22px + env(safe-area-inset-bottom));max-height:88vh;overflow-y:auto}
+.sheet{background:var(--surface);width:100%;overflow-x:hidden;border-radius:22px 22px 0 0;padding:16px 16px calc(22px + env(safe-area-inset-bottom));max-height:88vh;overflow-y:auto}
+.sheet .txt{min-width:0}
+.mv{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,110px) auto;gap:8px;align-items:center;margin-top:8px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.acts .btn{text-align:center}
 .sheet h3{font:800 19px var(--display);margin:0 0 10px}
 .toast{position:fixed;left:16px;right:16px;bottom:84px;z-index:20;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px;font-size:14px}
 .toast.err{background:var(--danger);color:#fff}
