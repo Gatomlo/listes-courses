@@ -5,6 +5,7 @@ import { get, post, patch, del, attempt, sync, newOp, setCached } from './api.js
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
 import { unitOptions, catOptions, contField } from './catalogue.js';
 import { SLOT } from './plats.js';
+import { wishRow } from './menu.js';
 
 const STATUS = { prep: 'En préparation', shopping: 'En courses', closed: 'Clôturée' };
 const longDate = (d) => fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -490,7 +491,7 @@ on('click', 'list-copy', async () => {
 export async function loadSuggestions() { S.suggestions = await get(hp('/suggestions')).catch(() => S.suggestions || []); }
 export function suggestionsHtml() {
   const mgr = isManager();
-  return (S.suggestions || []).map((s) => (s.kind === 'meal' ? `<div class="item"><div class="grow"><div class="nm">🍽 ${esc(s.dish)}</div><div class="muted">${esc(s.suggested_by_name || '?')} → ${esc(fmtDate(s.date, { weekday: 'short', day: 'numeric', month: 'short' }))} · ${SLOT[s.slot]}</div></div>
+  return (S.suggestions || []).map((s) => (s.kind === 'wish' ? wishRow(s) : s.kind === 'meal' ? `<div class="item"><div class="grow"><div class="nm">🍽 ${esc(s.dish)}</div><div class="muted">${esc(s.suggested_by_name || '?')} → ${esc(fmtDate(s.date, { weekday: 'short', day: 'numeric', month: 'short' }))} · ${SLOT[s.slot]}</div></div>
     ${mgr ? `<button class="btn sm" data-a="msugg-ok" data-id="${s.id}">Accepter</button><button class="btn sm sec2" data-a="msugg-no" data-id="${s.id}">✕</button>` : '<span class="pill p-carrot">en attente</span>'}</div>` : `<div class="item"><div class="grow"><div class="nm">${qtyText(s.qty)} × ${esc(s.name)}</div>
     <div class="muted">${esc(s.suggested_by_name || '?')} → ${s.list_type === 'backlog' ? 'À prévoir' : 'liste du ' + esc(fmtDate(s.list_date))}</div></div>
     ${mgr ? `<button class="btn sm" data-a="fsugg-ok" data-id="${s.id}">Accepter</button><button class="btn sm sec2" data-a="fsugg-no" data-id="${s.id}">✕</button>` : '<span class="pill p-carrot">en attente</span>'}</div>`)).join('')

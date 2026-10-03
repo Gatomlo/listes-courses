@@ -4,6 +4,7 @@ import { esc, fmtDate, on, sheet, closeSheet, confirmSheet, toast, isPc } from '
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
 import { SLOT, tagChips, loadDishes, recipeSheet, newDishFrom, chosenOf, dishIngredients } from './plats.js';
+import { loadSuggestions } from './listes.js';
 
 const SLOTS = ['pdj', 'midi', 'soir', 'coll'];
 const today = () => new Date().toISOString().slice(0, 10);
@@ -24,12 +25,14 @@ function slotsShown() {
 
 let menu = null; // { from, to, period: { id, start, end, saved }, meals, lists }
 export async function loadMenu() {
-  menu = await get(hp(`/menu?at=${S.menuAt || today()}`));
+  [menu, S.wishes] = await Promise.all([get(hp(`/menu?at=${S.menuAt || today()}`)), get(hp('/wishes')).catch(() => S.wishes || [])]);
   if (!S.dishes) await loadDishes();
-  // Retour apres creation d'un plat depuis le menu : on reprend l'ajout du repas.
+  // Retour apres creation d'un plat depuis le menu : on reprend l'ajout du repas,
+  // ou on valide l'envie dont on vient de creer la fiche.
   const r = S.dishReturn;
   S.dishReturn = null;
-  if (r && r.dish_id) { pm = { date: r.date, slot: r.slot, dish_id: r.dish_id, persons: 4, skip: [] }; setTimeout(stockSheet); }
+  if (r && r.dish_id && r.wish) { const w = await attempt(() => post(hp(`/wishes/${r.wish}/accept`), { dish_id: r.dish_id })); if (w) { S.wishes = w; toast('Envie validée'); loadHouse().catch(() => {}); } }
+  else if (r && r.dish_id) { pm = { date: r.date, slot: r.slot, dish_id: r.dish_id, persons: 4, skip: [] }; setTimeout(stockSheet); }
 }
 const mealAt = (d, s) => menu.meals.find((m) => m.date === d && m.slot === s && !m.suggestion) || menu.meals.find((m) => m.date === d && m.slot === s);
 const shopDay = (d) => menu.lists.some((l) => l.date === d);
@@ -67,10 +70,55 @@ export function menuView() {
       <button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.to, 1)}" aria-label="Menu suivant">›</button></div>
       <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}</div>
       ${body}
+      ${wishesHtml()}
       ${mgr ? `<div class="sec">Remarques</div><textarea class="txt" rows="3" maxlength="2000" placeholder="Remarques sur ce menu (imprimées avec l’export)" data-ch="menu-note">${esc(menu.note || '')}</textarea>`
         : menu.note ? `<div class="sec">Remarques</div><div class="card pre">${esc(menu.note)}</div>` : ''}`,
   };
 }
+// ---------- Envies de plats (sans date) ----------
+export function wishRow(w) {
+  const mgr = isManager(), mine = w.created_by === S.me.id;
+  const acts = [];
+  if (mgr && w.status === 'pending' && w.dish_id) acts.push(`<button class="btn sm" data-a="wish-ok" data-id="${w.id}">Valider</button>`);
+  if (mgr && !w.dish_id) acts.push(`<button class="btn sm" data-a="wish-dish" data-id="${w.id}" data-name="${esc(w.name)}">Créer la fiche</button>`);
+  if (!mgr && w.status === 'pending') acts.push('<span class="pill p-carrot">en attente</span>');
+  if (mgr || (mine && w.status === 'pending')) acts.push(`<button class="btn sm sec2" data-a="wish-del" data-id="${w.id}" aria-label="Retirer">✕</button>`);
+  return `<div class="item"><div class="grow"><div class="nm">💡 ${esc(w.name)}${w.dish_id ? '' : ' <span class="muted small">(nouveau plat)</span>'}</div>
+    <div class="muted small">${esc(w.created_by_name || '?')}${mgr && w.status === 'pending' ? ' · à valider' : ''}</div></div>${acts.join('')}</div>`;
+}
+function wishesHtml() {
+  const ws = S.wishes || [];
+  return `<div class="sec">💡 Envies de plats</div><div class="card">
+    ${ws.map(wishRow).join('') || '<p class="muted small">Aucune envie pour l’instant. Proposez des plats pour les prochains menus.</p>'}
+    <button class="btn sec2 sm" data-a="wish-add">＋ Proposer un plat</button></div>`;
+}
+let wq = '';
+function wishSheet() {
+  const q = norm(wq.trim()), taken = new Set((S.wishes || []).map((w) => w.dish_id));
+  const list = S.dishes.filter((d) => !taken.has(d.id) && (!q || norm(d.name).includes(q))).slice(0, 30);
+  const exact = S.dishes.some((d) => norm(d.name) === q);
+  sheet(`<h3>💡 Proposer un plat</h3>
+    <input class="txt" id="wish-q" placeholder="🔍 Plat existant ou nom d’un nouveau plat…" value="${esc(wq)}" data-in="wish-q">
+    ${wq.trim() && !exact ? `<button class="btn full" data-a="wish-name">＋ Proposer « ${esc(wq.trim())} » (nouveau plat)</button>` : ''}
+    <div class="pick">${list.map((d) => `<button class="card click" data-a="wish-pick" data-id="${d.id}"><b>${esc(d.name)}</b>${d.last_date ? `<span class="muted block">dernière fois le ${esc(fmtDate(d.last_date))}</span>` : ''}</button>`).join('') || '<p class="muted">Aucun plat existant ne correspond.</p>'}</div>`);
+}
+const afterWish = async (w, msg) => {
+  if (!w) return;
+  S.wishes = w;
+  toast(msg);
+  await loadHouse();
+  if ((location.hash || '').startsWith('#/listes')) await loadSuggestions();
+  render();
+};
+const addWish = async (body) => { closeSheet(); afterWish(await attempt(() => post(hp('/wishes'), body)), isManager() ? 'Envie ajoutée' : 'Envie proposée'); };
+on('click', 'wish-add', async () => { wq = ''; if (!S.dishes) await loadDishes(); wishSheet(); });
+on('input', 'wish-q', (el) => { wq = el.value; wishSheet(); const i = document.getElementById('wish-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
+on('click', 'wish-pick', (el) => addWish({ dish_id: Number(el.dataset.id) }));
+on('click', 'wish-name', () => addWish({ name: wq.trim() }));
+on('click', 'wish-ok', async (el) => afterWish(await attempt(() => post(hp(`/wishes/${el.dataset.id}/accept`))), 'Envie validée'));
+on('click', 'wish-del', async (el) => afterWish(await attempt(() => del(hp(`/wishes/${el.dataset.id}`))), 'Envie retirée'));
+on('click', 'wish-dish', (el) => newDishFrom(el.dataset.name, { wish: Number(el.dataset.id) }));
+
 on('change', 'menu-note', async (el) => {
   const r = await attempt(() => put(hp('/menu-note'), { start: menu.from, note: el.value }));
   if (r) { menu.note = r.note; toast('Remarques enregistrées'); }
@@ -225,11 +273,13 @@ on('click', 'menu-slots-ok', () => {
 let pm = null; // repas en preparation : { id?, date, slot, dish_id, persons, skip: [], options: [] }
 function pickSheet() {
   const q = norm(pm.q || '');
-  const list = S.dishes.filter((d) => (!q || norm(d.name).includes(q) || d.tags.some((t) => norm(t).includes(q))) && (!pm.tag || d.tags.includes(pm.tag)));
+  const wished = new Set((S.wishes || []).filter((w) => w.status === 'ok' && w.dish_id).map((w) => w.dish_id));
+  const list = S.dishes.filter((d) => (!q || norm(d.name).includes(q) || d.tags.some((t) => norm(t).includes(q))) && (!pm.tag || d.tags.includes(pm.tag)))
+    .sort((a, b) => wished.has(b.id) - wished.has(a.id));
   sheet(`<h3>${esc(fmtDate(pm.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[pm.slot]}</h3>
     <input class="txt" id="pick-q" placeholder="🔍 Rechercher un plat…" value="${esc(pm.q || '')}" data-in="pick-q">
     ${tagChips('pick-tag', pm.tag)}
-    <div class="pick">${list.map((d) => `<button class="card click" data-a="pick-dish" data-id="${d.id}"><b>${esc(d.name)}</b><span class="muted block">${d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}` : 'rappel seulement'}${d.last_date ? ` · dernière fois le ${esc(fmtDate(d.last_date))}` : ''}</span></button>`).join('') || '<p class="muted">Aucun plat.</p>'}</div>
+    <div class="pick">${list.map((d) => `<button class="card click" data-a="pick-dish" data-id="${d.id}"><b>${wished.has(d.id) ? '💡 ' : ''}${esc(d.name)}</b><span class="muted block">${d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}` : 'rappel seulement'}${d.last_date ? ` · dernière fois le ${esc(fmtDate(d.last_date))}` : ''}</span></button>`).join('') || '<p class="muted">Aucun plat.</p>'}</div>
     ${isManager() ? `<button class="btn sec2 full" data-a="pick-new">＋ Nouveau plat${pm.q ? ` « ${esc(pm.q)} »` : ''}</button>` : ''}`);
 }
 on('click', 'meal-add', (el) => { pm = { date: el.dataset.date, slot: el.dataset.slot, persons: 4, skip: [], q: '' }; pickSheet(); });
