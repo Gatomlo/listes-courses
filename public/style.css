@@ -207,15 +207,18 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
 @media print{
   @page{size:A4 landscape;margin:10mm}
   body>*:not(#print-area){display:none!important}
+  html,body{background:#fff!important}
   #print-area{display:block}
-  #print-area .pm{padding:0}
+  #print-area .pm{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print-area .pm th,#print-area .pm td,#print-area .pm-note{border-color:#8f9a88}
+  #print-area .pm th.off,#print-area .pm td.off{border:none}
   #print-area .pm h1{font-size:26px}
-  #print-area .pm th,#print-area .pm td{font-size:14px;padding:8px;height:64px}
+  #print-area .pm th,#print-area .pm td{font-size:14px;padding:6px 8px;height:52px}
   #print-area .pm th{height:auto}
   #print-area .pm col.c-sl{width:9mm}
   #print-area .pm .sl{padding:4px 0}
   #print-area .pm table{break-inside:avoid}
-  #print-area .pm-note{min-height:40mm;font-size:14px;break-inside:avoid}
+  #print-area .pm-note{min-height:30mm;font-size:14px;break-inside:avoid}
 }
 
 /* ---------- Accordeons ---------- */
