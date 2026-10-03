@@ -68,3 +68,14 @@ test('deplacer un repas : vers un creneau libre, echange avec un creneau occupe'
   assert.deepEqual(await meals(), { [m1]: '2030-05-07 midi', [m2]: '2030-05-08 soir' });
   assert.equal((await lea.patch(`${h}/meals/${m1}`, { date: '2030-05-06' })).status, 403);
 });
+
+test('remarques du menu : par premier jour, gestionnaire, vide = supprimee', async () => {
+  const note = async () => (await thomas.get(`${h}/menu?from=2030-06-03&days=7`)).data.note;
+  assert.equal(await note(), '');
+  assert.equal((await lea.put(`${h}/menu-note`, { start: '2030-06-03', note: 'x' })).status, 403);
+  assert.equal((await thomas.put(`${h}/menu-note`, { start: '2030-06-03', note: ' Anniv mamie samedi ' })).data.note, 'Anniv mamie samedi');
+  assert.equal(await note(), 'Anniv mamie samedi');
+  assert.equal((await thomas.get(`${h}/menu?from=2030-06-04&days=7`)).data.note, '');
+  await thomas.put(`${h}/menu-note`, { start: '2030-06-03', note: '' });
+  assert.equal(await note(), '');
+});

@@ -1,7 +1,7 @@
 // Menu : planning des repas (jours x creneaux ; grille semaine sur PC), ajout d'un plat
 // avec ingredients en reserve, fiche repas, export / impression, lien d'affichage.
 import { esc, fmtDate, on, sheet, closeSheet, confirmSheet, toast, isPc } from './ui.js';
-import { get, post, patch, del, attempt } from './api.js';
+import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
 import { SLOT, tagChips, loadDishes, recipeSheet, newDishFrom, chosenOf, dishIngredients } from './plats.js';
 
@@ -360,7 +360,7 @@ on('click', 'meal-change', (el) => {
 });
 
 // ---------- Export / impression ----------
-const ex = { range: 'menu', slots: { midi: true, soir: true }, persons: false, shop: true };
+const ex = { range: 'menu', slots: { midi: true, soir: true }, persons: false, shop: true, notes: true };
 let exData = null;
 export async function loadExport() {
   if (!menu) await loadMenu();
@@ -371,16 +371,20 @@ export async function loadExport() {
   }
   exData = await get(hp(`/menu?from=${start}&days=${days}`));
 }
+const noteBox = (note) => `<div class="pm-note"><b>Remarques</b>${note ? `<div class="txt-n">${esc(note)}</div>` : ''}</div>`;
 function sheetHtml(d, household) {
   const days = []; for (let x = d.from; x <= d.to; x = addDays(x, 1)) days.push(x);
   const slots = SLOTS.filter((s) => ex.slots[s]);
   const shop = new Set((d.lists || []).map((l) => l.date).concat(d.shoppingDays || []));
   const meals = d.meals.filter((m) => !m.suggestion);
   const weeks = []; for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+  // Toujours 7 colonnes de meme largeur : la derniere semaine incomplete est completee de cases vides.
+  const pad = (w, tag) => `<${tag} class="off"></${tag}>`.repeat(7 - w.length);
   return `<div class="pm"><h1>Menu du ${esc(fmtDate(d.from, { day: 'numeric', month: 'long' }))} au ${esc(fmtDate(d.to, { day: 'numeric', month: 'long' }))}</h1>
     <div class="meta">${esc(household)}${ex.shop ? ' · 🛒 = jour de courses' : ''}</div>
-    ${weeks.map((w) => `<table><tr><th></th>${w.map((x) => `<th>${esc(fmtDate(x, { weekday: 'short', day: 'numeric', month: 'short' }))}${ex.shop && shop.has(x) ? ' 🛒' : ''}</th>`).join('')}</tr>
-      ${slots.map((s) => `<tr><td class="sl">${SLOT[s]}</td>${w.map((x) => { const m = meals.find((y) => y.date === x && y.slot === s); return `<td>${m ? esc(m.dish) + (ex.persons ? ` <span class="np">(${m.persons} p.)</span>` : '') : ''}</td>`; }).join('')}</tr>`).join('')}</table>`).join('')}
+    ${weeks.map((w) => `<table><colgroup><col class="c-sl">${'<col>'.repeat(7)}</colgroup><tr><th class="sl"></th>${w.map((x) => `<th>${esc(fmtDate(x, { weekday: 'short', day: 'numeric', month: 'short' }))}${ex.shop && shop.has(x) ? ' 🛒' : ''}</th>`).join('')}${pad(w, 'th')}</tr>
+      ${slots.map((s) => `<tr><td class="sl"><span>${SLOT[s]}</span></td>${w.map((x) => { const m = meals.find((y) => y.date === x && y.slot === s); return `<td>${m ? esc(m.dish) + (ex.persons ? ` <span class="np">(${m.persons} p.)</span>` : '') : ''}</td>`; }).join('')}${pad(w, 'td')}</tr>`).join('')}</table>`).join('')}
+    ${ex.notes ? noteBox(d.note) : ''}
     <div class="foot"><span>Le Cabas</span><span>Imprimé le ${new Date().toLocaleDateString('fr-BE')}</span></div></div>`;
 }
 export function exportView() {
@@ -390,7 +394,8 @@ export function exportView() {
     title: 'Exporter le menu', back: '#/menu', sub: 'A4 paysage',
     body: `<div class="sec">Période</div><div class="opt">${[['menu', 'Menu affiché'], ['week', '7 jours'], ['list', 'Période de la prochaine liste']].map(([k, t]) => `<button class="${ex.range === k ? 'on' : ''}" data-a="ex-range" data-k="${k}">${t}</button>`).join('')}</div>
       <div class="sec">Créneaux</div><div class="opt">${SLOTS.map((s) => `<button class="${ex.slots[s] ? 'on' : ''}" data-a="ex-slot" data-s="${s}">${SLOT[s]}</button>`).join('')}</div>
-      <div class="sec">Options</div><div class="opt"><button class="${ex.persons ? 'on' : ''}" data-a="ex-opt" data-k="persons">Nb de personnes</button><button class="${ex.shop ? 'on' : ''}" data-a="ex-opt" data-k="shop">Jours de courses 🛒</button></div>
+      <div class="sec">Options</div><div class="opt"><button class="${ex.persons ? 'on' : ''}" data-a="ex-opt" data-k="persons">Nb de personnes</button><button class="${ex.shop ? 'on' : ''}" data-a="ex-opt" data-k="shop">Jours de courses 🛒</button><button class="${ex.notes ? 'on' : ''}" data-a="ex-opt" data-k="notes">Remarques</button></div>
+      ${ex.notes ? `<div class="sec">Remarques</div>${mgr ? `<textarea class="txt" rows="3" maxlength="2000" placeholder="Laisser vide pour imprimer un cadre à compléter à la main" data-in="ex-note" data-ch="ex-note-save">${esc(exData.note || '')}</textarea>` : `<p class="muted small">${exData.note ? esc(exData.note) : 'Aucune remarque : un cadre vide sera imprimé.'}</p>`}` : ''}
       <div class="sec">Aperçu</div><div id="print-src">${sheetHtml(exData, S.house.household.name)}</div>
       <div class="row end"><button class="btn" data-a="ex-print">🖨 Imprimer</button><button class="btn" data-a="ex-print" data-pdf="1">⬇ PDF</button></div>
       <div class="sec">Lien d'affichage</div><div class="card"><p class="muted small">Page en lecture seule, sans connexion, qui se met à jour toute seule (tablette de cuisine). Révocable.</p>
@@ -401,6 +406,12 @@ export function exportView() {
 on('click', 'ex-range', async (el) => { ex.range = el.dataset.k; await loadExport(); render(); });
 on('click', 'ex-slot', (el) => { ex.slots[el.dataset.s] = !ex.slots[el.dataset.s]; render(); });
 on('click', 'ex-opt', (el) => { ex[el.dataset.k] = !ex[el.dataset.k]; render(); });
+// Apercu mis a jour a la frappe (sans re-rendu, pour garder le curseur) ; enregistre en quittant le champ.
+on('input', 'ex-note', (el) => { const b = document.querySelector('#print-src .pm-note'); if (b) b.outerHTML = noteBox(el.value.trim()); });
+on('change', 'ex-note-save', async (el) => {
+  const r = await attempt(() => put(hp('/menu-note'), { start: exData.from, note: el.value }));
+  if (r) { exData.note = r.note; toast('Remarques enregistrées'); }
+});
 on('click', 'ex-print', (el) => {
   let area = document.getElementById('print-area');
   if (!area) { area = document.createElement('div'); area.id = 'print-area'; document.body.appendChild(area); }
@@ -425,7 +436,7 @@ export async function loadPublic(token) {
 export function publicView() {
   if (!pub || pub.error) return { noNav: true, title: 'Menu', body: `<div class="card error">${esc(pub ? pub.error : 'Chargement…')}</div>` };
   const saved = { ...ex };
-  Object.assign(ex, { slots: Object.fromEntries(SLOTS.map((s) => [s, slotsShown().includes(s)])), persons: true, shop: true });
+  Object.assign(ex, { slots: Object.fromEntries(SLOTS.map((s) => [s, slotsShown().includes(s)])), persons: true, shop: true, notes: !!pub.note });
   const html = sheetHtml(pub, pub.household);
   Object.assign(ex, saved);
   return { noNav: true, wide: true, title: `Menu · ${pub.household}`, sub: 'Affichage en lecture seule · mis à jour toutes les 5 minutes', body: html };
