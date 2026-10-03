@@ -263,3 +263,4 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
   .sheet{width:520px;border-radius:18px;max-height:80vh}
   .toast{left:auto;right:24px;bottom:24px;width:380px}
 }
+.pre{white-space:pre-wrap}

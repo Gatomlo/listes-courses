@@ -66,9 +66,15 @@ export function menuView() {
       <div class="grow c"><b>${range}</b><span class="muted small block">${days.length} jours · ${p.saved ? 'menu enregistré' : 'période proposée'}</span></div>
       <button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.to, 1)}" aria-label="Menu suivant">›</button></div>
       <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}</div>
-      ${body}`,
+      ${body}
+      ${mgr ? `<div class="sec">Remarques</div><textarea class="txt" rows="3" maxlength="2000" placeholder="Remarques sur ce menu (imprimées avec l’export)" data-ch="menu-note">${esc(menu.note || '')}</textarea>`
+        : menu.note ? `<div class="sec">Remarques</div><div class="card pre">${esc(menu.note)}</div>` : ''}`,
   };
 }
+on('change', 'menu-note', async (el) => {
+  const r = await attempt(() => put(hp('/menu-note'), { start: menu.from, note: el.value }));
+  if (r) { menu.note = r.note; toast('Remarques enregistrées'); }
+});
 on('click', 'menu-nav', async (el) => { S.menuAt = el.dataset.d || null; await loadMenu(); render(); });
 
 // Dates du menu (gestionnaire) : fixer une periode proposee, modifier ou supprimer un menu.
