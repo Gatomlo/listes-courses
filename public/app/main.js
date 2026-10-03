@@ -43,8 +43,9 @@ const ROUTES = {
 function shell(v) {
   const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes', magasin: 'listes', scan: 'listes', plat: 'plats', menuexport: 'menu' }[S.route[0]] || S.route[0];
   const badge = S.house && S.house.role === 'manager' && S.house.pending ? `<span class="badge">${S.house.pending}</span>` : '';
+  const wbadge = S.house && S.house.role === 'manager' && S.house.wishesPending ? `<span class="badge">${S.house.wishesPending}</span>` : '';
   const nav = v.noNav ? '' : `<nav class="tabs">${isPc() ? `<div class="brand">🧺 Le Cabas<small>${esc(S.house ? S.house.household.name : '')}</small></div>` : ''}
-    ${NAV.map(([k, t, svg]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg><span>${t}</span>${k === 'listes' ? badge : ''}</a>`).join('')}</nav>`;
+    ${NAV.map(([k, t, svg]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg><span>${t}</span>${k === 'listes' ? badge : k === 'menu' ? wbadge : ''}</a>`).join('')}</nav>`;
   app.className = 'shell' + (v.noNav ? ' nonav' : '') + (v.wide ? ' wide' : '');
   const pending = S.me ? outbox().length : 0;
   const hhmm = (t) => new Date(t).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });

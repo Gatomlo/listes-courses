@@ -41,17 +41,17 @@ export function platsView() {
   const n = norm(q).trim();
   const list = S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)))
     && (!tg || d.tags.includes(tg))
-    && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients) || (f === 'planned' && d.next_date)));
+    && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients) || (f === 'planned' && d.next_date) || (f === 'draft' && d.draft)));
   const card = (d) => {
     const hits = n && !norm(d.name).includes(n) ? d.ingredient_names.filter((x) => norm(x).includes(n)) : [];
-    return `<a class="card click" href="#/plats/${d.id}"><h4>${esc(d.name)}${d.has_recipe ? ' <span class="pill p-plum">📖</span>' : ''}</h4>
+    return `<a class="card click" href="#/plats/${d.id}"><h4>${d.draft ? '✏️ ' : ''}${esc(d.name)}${d.has_recipe ? ' <span class="pill p-plum">📖</span>' : ''}</h4>
       <div class="muted">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}${d.time_text ? ' · ⏱ ' + esc(d.time_text) : ''}` : 'Ingrédients connus par cœur'}</div>
       <div class="pills">${d.tags.map((t) => `<span class="pill p-grey">#${esc(t)}</span>`).join('')}${d.next_date ? `<span class="pill p-leaf">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span>` : ''}<span class="pill p-grey">${d.last_date ? `dernière fois il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</span></div></a>`;
   };
   return {
     title: 'Plats', sub: `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`,
     body: `<input class="txt" id="dish-q" placeholder="🔍 Rechercher un plat ou un ingrédient…" value="${esc(q)}" data-in="dish-q">
-      <div class="opt">${[['all', 'Tous'], ['recipe', '📖 Avec recette'], ['memo', 'Sans détail'], ['planned', 'Au menu']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
+      <div class="opt">${[['all', 'Tous'], ['recipe', '📖 Avec recette'], ['memo', 'Sans détail'], ['planned', 'Au menu'], ['draft', '✏️ Suggestions']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
       ${tagChips('dish-tag', tg)}
       <div class="cards3">${list.map(card).join('')}</div>
       ${list.length ? '' : `<p class="muted">Aucun plat trouvé.</p>${isManager() && q ? `<button class="btn" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}`}
@@ -82,7 +82,8 @@ export async function loadDish(id) {
 export const currentDish = () => ed;
 
 export function dishView() {
-  const ro = !isManager(), dis = ro ? 'disabled' : '';
+  // Brouillon : modifiable par le membre qui l'a propose tant qu'il n'est pas valide.
+  const mgr = isManager(), ro = !mgr && !(ed.draft && ed.draft_by === S.me.id), dis = ro ? 'disabled' : '';
   const nIng = ed.ingredients.length;
   const ingRows = (t, empty) => ingsOf(t).map((i, k) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>
     ${i.is_base ? '<span class="pill p-grey">de base</span>' : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" ${dis} data-ch="ing-qty" data-t="${t}" data-k="${k}"><select class="txt sm w6" ${dis} data-ch="ing-unit" data-t="${t}" data-k="${k}" aria-label="Unité">${[['', i.unit], ...IUNITS].map(([v, l]) => `<option value="${v}" ${(i.iunit || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
@@ -103,12 +104,12 @@ export function dishView() {
     sum: `${ed.upcoming.length ? ` · prévu ${esc(fmtDate(ed.upcoming[0].date, { weekday: 'short', day: 'numeric', month: 'short' }))}` : ' · rien de prévu'}${ed.times ? ` · ${ed.times} fois` : ''}`,
     body: `<div class="muted small" style="margin-top:8px">À venir</div>
       ${ed.upcoming.map((m) => mealRow(m)).join('') || '<p class="muted">Pas encore prévu au menu.</p>'}
-      <button class="btn sec2 sm" style="margin:6px 0" data-a="plan-dish" data-id="${ed.id}">📅 ${ro ? 'Suggérer au menu' : 'Ajouter au menu'}</button>
+      <button class="btn sec2 sm" style="margin:6px 0" data-a="plan-dish" data-id="${ed.id}">📅 ${mgr ? 'Ajouter au menu' : 'Suggérer au menu'}</button>
       <div class="muted small" style="margin-top:8px">Historique${ed.times > 5 ? ' · 5 dernières fois' : ''}</div>
       ${ed.times ? `<div class="pills"><span class="pill p-leaf">${ed.times} fois planifié</span><span class="pill p-grey">dernière il y a ${daysAgo(ed.past[0].date)} j</span>${ed.times > 1 ? `<span class="pill p-grey">en moyenne tous les ${Math.round(daysAgo(ed.first_date) / (ed.times - 1))} j</span>` : ''}</div>${ed.past.map((m) => mealRow(m)).join('')}` : '<p class="muted">Jamais planifié pour l’instant.</p>'}`,
   }) : '';
   return {
-    title: ed.id ? ed.name : 'Nouveau plat', sub: ro ? 'Lecture seule (membre)' : ed.id ? 'Plat du foyer' : '', back: !ed.id && S.dishReturn ? '#/menu' : '#/plats',
+    title: ed.id ? ed.name : 'Nouveau plat', sub: ed.draft ? '✏️ Proposition à valider par un gestionnaire' : ro ? 'Lecture seule (membre)' : ed.id ? 'Plat du foyer' : '', back: !ed.id && S.dishReturn ? '#/menu' : '#/plats',
     body: `${acc('d_info', { icon: '📝', title: 'Informations', def: true, sum: ` · ${ed.portions} pers.${ed.time_text ? ' · ⏱ ' + esc(ed.time_text) : ''}`,
         body: `<div class="form"><label class="muted">Nom</label><input class="txt" value="${esc(ed.name)}" ${dis} data-ch="ed" data-f="name">
           <div class="row gap"><label class="grow"><span class="muted">Portions de référence</span><input class="txt" type="number" min="1" value="${ed.portions}" ${dis} data-ch="ed" data-f="portions"></label>
@@ -122,13 +123,13 @@ export function dishView() {
           <p class="muted small">Quantités facultatives, ajustées au nombre de personnes du repas : en emballages, ou en g, ml, pièces (convertis en emballages grâce à la contenance du produit).</p>`}` })}
       ${variants}
       ${acc('d_rec', { icon: '📖', title: 'Recette', sum: ed.url || ed.steps || ed.notes ? ' · renseignée' : ' · facultative, vide',
-        body: `<div class="form"><label class="muted">Lien vers une recette en ligne</label><div class="row gap"><input class="txt grow" value="${esc(ed.url)}" placeholder="https://…" ${dis} data-ch="ed" data-f="url">${ro ? '' : '<button class="btn sm" data-a="rec-import">⤓ Importer</button>'}</div>
-          ${ro ? '' : '<p class="muted small">Importer lit nom, portions, temps, ingrédients et étapes quand le site les publie.</p>'}
+        body: `<div class="form"><label class="muted">Lien vers une recette en ligne</label><div class="row gap"><input class="txt grow" value="${esc(ed.url)}" placeholder="https://…" ${dis} data-ch="ed" data-f="url">${mgr ? '<button class="btn sm" data-a="rec-import">⤓ Importer</button>' : ''}</div>
+          ${!mgr ? '' : '<p class="muted small">Importer lit nom, portions, temps, ingrédients et étapes quand le site les publie.</p>'}
           <label class="muted">Étapes (une par ligne)</label><textarea class="txt" rows="6" ${dis} data-ch="ed" data-f="steps">${esc(ed.steps)}</textarea>
           <label class="muted">Notes</label><textarea class="txt" rows="2" ${dis} data-ch="ed" data-f="notes">${esc(ed.notes)}</textarea>
           ${ed.id ? `<button class="btn sec2 sm" style="margin-top:8px" data-a="recipe-view" data-id="${ed.id}">📖 ${ro ? 'Voir' : 'Aperçu de'} la recette</button>` : ''}</div>` })}
       ${plan}
-      ${ro ? '' : `<div class="row end">${ed.id ? '<button class="btn sec2 danger-t" data-a="dish-del">Supprimer</button>' : ''}<button class="btn" data-a="dish-save">Enregistrer</button></div>`}`,
+      ${ro ? '' : `<div class="row end">${ed.id && mgr ? '<button class="btn sec2 danger-t" data-a="dish-del">Supprimer</button>' : ''}<button class="btn" data-a="dish-save">${ed.draft && mgr ? '✓ Valider la fiche' : 'Enregistrer'}</button></div>`}`,
   };
 }
 const mealRow = (m) => `<div class="item click" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted w8">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span><span class="grow">${SLOT[m.slot]} · ${m.persons} pers.</span><span class="muted">›</span></div>`;
@@ -211,11 +212,12 @@ on('click', 'dish-save', async () => {
     groups: ed.groups.map((g) => ({ name: g.name, options: g.options.map((o) => ({ id: o.id, name: o.name, ingredients: ings(o.ingredients) })) })) };
   const d = await attempt(() => (ed.id ? put(hp(`/dishes/${ed.id}`), body) : post(hp('/dishes'), body)));
   if (!d) return;
-  const isNew = !ed.id;
+  const isNew = !ed.id, wasDraft = ed.draft;
   ed = { ...d, steps: d.steps || '', notes: d.notes || '', url: d.url || '', time_text: d.time_text || '' };
   S.dishes = null;
   loadHouse().catch(() => {}); // tags du foyer (ecran Foyer)
-  toast(isNew ? 'Plat créé' : 'Plat enregistré · listes recalculées');
+  S.wishes = null;
+  toast(isNew ? 'Plat créé' : wasDraft && !d.draft ? 'Fiche validée' : 'Plat enregistré · listes recalculées');
   if (isNew && S.dishReturn) { S.dishReturn.dish_id = d.id; go('#/menu'); } else if (isNew) go(`#/plats/${d.id}`); else render();
 });
 on('click', 'dish-del', async () => {

@@ -65,6 +65,7 @@ a.card{text-decoration:none}
 .btn.full{width:100%}
 .btn:disabled{opacity:.5;cursor:default}
 .ic{border:0;background:var(--sunk);border-radius:7px;min-width:28px;height:28px;padding:0 6px}
+a.ic{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:inherit}
 .item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
 .item:last-child{border-bottom:0}
 .item.click{cursor:pointer}

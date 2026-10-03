@@ -1,4 +1,4 @@
-// Envies de plats sans date : propositions des membres, validation, creation de fiche.
+// Envies de plats sans date : propositions des membres, fiches brouillon, validation.
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { start, household } = require('./helpers');
@@ -7,42 +7,63 @@ let server, thomas, lea, h;
 before(async () => { server = await start(); ({ thomas, lea, h } = await household()); });
 after(() => server.close());
 
-test('envies : membre en attente, gestionnaire valide, fiche creee, retiree une fois au menu', async () => {
-  const bolo = (await thomas.post(`${h}/dishes`, { name: 'Bolo', portions: 4, ingredients: [] })).data.id;
-  const pending = async () => (await thomas.get(h)).data.pending;
-  const p0 = await pending();
+const dishByName = async (n) => (await thomas.get(`${h}/dishes`)).data.find((d) => d.name === n);
 
-  // Membre : plat existant et nom libre (un nom deja connu devient le plat).
+test('envies : membre en attente, brouillon modifiable par son auteur, valide par un gestionnaire', async () => {
+  const bolo = (await thomas.post(`${h}/dishes`, { name: 'Bolo', portions: 4, ingredients: [] })).data.id;
+  const count = async () => (await thomas.get(h)).data.wishesPending;
+
   let w = (await lea.post(`${h}/wishes`, { dish_id: bolo })).data;
-  assert.deepEqual(w.map((x) => [x.name, x.status]), [['Bolo', 'pending']]);
+  assert.deepEqual(w.map((x) => [x.name, x.status, x.draft]), [['Bolo', 'pending', 0]]);
   assert.equal((await lea.post(`${h}/wishes`, { name: ' bolo ' })).status, 409);
+
+  // Nom libre : fiche brouillon creee, visible dans les plats.
   w = (await lea.post(`${h}/wishes`, { name: 'Tartiflette' })).data;
   const tarti = w.find((x) => x.name === 'Tartiflette');
-  assert.equal(tarti.dish_id, null);
-  assert.equal(await pending(), p0 + 2);
-  assert.ok((await thomas.get(`${h}/suggestions`)).data.some((s) => s.kind === 'wish' && s.name === 'Tartiflette'));
+  assert.equal(tarti.draft, 1);
+  assert.equal((await dishByName('Tartiflette')).draft, 1);
+  assert.equal(await count(), 2);
+  assert.ok(!(await thomas.get(`${h}/suggestions`)).data.some((s) => s.kind === 'wish'));
 
-  // Validation : plat existant ; nom libre seulement avec une fiche.
+  // L'auteur complete son brouillon ; pas un autre plat ; enregistrement membre = toujours brouillon.
+  assert.equal((await lea.put(`${h}/dishes/${tarti.dish_id}`, { name: 'Tartiflette', portions: 6, ingredients: [], notes: 'Reblochon' })).status, 200);
+  assert.equal((await lea.put(`${h}/dishes/${bolo}`, { name: 'Bolo', portions: 4, ingredients: [] })).status, 403);
+  assert.equal((await dishByName('Tartiflette')).draft, 1);
+
+  // Gestionnaire : valider un plat existant ; enregistrer le brouillon = valider.
   assert.equal((await lea.post(`${h}/wishes/${w[0].id}/accept`)).status, 403);
   await thomas.post(`${h}/wishes/${w.find((x) => x.name === 'Bolo').id}/accept`);
-  assert.equal((await thomas.post(`${h}/wishes/${tarti.id}/accept`)).status, 409);
-  const td = (await thomas.post(`${h}/dishes`, { name: 'Tartiflette', portions: 4, ingredients: [] })).data.id;
-  w = (await thomas.post(`${h}/wishes/${tarti.id}/accept`, { dish_id: td })).data;
-  assert.deepEqual(w.map((x) => [x.name, x.status, !!x.dish_id]), [['Bolo', 'ok', true], ['Tartiflette', 'ok', true]]);
-  assert.equal(await pending(), p0);
+  await thomas.put(`${h}/dishes/${tarti.dish_id}`, { name: 'Tartiflette', portions: 6, ingredients: [] });
+  assert.equal((await dishByName('Tartiflette')).draft, 0);
+  w = (await thomas.get(`${h}/wishes`)).data;
+  assert.deepEqual(w.map((x) => [x.name, x.status]), [['Bolo', 'ok'], ['Tartiflette', 'ok']]);
+  assert.equal(await count(), 0);
+  assert.equal((await lea.put(`${h}/dishes/${tarti.dish_id}`, { name: 'Tartiflette', portions: 4, ingredients: [] })).status, 403);
+});
 
-  // Membre : ne retire que ses envies en attente ; gestionnaire : directement validee.
-  assert.equal((await lea.del(`${h}/wishes/${tarti.id}`)).status, 403);
-  const soupe = (await thomas.post(`${h}/dishes`, { name: 'Soupe', portions: 4, ingredients: [] })).data.id;
-  w = (await thomas.post(`${h}/wishes`, { dish_id: soupe })).data;
-  assert.equal(w.find((x) => x.name === 'Soupe').status, 'ok');
+test('envies : refus d un brouillon = fiche supprimee ; planifier = valider', async () => {
+  let w = (await lea.post(`${h}/wishes`, { name: 'Chili' })).data;
+  const chili = w.find((x) => x.name === 'Chili');
+  const mid = (await lea.post(`${h}/meals`, { date: '2030-03-10', slot: 'soir', dish_id: chili.dish_id })).data.id;
+  assert.ok(mid);
+  await thomas.del(`${h}/wishes/${chili.id}`);
+  assert.equal(await dishByName('Chili'), undefined);
+  assert.equal((await thomas.get(`${h}/menu?from=2030-03-10&days=1`)).data.meals.length, 0);
 
-  // Mis au menu par un gestionnaire : l'envie disparait ; suggestion d'un membre : a l'acceptation.
-  await thomas.post(`${h}/meals`, { date: '2030-03-04', slot: 'soir', dish_id: bolo });
-  const mid = (await lea.post(`${h}/meals`, { date: '2030-03-05', slot: 'soir', dish_id: td })).data.id;
-  assert.deepEqual((await thomas.get(`${h}/wishes`)).data.map((x) => x.name), ['Tartiflette', 'Soupe']);
-  await thomas.post(`${h}/meals/${mid}/accept`);
-  assert.deepEqual((await thomas.get(`${h}/wishes`)).data.map((x) => x.name), ['Soupe']);
-  await thomas.del(`${h}/dishes/${soupe}`);
-  assert.deepEqual((await thomas.get(`${h}/wishes`)).data, []);
+  w = (await lea.post(`${h}/wishes`, { name: 'Curry' })).data;
+  const curry = w.find((x) => x.name === 'Curry');
+  await thomas.post(`${h}/meals`, { date: '2030-03-11', slot: 'soir', dish_id: curry.dish_id });
+  assert.equal((await dishByName('Curry')).draft, 0);
+  assert.ok(!(await thomas.get(`${h}/wishes`)).data.some((x) => x.name === 'Curry'));
+
+  // Gestionnaire : nom libre = fiche normale, envie validee ; retiree a la suppression du plat.
+  w = (await thomas.post(`${h}/wishes`, { name: 'Soupe' })).data;
+  const soupe = w.find((x) => x.name === 'Soupe');
+  assert.deepEqual([soupe.status, soupe.draft], ['ok', 0]);
+  await thomas.del(`${h}/dishes/${soupe.dish_id}`);
+  assert.ok(!(await thomas.get(`${h}/wishes`)).data.some((x) => x.name === 'Soupe'));
+  // Membre : retire sa propre envie en attente (brouillon supprime).
+  w = (await lea.post(`${h}/wishes`, { name: 'Gaufres' })).data;
+  assert.equal((await lea.del(`${h}/wishes/${w.find((x) => x.name === 'Gaufres').id}`)).status, 200);
+  assert.equal(await dishByName('Gaufres'), undefined);
 });
