@@ -198,9 +198,9 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
 .pm .sl{background:#f3f5f0;font-weight:700;color:#66705f;padding:4px 0;text-align:center;vertical-align:middle}
 .pm td.sl span{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:.5px}
 .pm th.off,.pm td.off{border:none;background:none}
-.pm-note{border:1px solid #dde3d6;border-radius:6px;padding:6px 8px;margin-bottom:10px;min-height:90px;font-size:12px;background:repeating-linear-gradient(#fff 0 23px,#e6ebe0 23px 24px);background-position:0 26px}
+.pm-note{border:1px solid #dde3d6;border-radius:6px;padding:6px 8px;margin-bottom:10px;min-height:90px;font-size:12px;background:#fff}
 .pm-note b{display:block;color:#2f7d4f;margin-bottom:4px}
-.pm-note .txt-n{white-space:pre-wrap;line-height:24px}
+.pm-note .txt-n{white-space:pre-wrap;line-height:1.5}
 .pm .np{color:#66705f}
 .pm .foot{font-size:10px;color:#66705f;display:flex;justify-content:space-between}
 #print-area{display:none}
