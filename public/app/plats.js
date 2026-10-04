@@ -12,8 +12,10 @@ const daysAgo = (d) => Math.round((Date.parse(today()) - Date.parse(d)) / 864e5)
 export const SLOT = { pdj: 'P.-déj.', midi: 'Midi', soir: 'Soir', coll: 'Collation' };
 const num = (v) => { const n = Number(String(v ?? '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
 const fmtQ = (q) => String(Math.round(q * 10) / 10).replace('.', ',');
-// Unite d'un ingredient : NULL = emballages du produit, sinon g / ml / pieces.
-const IUNITS = [['g', 'g'], ['ml', 'ml'], ['pc', 'pièce']];
+// Unite d'un ingredient : NULL = emballages du produit, sinon comme lib/units.js (ING_UNITS) ;
+// BASEU = unite de calcul (g et ml equivalents).
+const IUNITS = [['g', 'g'], ['kg', 'kg'], ['ml', 'ml'], ['cl', 'cl'], ['l', 'L'], ['pc', 'pièce'], ['cc', 'CC'], ['cs', 'CS']];
+const BASEU = { g: 'g', kg: 'g', ml: 'ml', cl: 'ml', l: 'ml', pc: 'pc', cc: 'ml', cs: 'ml' };
 const iunitLabel = (i) => (i.iunit ? IUNITS.find(([k]) => k === i.iunit)[1] : i.unit);
 const amountText = (q, i) => (i.iunit === 'g' && q >= 1000 ? `${fmtQ(q / 1000)} kg` : i.iunit === 'ml' && q >= 1000 ? `${fmtQ(q / 1000)} L` : `${fmtQ(q)} ${iunitLabel(i)}${i.iunit === 'pc' && q > 1 ? 's' : ''}`);
 // Conversion possible en emballages (meme regle que lib/units.js, g et ml equivalents).
@@ -23,7 +25,8 @@ function convertible(i) {
   if (!p) return i.conv !== false;
   if (!p.size) return false;
   const mass = (u) => u === 'g' || u === 'ml';
-  return p.size.u === i.iunit || (mass(p.size.u) && mass(i.iunit)) || p.piece_qty > 0;
+  const u = BASEU[i.iunit];
+  return p.size.u === u || (mass(p.size.u) && mass(u)) || p.piece_qty > 0;
 }
 
 export async function loadDishes() { S.dishes = await get(hp('/dishes')); }

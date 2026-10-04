@@ -154,11 +154,11 @@ test('lien d\'affichage du menu : lecture seule sans connexion, revocable', asyn
 
 test('lecture des ingredients et des recettes', () => {
   const ka = (s) => ['qty', 'unit', 'name', 'amount', 'amount_unit'].map((k) => parseIngredient(s)[k]);
-  assert.deepEqual(ka('1,2 kg de pommes de terre'), [1.2, 'kg', 'pommes de terre', 1200, 'g']);
+  assert.deepEqual(ka('1,2 kg de pommes de terre'), [1.2, 'kg', 'pommes de terre', 1.2, 'kg']);
   assert.deepEqual(ka("2 gousses d'ail"), [2, 'gousses', 'ail', null, null]);
   assert.deepEqual(ka('3 oignons'), [3, null, 'oignons', 3, 'pc']);
   assert.deepEqual(ka('2 boîtes de pois chiches'), [2, 'boîtes', 'pois chiches', 2, null]);
-  assert.deepEqual(ka("2 c. à s. d'huile").slice(3), [30, 'ml']);
+  assert.deepEqual(ka("2 c. à s. d'huile").slice(3), [2, 'cs']);
   assert.equal(parseIngredient('Sel, poivre').base, true);
   assert.equal(parseIngredient('½ litre de lait').qty, 0.5);
   const html = `<html><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage"},{"@type":"Recipe","name":"Gratin dauphinois","recipeYield":"6 personnes","totalTime":"PT1H30M",
