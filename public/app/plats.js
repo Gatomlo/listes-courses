@@ -86,8 +86,8 @@ export function dishView() {
   const mgr = isManager(), ro = !mgr && !(ed.draft && ed.draft_by === S.me.id), dis = ro ? 'disabled' : '';
   const nIng = ed.ingredients.length;
   const ingRows = (t, empty) => ingsOf(t).map((i, k) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>
-    ${i.is_base ? '<span class="pill p-grey">de base</span>' : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" ${dis} data-ch="ing-qty" data-t="${t}" data-k="${k}"><select class="txt sm w6" ${dis} data-ch="ing-unit" data-t="${t}" data-k="${k}" aria-label="Unité">${[['', i.unit], ...IUNITS].map(([v, l]) => `<option value="${v}" ${(i.iunit || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
-    ${convertible(i) ? '' : `<a class="pill p-carrot" href="#/catalogue/${i.product_id}" title="Indiquer la contenance de l'emballage (ex. 500 g) ou le poids d'une pièce dans la fiche produit ; en attendant : 1 ${esc(i.unit)}">⚠ contenance ?</a>`}`}
+    ${i.is_base ? '<span class="pill p-grey">de base</span>' : ''}<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" ${dis} data-ch="ing-qty" data-t="${t}" data-k="${k}"><select class="txt sm w6" ${dis} data-ch="ing-unit" data-t="${t}" data-k="${k}" aria-label="Unité">${[['', i.unit], ...IUNITS].map(([v, l]) => `<option value="${v}" ${(i.iunit || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+    ${i.is_base || convertible(i) ? '' : `<a class="pill p-carrot" href="#/catalogue/${i.product_id}" title="Indiquer la contenance de l'emballage (ex. 500 g) ou le poids d'une pièce dans la fiche produit ; en attendant : 1 ${esc(i.unit)}">⚠ contenance ?</a>`}
     ${ro ? '' : `<button class="ic" data-a="ing-del" data-t="${t}" data-k="${k}" title="Retirer">✕</button>`}</div>`).join('') || empty;
   const ingAdd = (t, ph) => (ro ? '' : `<div class="addbox" style="margin:8px 0"><input class="txt" id="ing-q-${t}" autocomplete="off" placeholder="${ph}" data-in="ing-q" data-t="${t}" data-enter="ing-first"><div id="ing-ac-${t}"></div></div>`);
   const variants = acc('d_var', {
@@ -170,8 +170,8 @@ on('input', 'ing-q', (el) => {
   document.getElementById(`ing-ac-${ingT}`).innerHTML = q ? `<div class="ac">${ms.map((p) => `<button data-a="ing-add" data-id="${p.id}"><span class="grow">${esc(p.name)}</span><span class="muted">${esc(catName(p.category_id))}</span></button>`).join('')}
     ${S.products.some((p) => norm(p.name) === norm(q)) ? '' : `<button data-a="ing-new"><b>＋ Créer « ${esc(q)} » dans les produits</b></button>`}</div>` : '';
 });
-const addIng = (p, qty = 1, note = null, t = ingT, iunit = null) => {
-  ingsOf(t).push({ product_id: p.id, name: p.name, unit: p.unit, iunit: p.is_base ? null : iunit, is_base: !!p.is_base, qty: p.is_base ? null : qty, note });
+const addIng = (p, qty = p.is_base ? null : 1, note = null, t = ingT, iunit = null) => {
+  ingsOf(t).push({ product_id: p.id, name: p.name, unit: p.unit, iunit, is_base: !!p.is_base, qty, note });
 };
 on('click', 'ing-add', (el) => { addIng(S.products.find((p) => p.id === Number(el.dataset.id))); render(); ingInput()?.focus(); });
 on('click', 'ing-first', (el) => { ingT = el.dataset.t; const ms = ingMatches(el.value); if (ms.length) { addIng(ms[0]); render(); ingInput()?.focus(); } });
@@ -246,7 +246,7 @@ export async function recipeSheet(dishId, persons, options) {
   if (!d) return;
   const p = persons || d.portions, f = p / d.portions;
   const steps = String(d.steps || '').split('\n').map((s) => s.trim()).filter(Boolean);
-  const row = (i) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>${i.is_base || i.qty == null ? '<span class="pill p-grey">selon goût</span>' : `<b class="price">${esc(amountText(i.qty * f, i))}</b>`}</div>`;
+  const row = (i) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>${i.qty == null ? '<span class="pill p-grey">selon goût</span>' : `<b class="price">${esc(amountText(i.qty * f, i))}</b>`}</div>`;
   const groups = d.groups || [], keep = options ? new Set(chosenOf(d, options)) : null;
   const variant = keep ? groups.map((g) => g.options.find((o) => keep.has(o.id)).name).join(', ') : '';
   const ings = keep ? dishIngredients(d, options) : d.ingredients;
