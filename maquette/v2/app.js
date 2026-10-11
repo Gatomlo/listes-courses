@@ -46,6 +46,8 @@ const PATHS = {
 };
 const I = (n, c = '') => `<svg class="i ${c}" viewBox="0 0 24 24" aria-hidden="true"><path d="${PATHS[n]}"${n === 'more' || n === 'grip' ? ' stroke-width="3"' : ''}/></svg>`;
 const sp = (st, label) => `<span class="sp" style="--c:${STORES[st].c};--cs:${STORES[st].cs}">${label ?? STORES[st].n}</span>`;
+// Bouton a icone : telephone = icone seule (libelle en aria-label), PC = icone + libelle.
+const bI = (icon, label, attrs = '', cls = 'sec') => `<button class="btn ${cls} icon-m" aria-label="${label}" title="${label}" ${attrs}>${I(icon)}<span class="lbl">${label}</span></button>`;
 const dotS = (st) => `<span class="dot" style="--c:${STORES[st].c}"></span>`;
 const avatar = (m, s = '') => `<span class="avatar ${s}" style="--c:${m.c}">${m.n[0]}</span>`;
 const member = (n) => MEMBERS.find((m) => m.n === n) || MEMBERS[0];

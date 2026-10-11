@@ -5,7 +5,7 @@ import { get, post, put, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder } from './state.js';
 import { matchLines } from './ticket.mjs';
 import { unitOptions, catOptions, contField } from './catalogue.js';
-import { I } from './icons.js';
+import { I, btnI } from './icons.js';
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const today = () => new Date().toISOString().slice(0, 10);
@@ -147,7 +147,7 @@ export function dishView() {
       </div><div>
       <div class="seg" style="margin-top:14px">${tabs.map(([k, t]) => `<button class="${cur === k ? 'on' : ''}" data-a="dtab" data-k="${k}">${t}</button>`).join('')}</div>
       ${{ ing: tabIng, rec: tabRec, parts: tabParts, hist: tabHist }[cur]}</div></div>`,
-    dock: ed.id ? `<a class="btn sec2" href="#/plats/${ed.id}/cuisine">${I('book')} Cuisiner</a><button class="btn grow" data-a="plan-dish" data-id="${ed.id}">${I('calendar')} ${mgr ? 'Ajouter au menu' : 'Suggérer au menu'}</button>` : null,
+    dock: ed.id ? `<div class="btn-row grow">${btnI('book', 'Cuisiner', `href="#/plats/${ed.id}/cuisine"`, 'sec2', 'a')}${btnI('calendar', mgr ? 'Ajouter au menu' : 'Suggérer au menu', `data-a="plan-dish" data-id="${ed.id}"`, '')}</div>` : null,
   };
 }
 on('click', 'dtab', (el) => { S.q.dtab = el.dataset.k; render(); });

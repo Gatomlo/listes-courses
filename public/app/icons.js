@@ -45,3 +45,6 @@ export const PATHS = {
   flame: 'M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z',
 };
 export const I = (n, c = '') => `<svg class="i ${c}" viewBox="0 0 24 24" aria-hidden="true"><path d="${PATHS[n]}"${n === 'more' || n === 'grip' ? ' stroke-width="3"' : ''}/></svg>`;
+// Bouton a icone : sur telephone l'icone seule (libelle en aria-label / title), sur PC
+// icone + libelle. Les rangees .btn-row placent ces boutons cote a cote, a parts egales.
+export const btnI = (icon, label, attrs = '', cls = 'sec2', tag = 'button') => `<${tag} class="btn ${cls} icon-m" aria-label="${label}" title="${label}" ${attrs}>${I(icon)}<span class="lbl">${label}</span></${tag}>`;

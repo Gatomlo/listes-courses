@@ -211,6 +211,12 @@ select.in{appearance:none;background-image:linear-gradient(45deg,transparent 50%
 .big{font:800 28px/1 var(--display);letter-spacing:-.01em}
 .mid{font:700 19px/1.15 var(--display)}
 
+/* Rangees de boutons a icone (bI) : cote a cote, a parts egales ; telephone = icone seule. */
+.btn-row{display:flex;gap:8px;min-width:0}
+.btn-row>.btn{flex:1 1 0;min-width:0}
+.sheet .foot.btn-row>.btn{flex:1 1 0}
+@container app (max-width:759px){.icon-m .lbl{display:none}.icon-m{padding:0 10px;min-width:46px}}
+
 /* Articles de liste */
 .item{display:flex;align-items:center;gap:12px;padding:11px 14px;min-height:58px;width:100%;text-align:left;transition:background .15s}
 .group > .item + .item{border-top:1px solid var(--line)}

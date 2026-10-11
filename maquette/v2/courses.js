@@ -27,7 +27,7 @@ VIEWS.home = () => {
           <div class="hstack">${heroStores.map((s) => sp(s, `${STORES[s].n} · ${sc.plan.by[s] || counted(cur).length}`)).join('')}</div>
           <div class="small" style="margin-top:6px">${sc.split ? `Faire les deux magasins fait économiser <b>${eur(sc.saving)}</b> par rapport à tout chez ${STORES[sc.all[0].st].n}.` : `Tout chez ${STORES[sc.all[0].st].n} : l’économie d’un 2e magasin reste sous ${eur(HOUSE.threshold)}.`}</div>
         </div>
-        <div class="btns" style="margin-top:14px"><button class="btn sec" data-a="go" data-v="list" data-id="${cur.id}">Ouvrir la liste</button><button class="btn" data-a="shop-pick" data-id="${cur.id}">${I('cart')} Mode courses</button></div>
+        <div class="btn-row" style="margin-top:14px">${bI('basket', 'Ouvrir la liste', `data-a="go" data-v="list" data-id="${cur.id}"`)}${bI('plus', 'Ajouter un article', `data-a="qa" data-k="item"`)}${bI('cart', 'Mode courses', `data-a="shop-pick" data-id="${cur.id}"`, '')}</div>
       </div>
       <div class="sh"><span>À prévoir</span><button data-a="go" data-v="list" data-id="ap">Voir</button></div>
       <button class="card tap" style="width:100%;text-align:left" data-a="go" data-v="list" data-id="ap">
@@ -199,7 +199,7 @@ A['item-open'] = (el) => {
       <button class="row tap" data-a="in-stock" data-id="${i.id}"><span class="ico">${I('box')}</span><span class="grow"><b>Déjà en réserve</b><span class="sub" style="display:block">Retiré des repas, il ne reviendra pas</span></span></button></div>` : ''}
     <div class="sh"><span>Prix</span><button data-a="go" data-v="product" data-id="${p.id}">Fiche produit</button></div>
     <div class="cmp">${activeStores().map((s) => `<div style="--c:${STORES[s].c};--cs:${STORES[s].cs}" class="${advised(p.id) === s ? 'best' : ''}"><div class="small b">${STORES[s].n}</div><div class="big num" style="margin-top:4px">${eur(price(p.id, s))}</div>${promoOf(p.id, s) ? '<div class="xs b">promo</div>' : ''}</div>`).join('')}</div>
-    <div class="foot"><button class="btn sec" data-a="item-move" data-id="${i.id}">${I('move')} Déplacer</button><button class="btn danger" data-a="item-del" data-id="${i.id}">${I('trash')} Retirer</button></div>`);
+    <div class="foot btn-row">${bI('doc', 'Fiche produit', `data-a="go" data-v="product" data-id="${p.id}"`)}${bI('tag', 'Promo', 'data-a="promo-add"')}${bI('move', 'Déplacer', `data-a="item-move" data-id="${i.id}"`)}${bI('trash', 'Retirer', `data-a="item-del" data-id="${i.id}"`, 'danger')}</div>`);
 };
 A.qty = (el) => { const { i } = findItem(el.dataset.id); i.q = Math.max(0, i.q + Number(el.dataset.d)); if (qtyOf(i) < 1) i.q = 1 - i.mq > 0 ? 1 - i.mq : 0; queued(); refresh(); render(); };
 CH['item-note'] = (el) => { findItem(el.dataset.id).i.note = el.value; queued(); render(); };

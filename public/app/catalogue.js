@@ -1,7 +1,7 @@
 // Catalogue commun du foyer : liste par rayon (recherche, filtres), fiche produit
 // (caracteristiques, prix moyens par magasin, releves), creation, fusion, suppression.
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
-import { I } from './icons.js';
+import { I, btnI } from './icons.js';
 import { get, post, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadProducts, loadHouse, activeStores, storeById, catName, categoryOrder } from './state.js';
 
@@ -158,7 +158,7 @@ export function productView() {
       ${acc('p_hist', { icon: `${I('receipt', 's')} `, title: 'Derniers relevés', sum: ` · ${p.records.length}`,
         body: `${p.records.map((r) => `<div class="item"><span class="muted w5">${fmtDate(r.date)}</span>${stTag(r.store_id)}<span class="grow muted">${SRC[r.source]}${r.promo ? ` · ${I('tag', 's')} promo` : ''}${r.user ? ' · ' + esc(r.user) : ''}</span><span class="price">${eur(r.price_cents)}</span>${mgr ? `<button class="ic" title="Supprimer ce relevé" data-a="rec-del" data-id="${r.id}">✕</button>` : ''}</div>`).join('') || '<p class="muted">Aucun relevé.</p>'}
           <button class="btn sec2 full" style="margin:8px 0" data-a="rec-add">＋ Ajouter un relevé</button>` })}
-      ${mgr ? `<div class="row end wide"><button class="btn sec2" data-a="prod-merge">⇄ Fusionner avec…</button><button class="btn sec2 danger-t" data-a="prod-del">Supprimer</button></div>` : ''}`,
+      ${mgr ? `<div class="btn-row wide" style="margin-top:12px">${btnI('merge', 'Fusionner avec…', 'data-a="prod-merge"')}${btnI('trash', 'Supprimer', 'data-a="prod-del"', 'sec2 danger-t')}</div>` : ''}`,
   };
 }
 

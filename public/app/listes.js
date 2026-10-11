@@ -5,7 +5,7 @@ import { get, post, patch, del, attempt, sync, newOp, setCached } from './api.js
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
 import { unitOptions, catOptions, contField } from './catalogue.js';
 import { SLOT } from './plats.js';
-import { I } from './icons.js';
+import { I, btnI } from './icons.js';
 
 const STATUS = { prep: 'En préparation', shopping: 'En courses', closed: 'Clôturée' };
 const longDate = (d) => fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -61,7 +61,7 @@ function heroCard(l) {
     <div class="row small"><span class="grow muted">${l.bought} / ${l.items} dans le caddie${l.pending ? ` · ${plural(l.pending, 'suggestion')}` : ''}</span>${l.estimate != null && l.items ? `<b class="price">≈ ${eur(l.estimate)}</b>` : ''}</div>
     <div class="prog" style="margin:6px 0 14px"><i style="width:${pct}%"></i></div></a>
     ${advice}
-    <div class="row" style="margin-top:14px"><a class="btn sec2 grow" href="#/listes/${l.id}">Ouvrir la liste</a>${l.items ? `<button class="btn grow" data-a="shop-pick" data-id="${l.id}">${I('cart')} Mode courses</button>` : ''}</div></div>`;
+    <div class="btn-row" style="margin-top:14px">${btnI('basket', 'Ouvrir la liste', `href="#/listes/${l.id}"`, 'sec2', 'a')}${btnI('plus', isManager() ? 'Ajouter un article' : 'Suggérer un article', 'href="#/raccourci/article"', 'sec2', 'a')}${l.items ? btnI('cart', 'Mode courses', `data-a="shop-pick" data-id="${l.id}"`, '') : ''}</div></div>`;
 }
 export function listesView() {
   const s = summary, mgr = isManager(), [next, ...later] = s.upcoming;
@@ -373,7 +373,7 @@ function closedBody(l) {
   const left = l.items.filter((i) => i.status !== 'bought');
   return `${acc('h_bought', { icon: I('check'), title: 'Achetés', sum: ` · ${bought.length}`, def: true, body: bought.map((i) => itemRow(i, l)).join('') || '<p class="muted">Rien.</p>' })}
     ${acc('h_left', { icon: I('repeat'), title: 'Non achetés', sum: ` · ${left.length}`, def: true, body: left.map((i) => itemRow(i, l)).join('') || '<p class="muted">Tout a été acheté.</p>' })}
-    <div class="row wrap">${isManager() && bought.length ? `<button class="btn sec2" data-a="list-copy">${I('repeat', 's')} Copier les articles achetés dans « À prévoir »</button>` : ''}<button class="btn sec2" data-a="scan-start" data-lid="${l.id}">${I('camera', 's')} Scanner un ticket</button>${isManager() ? '<button class="btn sec2 danger-t" data-a="list-del">Supprimer la liste</button>' : ''}</div>`;
+    <div class="btn-row">${isManager() && bought.length ? btnI('repeat', 'Copier les achetés dans « À prévoir »', 'data-a="list-copy"') : ''}${btnI('camera', 'Scanner un ticket', `data-a="scan-start" data-lid="${l.id}"`)}${isManager() ? btnI('trash', 'Supprimer la liste', 'data-a="list-del"', 'sec2 danger-t') : ''}</div>`;
 }
 
 // ---------- Ajout avec recherche dans le catalogue ----------
@@ -474,7 +474,7 @@ on('click', 'item', async (el) => {
     ${i.manual_store ? `<div class="row line"><span class="grow">Magasin choisi : <b>${esc(storeName(i.at_store_id))}</b>${i.best_store_id ? ` (conseil : ${esc(storeName(i.best_store_id))})` : ''}</span><button class="btn sm sec2" data-a="store-advice" data-id="${i.id}">Revenir au conseil</button></div>` : ''}
     ${mgr && others.length ? `<div class="sec">Déplacer vers</div><div class="opt">${others.map((o) => `<button data-a="item-move" data-id="${i.id}" data-to="${o.id}">${o.type === 'backlog' ? 'À prévoir' : 'Liste du ' + esc(fmtDate(o.date))}</button>`).join('')}</div>` : ''}
     ${mgr ? `<div class="row line"><span class="grow"><b>Récurrent</b><span class="muted block">${p.recurrence ? 'Revient automatiquement' : 'Non'}</span></span><button class="btn sm sec2" data-a="item-rec" data-pid="${i.product_id}" data-rec="${p.recurrence ? '' : 1}">${p.recurrence ? 'Arrêter' : 'Rendre récurrent'}</button></div>` : ''}
-    <div class="row end"><button class="btn sec2" data-a="go-product" data-pid="${i.product_id}">Fiche produit</button>${current.type === 'dated' ? `<button class="btn sec2" data-a="promo" data-pid="${i.product_id}" data-sid="${i.promos && i.promos[0] ? i.promos[0].store_id : i.at_store_id || ''}">${I('tag', 's')} Promo</button>` : ''}${mgr ? `<button class="btn sec2 danger-t" data-a="item-del" data-id="${i.id}">Retirer</button>` : ''}<button class="btn" data-a="item-save" data-id="${i.id}">Enregistrer</button></div>`);
+    <div class="btn-row" style="margin-top:14px">${btnI('doc', 'Fiche produit', `data-a="go-product" data-pid="${i.product_id}"`)}${current.type === 'dated' ? btnI('tag', 'Promo', `data-a="promo" data-pid="${i.product_id}" data-sid="${i.promos && i.promos[0] ? i.promos[0].store_id : i.at_store_id || ''}"`) : ''}${mgr ? btnI('trash', 'Retirer', `data-a="item-del" data-id="${i.id}"`, 'sec2 danger-t') : ''}${btnI('check', 'Enregistrer', `data-a="item-save" data-id="${i.id}"`, '')}</div>`);
 });
 on('click', 'qty', (el) => {
   const input = document.querySelector('.sheet [name=qty]');
