@@ -79,6 +79,18 @@ test('magasins : ajout, desactivation, au moins un actif', async () => {
   await thomas.patch(`${h}/stores/${im.id}`, { active: true });
 });
 
+test('parcours incomplet repare : rayons manquants remis en fin de parcours', async () => {
+  const { db } = require('../lib/db');
+  const before = (await thomas.get(h)).data;
+  const s = before.stores[0], keep = s.categoryOrder[2];
+  db.prepare('DELETE FROM store_category_order WHERE store_id = ? AND category_id <> ?').run(s.id, keep);
+  const after = (await thomas.get(h)).data;
+  const fixed = after.stores.find((x) => x.id === s.id);
+  assert.equal(fixed.categoryOrder.length, before.categories.length);
+  assert.equal(fixed.categoryOrder[0], keep);
+  assert.ok(after.stores.every((x) => x.categoryOrder.length === after.categories.length));
+});
+
 test('rayons : ajout en fin de parcours, ordre, suppression avec transfert', async () => {
   const r = await thomas.post(`${h}/categories`, { name: 'Bio' });
   const bio = r.data.categories.find((c) => c.name === 'Bio');
