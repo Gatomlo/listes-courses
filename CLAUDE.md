@@ -1,7 +1,7 @@
 # Le Cabas (listes-courses)
 
 ## Objectif
-Outil privé du foyer : listes de courses partagées (« À prévoir » + listes datées), prix moyens par magasin (Intermarché, Colruyt), conseil de magasin et économie estimée du split, listes par magasin triées par rayon, menus qui alimentent les listes. Spécifications : `CAHIER_DES_CHARGES.md` (§11 = étapes). Maquette de référence (toutes les fonctions) : `maquette/index.html`, publiée sur https://claude.ai/artifact/PFxn57TQBfrCebd4mEvCtw (republier après modification ; servir avec `npx http-server maquette -p 5180`).
+Outil privé du foyer : listes de courses partagées (« À prévoir » + listes datées), prix moyens par magasin (Intermarché, Colruyt), conseil de magasin et économie estimée du split, listes par magasin triées par rayon, menus qui alimentent les listes. Spécifications : `CAHIER_DES_CHARGES.md` (§11 = étapes). Maquette de référence (toutes les fonctions) : `maquette/index.html`, publiée sur https://claude.ai/artifact/PFxn57TQBfrCebd4mEvCtw (republier après modification ; servir avec `npx http-server maquette -p 5180`). Maquette de refonte v2 (smartphone first, interactive, non codée dans l'app) : `maquette/v2/` (index.html + style.css + data.js, app.js, courses.js, menu.js, more.js), publiée sur https://claude.ai/artifact/PqRcnDnxCtf7kYMUbWoWEn (`/v2/` avec http-server).
 
 ## État (au 2026-10-02)
 - **Étape 1 (socle) codée** : connexion par lien e-mail, foyers, membres et invitations, rôles, réglages, magasins (couleur, actif), rayons et leur ordre par magasin, produits — ex-« Catalogue », route interne `#/catalogue` inchangée (fiche, relevés, prix moyens, magasin conseillé/imposé, fusion, suppression). Interface mobile + PC (barre latérale, accordéons, colonnes en maçonnerie).
