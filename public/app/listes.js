@@ -64,39 +64,39 @@ function heroCard(l) {
     <div class="small" style="margin-top:6px">${a.stores.length < 2 ? `Tout est prévu chez ${esc(a.stores[0].name)}.`
       : a.split ? `Faire les ${a.stores.length} magasins fait économiser <b>${eur(a.saving)}</b> par rapport à tout chez ${esc(mono ? mono.name : '?')}.`
         : `L’économie d’un 2e magasin (${eur(Math.max(0, a.saving))}) reste sous le seuil de ${eur(a.threshold)}.`}</div></div>`;
-  return `<div class="card hero-c"><a href="#/listes/${l.id}" style="color:inherit;text-decoration:none;display:block">
-    <div class="row"><span class="grow muted small">Prochaines courses</span>${statusPill(l)}</div>
+ return `<section class="card box hero-c"><a href="#/listes/${l.id}" style="color:inherit;text-decoration:none;display:block">
+    <div class="box-h"><span>Prochaines courses</span>${statusPill(l)}</div>
     <div class="mid" style="margin:4px 0 12px">${esc(shortTitle(l))}</div>
     <div class="row small"><span class="grow muted">${l.bought} / ${l.items} dans le caddie${l.pending ? ` · ${plural(l.pending, 'suggestion')}` : ''}</span>${l.estimate != null && l.items ? `<b class="price">≈ ${eur(l.estimate)}</b>` : ''}</div>
     <div class="prog" style="margin:6px 0 14px"><i style="width:${pct}%"></i></div></a>
     ${advice}
-    <div class="btn-row" style="margin-top:14px">${btnI('basket', 'Ouvrir la liste', `href="#/listes/${l.id}"`, 'sec2', 'a')}${btnI('plus', isManager() ? 'Ajouter un article' : 'Suggérer un article', 'href="#/raccourci/article"', 'sec2', 'a')}${l.items ? btnI('cart', 'Mode courses', `data-a="shop-pick" data-id="${l.id}"`, '') : ''}</div></div>`;
+    <div class="btn-row" style="margin-top:14px">${btnI('basket', 'Ouvrir la liste', `href="#/listes/${l.id}"`, 'sec2', 'a')}${btnI('plus', isManager() ? 'Ajouter un article' : 'Suggérer un article', 'href="#/raccourci/article"', 'sec2', 'a')}${l.items ? btnI('cart', 'Mode courses', `data-a="shop-pick" data-id="${l.id}"`, '') : ''}</div></section>`;
 }
+// Bloc de l'accueil : un cadre, son titre et son lien a l'interieur (meme forme partout).
+const box = (title, action, content, cls = '') => `<section class="card box ${cls}"><div class="box-h"><span>${title}</span>${action || ''}</div>${content}</section>`;
 export function listesView() {
   const s = summary, mgr = isManager(), [next, ...later] = s.upcoming;
   const sug = S.house.pending || (S.suggestions || []).length;
   const listRow = (l) => `<a class="item click" href="#/listes/${l.id}"><span class="ico ${l.status === 'shopping' ? 'leaf' : ''}">${I(l.status === 'closed' ? 'check' : 'basket')}</span>
     <span class="grow"><b>${esc(shortTitle(l))}</b><span class="muted block">${plural(l.items, 'article')}${l.estimate != null && l.items ? ` · ≈ ${eur(l.estimate)}` : ''}${l.pending ? ` · ${plural(l.pending, 'suggestion')}` : ''}</span></span>${l.status !== 'closed' ? statusPill(l) : ''}${I('chev', 's chev')}</a>`;
   const b = s.backlog;
+  const empty = (t) => `<p class="muted small" style="margin:4px 0 0">${t}</p>`;
+  const promoCards = `<div class="mini-grid">${promos.slice(0, 12).map((p) => { const st = storeById(p.store_id) || { name: '?', color: 'var(--muted)' };
+    return `<a class="mini" href="#/catalogue/${p.product_id}"><span class="st" style="--c:${esc(st.color)}">${esc(st.name)}</span>
+      <b>${esc(p.product)}</b><span><b class="price" style="color:var(--carrot)">${p.price_cents != null ? eur(p.price_cents) : 'promo'}</b> <span class="muted small">${p.list_id ? 'ces courses' : `jusqu’au ${esc(fmtDate(p.valid_until))}`}</span></span></a>`; }).join('')}
+    <button class="mini add" data-a="promo-new">${I('tag')}<b class="small">Signaler une promo</b></button></div>`;
+  const histOpen = S.q.histOpen || isPc();
   return {
     title: 'Courses', sub: S.house.household.name, large: true,
     body: `${sug && mgr ? `<button class="banner" data-a="sugg-sheet">${I('bulb')}<span class="grow">${plural(S.house.pending, 'suggestion')} à valider</span>${I('chev', 's')}</button>` : ''}
       <div class="home-grid${isPc() ? ' three' : ''}"><div>
-      ${next ? heroCard(next) : `<div class="card hero-c c"><p class="muted">Aucune liste de courses prévue.</p>${mgr ? '<button class="btn" data-a="list-new">＋ Nouvelle liste</button>' : ''}</div>`}
-      <div class="sec">À prévoir <a href="#/listes/${b.id}">Voir</a></div>
-      <a class="card click" href="#/listes/${b.id}"><b>${plural(b.items, 'article')}</b>${b.pending ? ` <span class="pill p-carrot">${plural(b.pending, 'suggestion')}</span>` : ''}
-        <span class="muted block">Sans date : à importer dans une prochaine liste${b.estimate != null && b.items ? ` · ≈ ${eur(b.estimate)}` : ''}.</span></a>
+      ${next ? heroCard(next) : box('Prochaines courses', '', `<p class="muted">Aucune liste de courses prévue.</p>${mgr ? '<button class="btn" data-a="list-new">＋ Nouvelle liste</button>' : ''}`, 'hero-c')}
+      ${box('À prévoir', `<a href="#/listes/${b.id}">Voir</a>`, `<a class="item click" href="#/listes/${b.id}"><span class="grow"><b>${plural(b.items, 'article')}</b>${b.pending ? ` <span class="pill p-carrot">${plural(b.pending, 'suggestion')}</span>` : ''}
+        <span class="muted block">Sans date : à importer dans une prochaine liste${b.estimate != null && b.items ? ` · ≈ ${eur(b.estimate)}` : ''}.</span></span>${I('chev', 's chev')}</a>`)}
       </div>${isPc() ? `<div>${nextPreview()}${weekPreview()}</div>` : ''}<div>
-      <div class="sec">Listes à venir ${mgr ? '<button data-a="list-new">＋ Nouvelle liste</button>' : ''}</div>
-      <div class="group">${later.map(listRow).join('') || `<p class="muted small" style="padding:12px 14px;margin:0">${next ? 'Pas d’autre liste prévue.' : 'Aucune.'}</p>`}</div>
-      <div class="sec">Promos en cours <a href="#/promos">Toutes</a></div>
-      <div class="hscroll">${promos.slice(0, 12).map((p) => { const st = storeById(p.store_id) || { name: '?', color: 'var(--muted)' };
-        return `<a class="card click" style="width:170px" href="#/catalogue/${p.product_id}"><span class="st" style="--c:${esc(st.color)}">${esc(st.name)}</span>
-          <div style="font-weight:650;margin:8px 0 2px">${esc(p.product)}</div><b class="price" style="color:var(--carrot)">${p.price_cents != null ? eur(p.price_cents) : 'promo'}</b>
-          <span class="muted block">${p.list_id ? 'ces courses' : `jusqu’au ${esc(fmtDate(p.valid_until))}`}</span></a>`; }).join('')}
-        <button class="card click c" style="width:140px;display:grid;place-items:center;gap:6px;color:var(--leaf)" data-a="promo-new">${I('tag', 'l')}<b class="small">Signaler une promo</b></button></div>
-      <div class="sec" id="history">Historique ${isPc() ? '' : `<button data-a="hist-toggle">${S.q.histOpen ? 'Masquer' : `Voir (${s.closed.length})`}</button>`}</div>
-      ${S.q.histOpen || isPc() ? `<div class="group">${s.closed.map(listRow).join('') || '<p class="muted small" style="padding:12px 14px;margin:0">Aucune liste clôturée.</p>'}</div>` : ''}
+      ${box('Listes à venir', mgr ? '<button data-a="list-new">＋ Nouvelle liste</button>' : '', later.map(listRow).join('') || empty(next ? 'Pas d’autre liste prévue.' : 'Aucune.'))}
+      ${box('Promos en cours', '<a href="#/promos">Toutes</a>', promoCards)}
+      <div id="history">${box('Historique', isPc() ? '' : `<button data-a="hist-toggle">${histOpen ? 'Masquer' : `Voir (${s.closed.length})`}</button>`, histOpen ? s.closed.map(listRow).join('') || empty('Aucune liste clôturée.') : '')}</div>
       </div></div>`,
   };
 }
@@ -106,19 +106,18 @@ function nextPreview() {
   if (!l || l.id !== (summary.upcoming[0] || {}).id) return '';
   const todo = l.items.filter((i) => !i.suggestion && i.status === 'todo');
   const by = activeStores().map((st) => [st, todo.filter((i) => i.at_store_id === st.id)]).filter(([, xs]) => xs.length);
-  return `<div class="sec">À prendre <a href="#/listes/${l.id}">Ouvrir</a></div>
-    ${by.map(([st, xs]) => `<div class="card"><div class="row" style="margin-bottom:6px"><span class="st" style="--c:${esc(st.color)}">${esc(st.name)}</span><span class="grow"></span><span class="muted small">${plural(xs.length, 'article')}</span>
+  return box('À prendre', `<a href="#/listes/${l.id}">Ouvrir</a>`, by.map(([st, xs]) => `<div class="box-part"><div class="row" style="margin-bottom:6px"><span class="st" style="--c:${esc(st.color)}">${esc(st.name)}</span><span class="grow"></span><span class="muted small">${plural(xs.length, 'article')}</span>
       <a class="ib" href="#/listes/${l.id}/magasin/${st.id}" aria-label="Mode courses ${esc(st.name)}" title="Mode courses">${I('cart', 's')}</a></div>
       <div class="pills">${xs.slice(0, 18).map((i) => `<span class="pill">${esc(i.name)}${i.qty !== 1 ? ` × ${qtyText(i.qty)}` : ''}</span>`).join('')}${xs.length > 18 ? `<span class="pill">+${xs.length - 18}</span>` : ''}</div></div>`).join('')
-      || `<div class="card muted small">${l.items.length ? 'Tout est dans le caddie.' : 'Liste vide pour l’instant.'}</div>`}`;
+      || `<p class="muted small" style="margin:4px 0 0">${l.items.length ? 'Tout est dans le caddie.' : 'Liste vide pour l’instant.'}</p>`);
 }
 // PC : repas des 7 prochains jours.
 function weekPreview() {
   if (!week) return '';
-  const days = [...Array(7)].map((_, k) => { const d = new Date(Date.now() + k * 864e5); return d.toISOString().slice(0, 10); });
+  const days = [...Array(7)].map((_, k) => new Date(Date.now() + k * 864e5).toISOString().slice(0, 10));
   const meals = week.meals.filter((m) => !m.suggestion);
-  return `<div class="sec">Cette semaine au menu <a href="#/menu">Menu</a></div><div class="group">${days.map((d) => { const ms = meals.filter((m) => m.date === d);
-    return `<div class="item"><span class="muted small" style="width:78px;flex:none">${esc(fmtDate(d, { weekday: 'short', day: 'numeric' }))}</span><span class="grow small">${ms.map((m) => `<span class="faint">${SLOT[m.slot]}</span> ${esc(m.dish)}`).join(' · ') || '<span class="faint">—</span>'}</span></div>`; }).join('')}</div>`;
+  return box('Cette semaine au menu', '<a href="#/menu">Menu</a>', days.map((d) => { const ms = meals.filter((m) => m.date === d);
+    return `<div class="item"><span class="muted small" style="width:78px;flex:none">${esc(fmtDate(d, { weekday: 'short', day: 'numeric' }))}</span><span class="grow small">${ms.map((m) => `<span class="faint">${SLOT[m.slot]}</span> ${esc(m.dish)}`).join(' · ') || '<span class="faint">—</span>'}</span></div>`; }).join(''));
 }
 on('click', 'hist-toggle', () => { S.q.histOpen = !S.q.histOpen; render(); });
 on('click', 'sugg-sheet', () => sheet(`<h3>Suggestions à valider</h3><p class="muted small">Proposées par les membres du foyer.</p>${suggestionsHtml()}`));

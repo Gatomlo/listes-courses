@@ -35,7 +35,7 @@ export function catalogueView() {
     <span class="tag">${p.best_store_id ? stTag(p.best_store_id) : '<span class="muted small">prix ?</span>'}</span></div>`;
   const head = `<div class="item prow phead pc-only" style="--n:${stores.length}"><span class="grow">Produit</span><span class="pc">Emballage</span>${stores.map((s) => `<span class="pc">${esc(s.name)}</span>`).join('')}<span class="tag">Conseil</span></div>`;
   return {
-    cols: true, title: 'Produits', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer`,
+    cols: 'wide-cols', title: 'Produits', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer`,
     right: isManager() ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button>' : '',
     body: `<div class="search">${I('search')}<input class="txt" id="cat-q" placeholder="Rechercher un produit…" value="${esc(q)}" data-in="cat-q"></div>
       <div class="opt">${[['all', 'Tous'], ['rec', `${I('repeat', 's')} Récurrents`], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>

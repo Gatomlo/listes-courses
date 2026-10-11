@@ -65,7 +65,7 @@ function shell(v) {
   const enter = key !== lastRoute;
   lastRoute = key;
   app.innerHTML = `<header class="top${v.large ? ' large' : ''}">${v.back ? `<a class="back" href="${v.back}" aria-label="Retour">${I('back')}</a>` : ''}<h2>${esc(v.title)}${v.sub && !v.large ? `<small>${esc(v.sub)}</small>` : ''}</h2><div class="acts-r">${v.right || ''}</div></header>
-    <main class="${enter ? 'enter' : ''}">${v.large ? `<h1 class="ltitle">${esc(v.title)}</h1>${v.sub ? `<p class="lsub root">${esc(v.sub)}</p>` : ''}` : ''}${banner}<div class="${v.cols ? 'cols' : ''}">${v.body}</div></main>
+    <main class="${enter ? 'enter' : ''}">${v.large ? `<h1 class="ltitle">${esc(v.title)}</h1>${v.sub ? `<p class="lsub root">${esc(v.sub)}</p>` : ''}` : ''}${banner}<div class="${v.cols ? `cols ${v.cols === true ? '' : v.cols}` : ''}">${v.body}</div></main>
     ${v.dock ? `<div class="dock">${v.dock}</div>` : ''}${nav}`;
   onScroll();
 }

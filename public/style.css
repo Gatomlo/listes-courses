@@ -350,17 +350,36 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
 .btn-row{display:flex;gap:8px;min-width:0}
 .btn-row>.btn{flex:1 1 0;min-width:0}
 .btn.danger-t{color:var(--danger)}
+/* Libelles visibles seulement si la rangee a la place (telephone, tablette, colonne etroite). */
+.btn-row{container-type:inline-size}
+.dock .btn-row{flex:1}
+.icon-m .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@container (max-width:520px){
+  .icon-m .lbl{display:none}
+  .icon-m{padding:0 10px;min-width:44px}
+}
 @media (max-width:899px){
   .icon-m .lbl{display:none}
   .icon-m{padding:0 10px;min-width:48px}
   .wish .btn-row>.btn{min-height:38px}
 }
 
+/* Accueil : blocs en cadre, titre et lien a l'interieur. */
+.card.box{padding:14px 16px}
+.box-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font:600 11.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.box-h a,.box-h button{font:600 13px var(--body);letter-spacing:0;text-transform:none;color:var(--leaf);background:none;border:0;padding:0;text-decoration:none}
+.box>.item{padding:10px 0}
+.box>.item+.item{border-top:1px solid var(--line)}
+.box-part+.box-part{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
+.mini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.mini{display:grid;gap:4px;align-content:start;padding:10px 12px;border-radius:13px;background:var(--raised);color:inherit;text-decoration:none;border:0;text-align:left}
+.mini.add{place-items:center;align-content:center;color:var(--leaf);text-align:center}
+
 /* Produits : une ligne par produit ; sur PC, colonnes alignees. */
 .pc,.pc-only{display:none}
 .prow .tag{flex:none}
 @media (min-width:900px){
-  .prow{display:grid!important;grid-template-columns:minmax(0,1fr) 92px repeat(var(--n),60px) 96px;gap:8px;align-items:center;min-height:0;padding:7px 0}
+  .prow{display:grid!important;grid-template-columns:minmax(140px,1fr) minmax(80px,120px) repeat(var(--n),minmax(70px,96px)) 112px;gap:8px;align-items:center;min-height:0;padding:7px 0}
   .prow .pc{display:block;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .prow .pc.muted{text-align:left}
   .prow .mob{display:none}
@@ -434,6 +453,7 @@ main.enter{animation:inR .26s cubic-bezier(.2,.8,.2,1)}
   .has-dock main{padding-bottom:100px}
   /* Colonnes « maconnerie » autant que la largeur le permet (min. 380 px). */
   .cols{columns:380px;column-gap:16px}
+  .cols.wide-cols{columns:620px}
   @media (min-width:1500px){.cards3{columns:4}}
   .cols>.acc,.cols>.group,.cols>.card{break-inside:avoid;display:inline-block;width:100%;vertical-align:top}
   .cols>.card.row{display:flex}
