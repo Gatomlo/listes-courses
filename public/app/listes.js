@@ -16,9 +16,18 @@ const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 
 let summary = null;   // GET /lists
 let promos = [];      // GET /promos (accueil)
+let nextList = null, week = null; // PC : apercu de la prochaine liste, repas des 7 jours
 let current = null;   // liste affichee (GET /lists/:id)
 
-export async function loadSummary() { [summary, promos] = await Promise.all([get(hp('/lists')), get(hp('/promos')).catch(() => promos)]); }
+export async function loadSummary() {
+  [summary, promos] = await Promise.all([get(hp('/lists')), get(hp('/promos')).catch(() => promos)]);
+  // PC : la place permet d'afficher le contenu de la prochaine liste et le menu de la semaine.
+  const n = summary.upcoming[0];
+  if (isPc()) {
+    [nextList, week] = await Promise.all([n ? get(hp(`/lists/${n.id}`)).catch(() => null) : null,
+      get(hp(`/menu?from=${new Date().toISOString().slice(0, 10)}&days=7`)).catch(() => null)]);
+  }
+}
 export async function loadList(id) {
   current = await get(hp(`/lists/${id}`));
   if (!S.products) await loadProducts();
@@ -72,12 +81,12 @@ export function listesView() {
   return {
     title: 'Courses', sub: S.house.household.name, large: true,
     body: `${sug && mgr ? `<button class="banner" data-a="sugg-sheet">${I('bulb')}<span class="grow">${plural(S.house.pending, 'suggestion')} à valider</span>${I('chev', 's')}</button>` : ''}
-      <div class="home-grid"><div>
+      <div class="home-grid${isPc() ? ' three' : ''}"><div>
       ${next ? heroCard(next) : `<div class="card hero-c c"><p class="muted">Aucune liste de courses prévue.</p>${mgr ? '<button class="btn" data-a="list-new">＋ Nouvelle liste</button>' : ''}</div>`}
       <div class="sec">À prévoir <a href="#/listes/${b.id}">Voir</a></div>
       <a class="card click" href="#/listes/${b.id}"><b>${plural(b.items, 'article')}</b>${b.pending ? ` <span class="pill p-carrot">${plural(b.pending, 'suggestion')}</span>` : ''}
         <span class="muted block">Sans date : à importer dans une prochaine liste${b.estimate != null && b.items ? ` · ≈ ${eur(b.estimate)}` : ''}.</span></a>
-      </div><div>
+      </div>${isPc() ? `<div>${nextPreview()}${weekPreview()}</div>` : ''}<div>
       <div class="sec">Listes à venir ${mgr ? '<button data-a="list-new">＋ Nouvelle liste</button>' : ''}</div>
       <div class="group">${later.map(listRow).join('') || `<p class="muted small" style="padding:12px 14px;margin:0">${next ? 'Pas d’autre liste prévue.' : 'Aucune.'}</p>`}</div>
       <div class="sec">Promos en cours <a href="#/promos">Toutes</a></div>
@@ -86,10 +95,30 @@ export function listesView() {
           <div style="font-weight:650;margin:8px 0 2px">${esc(p.product)}</div><b class="price" style="color:var(--carrot)">${p.price_cents != null ? eur(p.price_cents) : 'promo'}</b>
           <span class="muted block">${p.list_id ? 'ces courses' : `jusqu’au ${esc(fmtDate(p.valid_until))}`}</span></a>`; }).join('')}
         <button class="card click c" style="width:140px;display:grid;place-items:center;gap:6px;color:var(--leaf)" data-a="promo-new">${I('tag', 'l')}<b class="small">Signaler une promo</b></button></div>
-      <div class="sec" id="history">Historique <button data-a="hist-toggle">${S.q.histOpen ? 'Masquer' : `Voir (${s.closed.length})`}</button></div>
-      ${S.q.histOpen ? `<div class="group">${s.closed.map(listRow).join('') || '<p class="muted small" style="padding:12px 14px;margin:0">Aucune liste clôturée.</p>'}</div>` : ''}
+      <div class="sec" id="history">Historique ${isPc() ? '' : `<button data-a="hist-toggle">${S.q.histOpen ? 'Masquer' : `Voir (${s.closed.length})`}</button>`}</div>
+      ${S.q.histOpen || isPc() ? `<div class="group">${s.closed.map(listRow).join('') || '<p class="muted small" style="padding:12px 14px;margin:0">Aucune liste clôturée.</p>'}</div>` : ''}
       </div></div>`,
   };
+}
+// PC : articles a prendre de la prochaine liste, par magasin retenu.
+function nextPreview() {
+  const l = nextList;
+  if (!l || l.id !== (summary.upcoming[0] || {}).id) return '';
+  const todo = l.items.filter((i) => !i.suggestion && i.status === 'todo');
+  const by = activeStores().map((st) => [st, todo.filter((i) => i.at_store_id === st.id)]).filter(([, xs]) => xs.length);
+  return `<div class="sec">À prendre <a href="#/listes/${l.id}">Ouvrir</a></div>
+    ${by.map(([st, xs]) => `<div class="card"><div class="row" style="margin-bottom:6px"><span class="st" style="--c:${esc(st.color)}">${esc(st.name)}</span><span class="grow"></span><span class="muted small">${plural(xs.length, 'article')}</span>
+      <a class="ib" href="#/listes/${l.id}/magasin/${st.id}" aria-label="Mode courses ${esc(st.name)}" title="Mode courses">${I('cart', 's')}</a></div>
+      <div class="pills">${xs.slice(0, 18).map((i) => `<span class="pill">${esc(i.name)}${i.qty !== 1 ? ` × ${qtyText(i.qty)}` : ''}</span>`).join('')}${xs.length > 18 ? `<span class="pill">+${xs.length - 18}</span>` : ''}</div></div>`).join('')
+      || `<div class="card muted small">${l.items.length ? 'Tout est dans le caddie.' : 'Liste vide pour l’instant.'}</div>`}`;
+}
+// PC : repas des 7 prochains jours.
+function weekPreview() {
+  if (!week) return '';
+  const days = [...Array(7)].map((_, k) => { const d = new Date(Date.now() + k * 864e5); return d.toISOString().slice(0, 10); });
+  const meals = week.meals.filter((m) => !m.suggestion);
+  return `<div class="sec">Cette semaine au menu <a href="#/menu">Menu</a></div><div class="group">${days.map((d) => { const ms = meals.filter((m) => m.date === d);
+    return `<div class="item"><span class="muted small" style="width:78px;flex:none">${esc(fmtDate(d, { weekday: 'short', day: 'numeric' }))}</span><span class="grow small">${ms.map((m) => `<span class="faint">${SLOT[m.slot]}</span> ${esc(m.dish)}`).join(' · ') || '<span class="faint">—</span>'}</span></div>`; }).join('')}</div>`;
 }
 on('click', 'hist-toggle', () => { S.q.histOpen = !S.q.histOpen; render(); });
 on('click', 'sugg-sheet', () => sheet(`<h3>Suggestions à valider</h3><p class="muted small">Proposées par les membres du foyer.</p>${suggestionsHtml()}`));

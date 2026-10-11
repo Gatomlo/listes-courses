@@ -356,6 +356,26 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
   .wish .btn-row>.btn{min-height:38px}
 }
 
+/* Produits : une ligne par produit ; sur PC, colonnes alignees. */
+.pc,.pc-only{display:none}
+.prow .tag{flex:none}
+@media (min-width:900px){
+  .prow{display:grid!important;grid-template-columns:minmax(0,1fr) 92px repeat(var(--n),60px) 96px;gap:8px;align-items:center;min-height:0;padding:7px 0}
+  .prow .pc{display:block;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prow .pc.muted{text-align:left}
+  .prow .mob{display:none}
+  .prow .nm .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .prow .pills{margin-top:2px}
+  .prow .price.best{color:color-mix(in srgb,var(--c) 80%,var(--ink))}
+  .prow .tag{text-align:right}
+  .prow.phead{display:grid!important;font-size:11.5px;font-weight:650;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:8px 0 4px}
+  .pc-only{display:block}
+  .prow.phead .pc{text-align:right}
+  .prow.phead .pc:first-of-type{text-align:left}
+  /* Formulaires des fiches : champs en deux colonnes quand c'est possible. */
+  #prod-form .row.gap{flex-wrap:nowrap}
+}
+
 /* ---------- Accordéons ---------- */
 .acc{background:var(--surface);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
 .acc-h{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:13px 14px;text-align:left}
@@ -412,7 +432,8 @@ main.enter{animation:inR .26s cubic-bezier(.2,.8,.2,1)}
   .dock{left:auto;right:28px;width:520px;bottom:18px;background:none;padding:0}
   .shell.nonav .dock{right:50%;transform:translateX(50%);bottom:18px}
   .has-dock main{padding-bottom:100px}
-  .cols{columns:2;column-gap:16px}
+  /* Colonnes « maconnerie » autant que la largeur le permet (min. 380 px). */
+  .cols{columns:380px;column-gap:16px}
   @media (min-width:1500px){.cards3{columns:4}}
   .cols>.acc,.cols>.group,.cols>.card{break-inside:avoid;display:inline-block;width:100%;vertical-align:top}
   .cols>.card.row{display:flex}
@@ -439,10 +460,12 @@ main.enter{animation:inR .26s cubic-bezier(.2,.8,.2,1)}
   .hscroll.wishes{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));overflow:visible;margin:0;padding:0}
   .hscroll.wishes>.wish{width:auto}
   .home-grid{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}
+  .home-grid.three{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .home-grid .hscroll{flex-wrap:wrap;overflow:visible;margin:0;padding:0}
+  .home-grid .hscroll>.card{width:calc(50% - 5px)!important}
 }
 @media (min-width:1500px){
   .split{grid-template-columns:minmax(0,1fr) 420px}
-  .cols{columns:3}
 }
 @media (max-width:899px){table.wk{display:none}}
 .pre{white-space:pre-wrap}

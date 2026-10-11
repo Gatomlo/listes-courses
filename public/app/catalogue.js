@@ -24,16 +24,22 @@ export function catalogueView() {
     && (f === 'all' || (f === 'rec' && p.recurrence) || (f === 'base' && p.is_base) || (f === 'noprice' && noPrice(p)));
   const list = S.products.filter(ok);
   const groups = categoryOrder().map((cid) => [cid, list.filter((p) => p.category_id === cid)]).filter(([, ps]) => ps.length);
-  const row = (p) => `<div class="item click" data-a="go" data-to="#/catalogue/${p.id}"><div class="grow"><div class="nm">${esc(p.name)}</div>
-    <div class="muted">${esc(p.unit)}${p.contenance ? ' · ' + esc(p.contenance) : ''} · ${activeStores().map((s) => `${esc(s.name)} ${eur(p.prices[s.id] && p.prices[s.id].avg)}`).join(' · ')}</div>
-    <div class="pills">${p.recurrence ? `<span class="pill p-leaf">${I('repeat', 's')} ${REC[p.recurrence]}</span>` : ''}${p.is_base ? '<span class="pill p-grey">de base</span>' : ''}${p.forced_store_id ? `<span class="pill p-plum">toujours ${esc((storeById(p.forced_store_id) || {}).name)}</span>` : ''}</div></div>
-    ${p.best_store_id ? stTag(p.best_store_id) : '<span class="muted small">prix ?</span>'}</div>`;
+  // Une ligne par produit ; sur PC, colonnes alignees (emballage, prix par magasin, conseil).
+  const stores = activeStores();
+  const pills = (p) => `${p.recurrence ? `<span class="pill p-leaf">${I('repeat', 's')} ${REC[p.recurrence]}</span>` : ''}${p.is_base ? '<span class="pill p-grey">de base</span>' : ''}${p.forced_store_id ? `<span class="pill p-plum">toujours ${esc((storeById(p.forced_store_id) || {}).name)}</span>` : ''}`;
+  const row = (p) => `<div class="item click prow" style="--n:${stores.length}" data-a="go" data-to="#/catalogue/${p.id}"><div class="grow nm"><span class="t">${esc(p.name)}</span>
+    <span class="mob muted small block">${esc(p.unit)}${p.contenance ? ' · ' + esc(p.contenance) : ''} · ${stores.map((s) => `${esc(s.name)} ${eur(p.prices[s.id] && p.prices[s.id].avg)}`).join(' · ')}</span>
+    ${pills(p) ? `<span class="pills">${pills(p)}</span>` : ''}</div>
+    <span class="pc muted small">${esc(p.unit)}${p.contenance ? ' · ' + esc(p.contenance) : ''}</span>
+    ${stores.map((s) => `<span class="pc price small${p.best_store_id === s.id ? ' best' : ''}" style="--c:${esc(s.color)}">${eur(p.prices[s.id] && p.prices[s.id].avg)}</span>`).join('')}
+    <span class="tag">${p.best_store_id ? stTag(p.best_store_id) : '<span class="muted small">prix ?</span>'}</span></div>`;
+  const head = `<div class="item prow phead pc-only" style="--n:${stores.length}"><span class="grow">Produit</span><span class="pc">Emballage</span>${stores.map((s) => `<span class="pc">${esc(s.name)}</span>`).join('')}<span class="tag">Conseil</span></div>`;
   return {
     cols: true, title: 'Produits', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer`,
     right: isManager() ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button>' : '',
     body: `<div class="search">${I('search')}<input class="txt" id="cat-q" placeholder="Rechercher un produit…" value="${esc(q)}" data-in="cat-q"></div>
       <div class="opt">${[['all', 'Tous'], ['rec', `${I('repeat', 's')} Récurrents`], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
-      ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: ps.map(row).join('') })).join('')
+      ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: head + ps.map(row).join('') })).join('')
         || `<p class="muted">Aucun produit.</p>${q ? `<button class="btn" data-a="prod-new" data-name="${esc(q)}">＋ Créer « ${esc(q)} »</button>` : ''}`}`,
     dock: `<button class="addbar" data-a="prod-new">${I('plus')}<span class="grow">Nouveau produit</span></button>`,
   };
