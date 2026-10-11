@@ -36,7 +36,7 @@ const shopDay = (d) => menu.lists.some((l) => l.date === d);
 
 function mealBtn(m) {
   const drag = isManager() && !m.suggestion ? `${isPc() ? ' draggable="true"' : ''} data-drag="${m.id}"` : '';
-  return `<button class="meal${m.suggestion ? ' pending' : ''}"${drag} data-a="meal-open" data-id="${m.id}" data-date="${m.date}">${m.has_recipe ? '📖 ' : ''}${esc(m.dish)}${m.persons !== 4 ? ` · ${m.persons} p.` : ''}${m.suggestion ? ' <span class="pill p-carrot">suggéré</span>' : ''}</button>`;
+  return `<button class="meal${m.suggestion ? ' pending' : ''}"${drag} data-a="meal-open" data-id="${m.id}" data-date="${m.date}">${m.parts?.length ? '🧩 ' : m.has_recipe ? '📖 ' : ''}${esc(m.dish)}${m.persons !== 4 ? ` · ${m.persons} p.` : ''}${m.suggestion ? ' <span class="pill p-carrot">suggéré</span>' : ''}</button>`;
 }
 const addBtn = (d, s) => `<button class="add" data-a="meal-add" data-date="${d}" data-slot="${s}" aria-label="Ajouter un plat">＋</button>`;
 
@@ -275,13 +275,13 @@ function pickSheet() {
   sheet(`<h3>${esc(fmtDate(pm.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[pm.slot]}</h3>
     <input class="txt" id="pick-q" placeholder="🔍 Rechercher un plat…" value="${esc(pm.q || '')}" data-in="pick-q">
     ${tagChips('pick-tag', pm.tag)}
-    <div class="pick">${list.map((d) => `<button class="card click" data-a="pick-dish" data-id="${d.id}"><b>${wished.has(d.id) ? '💡 ' : ''}${d.draft ? '✏️ ' : ''}${esc(d.name)}</b><span class="muted block">${d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}` : 'rappel seulement'}${d.last_date ? ` · dernière fois le ${esc(fmtDate(d.last_date))}` : ''}</span></button>`).join('') || '<p class="muted">Aucun plat.</p>'}</div>
+    <div class="pick">${list.map((d) => `<button class="card click" data-a="pick-dish" data-id="${d.id}"><b>${wished.has(d.id) ? '💡 ' : ''}${d.draft ? '✏️ ' : ''}${esc(d.name)}</b><span class="muted block">${d.parts ? `🧩 ${esc((d.part_names || []).join(', '))}` : d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}` : 'rappel seulement'}${d.last_date ? ` · dernière fois le ${esc(fmtDate(d.last_date))}` : ''}</span></button>`).join('') || '<p class="muted">Aucun plat.</p>'}</div>
     ${isManager() ? `<button class="btn sec2 full" data-a="pick-new">＋ Nouveau plat${pm.q ? ` « ${esc(pm.q)} »` : ''}</button>` : ''}`);
 }
 on('click', 'meal-add', (el) => { pm = { date: el.dataset.date, slot: el.dataset.slot, persons: 4, skip: [], q: '' }; pickSheet(); });
 on('input', 'pick-q', (el) => { pm.q = el.value; pickSheet(); const i = document.getElementById('pick-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('click', 'pick-tag', (el) => { pm.tag = pm.tag === el.dataset.t ? '' : el.dataset.t; pickSheet(); });
-on('click', 'pick-dish', (el) => { pm.dish_id = Number(el.dataset.id); stockSheet(); });
+on('click', 'pick-dish', (el) => { pm.dish_id = Number(el.dataset.id); pm.part_skip = []; stockSheet(); });
 on('click', 'pick-new', () => { closeSheet(); newDishFrom(pm.q, { date: pm.date, slot: pm.slot }); });
 on('click', 'close-nav', (el) => { closeSheet(); go(el.getAttribute('href')); });
 
@@ -313,10 +313,14 @@ async function stockSheet() {
   const d = pm.dish && pm.dish.id === pm.dish_id ? pm.dish : await attempt(() => get(hp(`/dishes/${pm.dish_id}`)));
   if (!d) return;
   pm.dish = d;
+  d.parts = d.parts || [];
   pm.options = chosenOf(d, pm.options);
-  const ing = dishIngredients(d, pm.options).filter((i) => !i.is_base);
+  pm.part_skip = pm.part_skip || [];
+  const ing = mealIngredients(d, pm);
   sheet(`<h3>${esc(d.name)}</h3><p class="muted">${esc(fmtDate(pm.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[pm.slot]}</p>
     ${d.groups.map((g) => `<div class="sec">${esc(g.name)}</div><div class="opt">${g.options.map((o) => `<button class="${pm.options.includes(o.id) ? 'on' : ''}" data-a="pm-opt" data-id="${o.id}">${esc(o.name)}</button>`).join('')}</div>`).join('')}
+    ${d.parts.length ? `<div class="sec">Recettes</div><p class="muted small">Décocher une recette pour ne pas la faire cette fois.</p>
+      ${d.parts.map((x) => `<label class="row line"><input type="checkbox" class="cb" data-ch="pm-part" data-id="${x.dish_id}" ${pm.part_skip.includes(x.dish_id) ? '' : 'checked'}><span class="grow">🧩 ${esc(x.name)}</span></label>`).join('')}` : ''}
     <div class="row"><span class="grow">Personnes</span><button class="btn sm sec2" data-a="pm-p" data-d="-1">−</button><b class="w3 c" id="pm-persons">${pm.persons}</b><button class="btn sm sec2" data-a="pm-p" data-d="1">＋</button></div>
     ${ing.length ? `<div class="sec">Ingrédients à acheter</div><div class="row"><p class="muted small grow">Décocher ce qui est encore en réserve.</p>
       <button class="btn sm sec2" data-a="pm-all" data-on="${ing.every((i) => !pm.skip.includes(i.product_id)) ? '' : '1'}">${ing.every((i) => !pm.skip.includes(i.product_id)) ? 'Tout décocher' : 'Tout cocher'}</button></div>
@@ -324,6 +328,16 @@ async function stockSheet() {
       : '<p class="muted">Plat sans ingrédients détaillés : simple rappel dans la liste.</p>'}
     <div class="row end"><button class="btn" data-a="pm-save">${pm.id ? 'Enregistrer' : isManager() ? 'Ajouter au menu' : 'Suggérer ce plat'}</button></div>`);
 }
+// Ingredients a acheter : plat (variantes) + recettes non ecartees, un par produit.
+function mealIngredients(d, m) {
+  const all = [...dishIngredients(d, m.options), ...d.parts.filter((x) => !m.part_skip.includes(x.dish_id)).flatMap((x) => x.ingredients)];
+  return all.filter((i, k) => !i.is_base && all.findIndex((x) => x.product_id === i.product_id) === k);
+}
+on('change', 'pm-part', (el) => {
+  const id = Number(el.dataset.id);
+  pm.part_skip = el.checked ? pm.part_skip.filter((x) => x !== id) : [...pm.part_skip, id];
+  stockSheet();
+});
 on('click', 'pm-opt', (el) => {
   const id = Number(el.dataset.id), g = pm.dish.groups.find((x) => x.options.some((o) => o.id === id));
   pm.options = [...pm.options.filter((o) => !g.options.some((x) => x.id === o)), id];
@@ -331,7 +345,7 @@ on('click', 'pm-opt', (el) => {
 });
 // Tout cocher (rien en reserve) / tout decocher (tout en reserve).
 on('click', 'pm-all', (el) => {
-  const ids = dishIngredients(pm.dish, pm.options).filter((i) => !i.is_base).map((i) => i.product_id);
+  const ids = mealIngredients(pm.dish, pm).map((i) => i.product_id);
   pm.skip = el.dataset.on ? pm.skip.filter((x) => !ids.includes(x)) : [...new Set([...pm.skip, ...ids])];
   stockSheet();
 });
@@ -344,8 +358,8 @@ on('change', 'pm-skip', (el) => {
   if (all) { all.dataset.on = none ? '' : '1'; all.textContent = none ? 'Tout décocher' : 'Tout cocher'; }
 });
 on('click', 'pm-save', async () => {
-  const body = { date: pm.date, slot: pm.slot, dish_id: pm.dish_id, persons: pm.persons, skip: pm.skip, options: pm.options };
-  const r = await attempt(() => (pm.id ? patch(hp(`/meals/${pm.id}`), { persons: pm.persons, skip: pm.skip, options: pm.options }) : post(hp('/meals'), body)));
+  const body = { date: pm.date, slot: pm.slot, dish_id: pm.dish_id, persons: pm.persons, skip: pm.skip, options: pm.options, part_skip: pm.part_skip };
+  const r = await attempt(() => (pm.id ? patch(hp(`/meals/${pm.id}`), { persons: pm.persons, skip: pm.skip, options: pm.options, part_skip: pm.part_skip }) : post(hp('/meals'), body)));
   if (!r) return;
   closeSheet();
   toast(pm.id ? 'Repas mis à jour · liste recalculée' : isManager() ? `${pm.dish.name} ajouté · ingrédients ajoutés à la liste de la période` : 'Plat suggéré au gestionnaire');
@@ -367,19 +381,21 @@ on('click', 'meal-open', async (el) => {
   if (m) mealSheet(m);
 });
 async function mealSheet(m) {
+  m = { parts: [], part_skip: [], ...m };
   const mgr = isManager();
   const lists = (await get(hp('/lists')).catch(() => ({ upcoming: [] }))).upcoming;
   sheet(`<h3>${esc(m.dish)}</h3><p class="muted">${esc(fmtDate(m.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[m.slot]}${m.suggestion ? ` · suggéré par ${esc(m.suggested_by_name || '?')}` : ''}</p>
     <div class="row"><span class="grow">Personnes</span><b>${m.persons}</b></div>
+    ${m.parts.length ? `<div class="sec">Recettes</div>${m.parts.map((x) => `<a class="item click${x.skipped ? ' skipped' : ''}" href="#/plats/${x.dish_id}" data-a="close-nav"><span class="grow">🧩 ${esc(x.name)}${x.skipped ? ' <span class="muted small">· pas cette fois</span>' : ''}</span><span class="muted">›</span></a>`).join('')}` : ''}
     ${m.skip.length ? `<p class="muted small">🥫 ${m.skip.length} ingrédient${m.skip.length > 1 ? 's' : ''} en réserve (non acheté${m.skip.length > 1 ? 's' : ''})</p>` : ''}
     ${mgr && !m.suggestion ? `<label class="row line"><span>Liste</span><select class="txt grow" data-ch="meal-list" data-id="${m.id}">
       <option value="">Automatique (période)</option>${lists.map((l) => `<option value="${l.id}" ${m.list_id === l.id ? 'selected' : ''}>Liste du ${esc(fmtDate(l.date))}</option>`).join('')}</select></label>` : ''}
     ${mgr && !m.suggestion ? `<div class="mv"><input class="txt" type="date" id="mv-date" value="${m.date}"><select class="txt" id="mv-slot">${SLOTS.map((s) => `<option value="${s}" ${s === m.slot ? 'selected' : ''}>${SLOT[s]}</option>`).join('')}</select>
       <button class="btn sec2 sm" data-a="meal-move" data-id="${m.id}">Déplacer</button></div>` : ''}
-    <button class="btn full" style="margin-top:10px" data-a="meal-recipe" data-dish="${m.dish_id}" data-p="${m.persons}" data-o="${m.options.join(',')}">📖 ${m.has_recipe ? 'Voir la recette' : 'Ingrédients'}</button>
+    <button class="btn full" style="margin-top:10px" data-a="meal-recipe" data-dish="${m.dish_id}" data-p="${m.persons}" data-o="${m.options.join(',')}" data-ps="${m.part_skip.join(',')}">📖 ${m.parts.length ? 'Voir les recettes' : m.has_recipe ? 'Voir la recette' : 'Ingrédients'}</button>
     <div class="acts">
       ${m.suggestion && mgr ? `<button class="btn sm" data-a="meal-accept" data-id="${m.id}">Accepter</button>` : ''}
-      ${mgr && !m.suggestion ? `<button class="btn sec2 sm" data-a="meal-edit" data-id="${m.id}" data-date="${m.date}">${m.variant ? 'Variantes, personnes…' : 'Personnes et réserve'}</button><button class="btn sec2 sm" data-a="meal-change" data-id="${m.id}" data-date="${m.date}" data-slot="${m.slot}">Changer de plat</button><a class="btn sec2 sm" href="#/plats/${m.dish_id}" data-a="close-nav">Modifier le plat</a>` : ''}
+      ${mgr && !m.suggestion ? `<button class="btn sec2 sm" data-a="meal-edit" data-id="${m.id}" data-date="${m.date}">${m.variant || m.parts.length ? (m.parts.length ? 'Recettes, personnes…' : 'Variantes, personnes…') : 'Personnes et réserve'}</button><button class="btn sec2 sm" data-a="meal-change" data-id="${m.id}" data-date="${m.date}" data-slot="${m.slot}">Changer de plat</button><a class="btn sec2 sm" href="#/plats/${m.dish_id}" data-a="close-nav">Modifier le plat</a>` : ''}
       ${mgr || (m.suggestion && m.suggested_by === S.me.id) ? `<button class="btn sec2 sm danger-t" data-a="meal-del" data-id="${m.id}">${m.suggestion ? 'Refuser / retirer' : 'Retirer du menu'}</button>` : ''}
     </div>`);
 }
@@ -389,7 +405,8 @@ on('click', 'meal-move', async (el) => {
   closeSheet();
   await moveMeal(el.dataset.id, date, slot);
 });
-on('click', 'meal-recipe', (el) => recipeSheet(Number(el.dataset.dish), Number(el.dataset.p), el.dataset.o.split(',').filter(Boolean).map(Number)));
+const idList = (v) => (v || '').split(',').filter(Boolean).map(Number);
+on('click', 'meal-recipe', (el) => recipeSheet(Number(el.dataset.dish), Number(el.dataset.p), idList(el.dataset.o), idList(el.dataset.ps)));
 on('change', 'meal-list', async (el) => {
   if (await attempt(() => patch(hp(`/meals/${el.dataset.id}`), { list_id: el.value }))) { toast('Repas rattaché · ingrédients déplacés'); closeSheet(); afterChange(); }
 });
@@ -402,7 +419,7 @@ on('click', 'meal-edit', async (el) => {
   const r = await attempt(() => get(hp(`/menu?from=${el.dataset.date}&days=1`)));
   const m = r && r.meals.find((x) => x.id === Number(el.dataset.id));
   if (!m) return;
-  pm = { id: m.id, date: m.date, slot: m.slot, dish_id: m.dish_id, persons: m.persons, skip: [...m.skip], options: [...m.options] };
+  pm = { id: m.id, date: m.date, slot: m.slot, dish_id: m.dish_id, persons: m.persons, skip: [...m.skip], options: [...m.options], part_skip: [...m.part_skip] };
   stockSheet();
 });
 on('click', 'meal-change', (el) => {

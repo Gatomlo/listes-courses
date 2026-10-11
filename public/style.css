@@ -273,3 +273,4 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
   .toast{left:auto;right:24px;bottom:24px;width:380px}
 }
 .pre{white-space:pre-wrap}
+.part-rec{border-top:1px solid var(--line);margin-top:12px;padding-top:8px}.part-rec h4{margin:0 0 2px}.part-rec ol.steps{margin-top:6px}.skipped{text-decoration:line-through;opacity:.6}

@@ -42,19 +42,19 @@ export const tagChips = (act, cur) => {
 export function platsView() {
   const q = S.q.dish || '', f = S.q.dishFilter || 'all', tg = S.q.dishTag || '';
   const n = norm(q).trim();
-  const list = S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)))
+  const list = S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)) || (d.part_names || []).some((x) => norm(x).includes(n)))
     && (!tg || d.tags.includes(tg))
-    && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients) || (f === 'planned' && d.next_date) || (f === 'draft' && d.draft)));
+    && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients && !d.parts) || (f === 'planned' && d.next_date) || (f === 'draft' && d.draft) || (f === 'parts' && d.parts)));
   const card = (d) => {
-    const hits = n && !norm(d.name).includes(n) ? d.ingredient_names.filter((x) => norm(x).includes(n)) : [];
+    const hits = n && !norm(d.name).includes(n) ? [...(d.part_names || []), ...d.ingredient_names].filter((x) => norm(x).includes(n)) : [];
     return `<a class="card click" href="#/plats/${d.id}"><h4>${d.draft ? '✏️ ' : ''}${esc(d.name)}${d.has_recipe ? ' <span class="pill p-plum">📖</span>' : ''}</h4>
-      <div class="muted">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}${d.time_text ? ' · ⏱ ' + esc(d.time_text) : ''}` : 'Ingrédients connus par cœur'}</div>
-      <div class="pills">${d.tags.map((t) => `<span class="pill p-grey">#${esc(t)}</span>`).join('')}${d.next_date ? `<span class="pill p-leaf">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span>` : ''}<span class="pill p-grey">${d.last_date ? `dernière fois il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</span></div></a>`;
+      <div class="muted">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.parts ? `🧩 ${esc((d.part_names || []).join(', '))}` : d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}${d.time_text ? ' · ⏱ ' + esc(d.time_text) : ''}` : 'Ingrédients connus par cœur'}</div>
+      <div class="pills">${d.parts ? `<span class="pill p-plum">🧩 ${d.parts} recette${d.parts > 1 ? 's' : ''}</span>` : ''}${d.tags.map((t) => `<span class="pill p-grey">#${esc(t)}</span>`).join('')}${d.next_date ? `<span class="pill p-leaf">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span>` : ''}<span class="pill p-grey">${d.last_date ? `dernière fois il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</span></div></a>`;
   };
   return {
     title: 'Plats', sub: `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`,
     body: `<input class="txt" id="dish-q" placeholder="🔍 Rechercher un plat ou un ingrédient…" value="${esc(q)}" data-in="dish-q">
-      <div class="opt">${[['all', 'Tous'], ['recipe', '📖 Avec recette'], ['memo', 'Sans détail'], ['planned', 'Au menu'], ['draft', '✏️ Suggestions']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
+      <div class="opt">${[['all', 'Tous'], ['recipe', '📖 Avec recette'], ['memo', 'Sans détail'], ['planned', 'Au menu'], ['parts', '🧩 Composés'], ['draft', '✏️ Suggestions']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
       ${tagChips('dish-tag', tg)}
       <div class="cards3">${list.map(card).join('')}</div>
       ${list.length ? '' : `<p class="muted">Aucun plat trouvé.</p>${isManager() && q ? `<button class="btn" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}`}
@@ -74,12 +74,12 @@ export function newDishFrom(name, ret) { pendingName = name || ''; S.dishReturn 
 export async function loadDish(id) {
   if (!S.products) await loadProducts();
   if (id === 'nouveau') {
-    ed = { id: null, name: pendingName || '', portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], groups: [], tags: [], upcoming: [], past: [], times: 0 };
+    ed = { id: null, name: pendingName || '', portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], groups: [], parts: [], used_in: [], tags: [], upcoming: [], past: [], times: 0 };
     pendingName = '';
   } else {
     S.dishReturn = null;
     const d = await get(hp(`/dishes/${id}`));
-    ed = { ...d, steps: d.steps || '', notes: d.notes || '', url: d.url || '', time_text: d.time_text || '' };
+    ed = { parts: [], used_in: [], ...d, steps: d.steps || '', notes: d.notes || '', url: d.url || '', time_text: d.time_text || '' };
   }
 }
 export const currentDish = () => ed;
@@ -102,6 +102,21 @@ export function dishView() {
         ${ro ? '' : `<button class="btn sec2 sm" data-a="opt-add" data-g="${gk}">＋ Option</button>`}</div>`).join('')}
       ${ro ? '' : `<button class="btn sec2 sm" style="margin:8px 0" data-a="grp-add">＋ Groupe de variantes</button>`}`,
   });
+  // Plat compose : recettes (autres plats) a preparer ensemble ; un seul niveau.
+  const parts = ed.used_in.length ? acc('d_parts', {
+    icon: '🧩', title: 'Utilisé dans', sum: ` · ${ed.used_in.length} plat${ed.used_in.length > 1 ? 's' : ''} composé${ed.used_in.length > 1 ? 's' : ''}`,
+    body: `${ed.used_in.map((d) => `<a class="item click" href="#/plats/${d.id}"><span class="grow">🧩 ${esc(d.name)}</span><span class="muted">›</span></a>`).join('')}
+      <p class="muted small">Ce plat est une des recettes de ces plats composés : il ne peut pas lui-même en contenir.</p>`,
+  }) : acc('d_parts', {
+    icon: '🧩', title: 'Composition', def: ed.parts.length ? true : 'closed',
+    sum: ed.parts.length ? ` · ${ed.parts.length} recette${ed.parts.length > 1 ? 's' : ''}` : ' · facultative',
+    body: `<p class="muted small" style="margin-top:8px">Pour un plat fait de plusieurs recettes (ex. Mezze : houmous, taboulé, falafels). Chaque recette reste un plat à part ; ses ingrédients s'ajoutent aux courses du repas.</p>
+      ${ed.parts.map((p, k) => `<div class="item"><a class="grow" href="#/plats/${p.dish_id}">${esc(p.name)}</a>
+        <input class="txt w5 sm c" type="number" min="0.5" step="0.5" value="${fmtQ(p.portions)}" ${dis} data-ch="part-portions" data-k="${k}" aria-label="Portions" title="Portions de cette recette pour les ${ed.portions} portions du plat"><span class="muted small">/ ${p.dish_portions} p.</span>
+        ${ro ? '' : `<button class="ic" data-a="part-up" data-k="${k}" title="Monter" ${k ? '' : 'disabled'}>↑</button><button class="ic" data-a="part-del" data-k="${k}" title="Retirer">✕</button>`}</div>`).join('') || '<p class="muted">Aucune recette : plat simple.</p>'}
+      ${ed.parts.length ? `<p class="muted small">Portions : quantité de chaque recette pour les ${ed.portions} portions du plat (recette d'origine / portions).</p>` : ''}
+      ${ro ? '' : `<div class="addbox" style="margin:8px 0"><input class="txt" id="part-q" autocomplete="off" placeholder="＋ Ajouter une recette (plat existant)…" data-in="part-q" data-enter="part-first"><div id="part-ac"></div></div>`}`,
+  });
   const plan = ed.id ? acc('d_menu', {
     icon: '📅', title: 'Au menu', def: true,
     sum: `${ed.upcoming.length ? ` · prévu ${esc(fmtDate(ed.upcoming[0].date, { weekday: 'short', day: 'numeric', month: 'short' }))}` : ' · rien de prévu'}${ed.times ? ` · ${ed.times} fois` : ''}`,
@@ -121,8 +136,9 @@ export function dishView() {
           <div class="pills">${ed.tags.map((t, k) => `<span class="pill p-grey">#${esc(t)}${ro ? '' : ` <button class="x" data-a="tag-rm" data-i="${k}" aria-label="Retirer">✕</button>`}</span>`).join('') || (ro ? '<span class="muted small">Aucun</span>' : '')}</div>
           ${ro ? '' : `<div class="row gap"><input class="txt grow" id="tag-in" list="tag-dl" placeholder="ex. rapide, végé, hiver…" data-enter="tag-add"><button class="btn sm sec2" data-a="tag-add">＋</button></div>
           <datalist id="tag-dl">${allTags().filter((t) => !ed.tags.includes(t)).map((t) => `<option value="${esc(t)}">`).join('')}</datalist>`}</div>` })}
-      ${acc('d_ing', { icon: '🥕', title: 'Ingrédients', def: true, sum: ` · ${nIng || 'aucun'}`,
-        body: `${ingRows('c', '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient (produit)…')}${ro ? '' : `
+      ${parts}
+      ${acc('d_ing', { icon: '🥕', title: ed.parts.length ? 'Ingrédients en plus' : 'Ingrédients', def: true, sum: ` · ${nIng || 'aucun'}`,
+        body: `${ingRows('c', ed.parts.length ? '<p class="muted">Rien en plus des recettes (ex. pain pita, olives…).</p>' : '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient (produit)…')}${ro ? '' : `
           <p class="muted small">Quantités facultatives, ajustées au nombre de personnes du repas : en emballages, ou en g, ml, pièces (convertis en emballages grâce à la contenance du produit).</p>`}` })}
       ${variants}
       ${acc('d_rec', { icon: '📖', title: 'Recette', sum: ed.url || ed.steps || ed.notes ? ' · renseignée' : ' · facultative, vide',
@@ -135,7 +151,37 @@ export function dishView() {
       ${ro ? '' : `<div class="row end">${ed.id && mgr ? '<button class="btn sec2 danger-t" data-a="dish-del">Supprimer</button>' : ''}<button class="btn" data-a="dish-save">${ed.draft && mgr ? '✓ Valider la fiche' : 'Enregistrer'}</button></div>`}`,
   };
 }
-const mealRow = (m) => `<div class="item click" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted w8">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span><span class="grow">${SLOT[m.slot]} · ${m.persons} pers.</span><span class="muted">›</span></div>`;
+const mealRow = (m) => `<div class="item click" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted w8">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span><span class="grow">${SLOT[m.slot]} · ${m.persons} pers.${m.via ? ` · <span class="muted">🧩 ${esc(m.via)}</span>` : ''}</span><span class="muted">›</span></div>`;
+
+// Composition : recherche parmi les plats (ni lui-meme, ni plat compose, ni deja la).
+function partMatches(q) {
+  const n = norm(q).trim();
+  return n ? (S.dishes || []).filter((d) => norm(d.name).includes(n) && d.id !== ed.id && !d.parts && !ed.parts.some((p) => p.dish_id === d.id)).slice(0, 6) : [];
+}
+on('input', 'part-q', async (el) => {
+  if (!S.dishes) await loadDishes();
+  const q = el.value.trim(), ms = partMatches(q);
+  document.getElementById('part-ac').innerHTML = q ? `<div class="ac">${ms.map((d) => `<button data-a="part-add" data-id="${d.id}"><span class="grow">${esc(d.name)}</span><span class="muted">${d.portions} p.</span></button>`).join('')}
+    ${isManager() && !S.dishes.some((d) => norm(d.name) === norm(q)) ? `<button data-a="part-new"><b>＋ Créer le plat « ${esc(q)} »</b></button>` : ''}</div>` : '';
+});
+const addPart = (d) => { ed.parts.push({ dish_id: d.id, name: d.name, portions: d.portions, dish_portions: d.portions }); };
+const partFocus = () => setTimeout(() => document.getElementById('part-q')?.focus());
+on('click', 'part-add', (el) => { addPart(S.dishes.find((d) => d.id === Number(el.dataset.id))); render(); partFocus(); });
+on('click', 'part-first', (el) => { const ms = partMatches(el.value); if (ms.length) { addPart(ms[0]); render(); partFocus(); } });
+// Nouveau plat (fiche vide, a completer ensuite : ingredients, import depuis un lien).
+on('click', 'part-new', async () => {
+  const q = document.getElementById('part-q').value.trim();
+  const d = await attempt(() => post(hp('/dishes'), { name: q.charAt(0).toUpperCase() + q.slice(1) }));
+  if (!d) return;
+  S.dishes = null;
+  addPart(d);
+  toast(`Plat « ${d.name} » créé · à compléter depuis sa fiche`);
+  render();
+  partFocus();
+});
+on('change', 'part-portions', (el) => { const n = num(el.value); if (n) ed.parts[Number(el.dataset.k)].portions = n; });
+on('click', 'part-del', (el) => { ed.parts.splice(Number(el.dataset.k), 1); render(); });
+on('click', 'part-up', (el) => { const k = Number(el.dataset.k); if (k) { ed.parts.splice(k - 1, 0, ...ed.parts.splice(k, 1)); render(); } });
 
 on('change', 'ed', (el) => { ed[el.dataset.f] = el.dataset.f === 'portions' ? Math.max(1, parseInt(el.value, 10) || 4) : el.value; });
 // Ingredients d'une cible : 'c' = communs, 'g-o' = option o du groupe g.
@@ -211,7 +257,7 @@ on('click', 'tag-rm', (el) => { ed.tags.splice(Number(el.dataset.i), 1); render(
 on('click', 'dish-save', async () => {
   takeTagInput();
   const ings = (list) => list.map((i) => ({ product_id: i.product_id, qty: i.qty, unit: i.iunit || null, note: i.note }));
-  const body = { ...ed, ingredients: ings(ed.ingredients),
+  const body = { ...ed, ingredients: ings(ed.ingredients), parts: ed.used_in.length ? undefined : ed.parts.map((p) => ({ dish_id: p.dish_id, portions: p.portions })),
     groups: ed.groups.map((g) => ({ name: g.name, options: g.options.map((o) => ({ id: o.id, name: o.name, ingredients: ings(o.ingredients) })) })) };
   const d = await attempt(() => (ed.id ? put(hp(`/dishes/${ed.id}`), body) : post(hp('/dishes'), body)));
   if (!d) return;
@@ -244,12 +290,13 @@ export function dishIngredients(d, options) {
 
 // ---------- Recette (lecture, quantites ajustees) ----------
 // options : variantes du repas ; sans repas, toutes les options sont listees par groupe.
-export async function recipeSheet(dishId, persons, options) {
+// Plat compose : chaque recette (sauf celles ecartees du repas, partSkip) a la suite.
+export async function recipeSheet(dishId, persons, options, partSkip = []) {
   const d = ed && ed.id === dishId ? ed : await attempt(() => get(hp(`/dishes/${dishId}`)));
   if (!d) return;
   const p = persons || d.portions, f = p / d.portions;
   const steps = String(d.steps || '').split('\n').map((s) => s.trim()).filter(Boolean);
-  const row = (i) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>${i.qty == null ? '<span class="pill p-grey">selon goût</span>' : `<b class="price">${esc(amountText(i.qty * f, i))}</b>`}</div>`;
+  const row = (i) => ingRow(i, f);
   const groups = d.groups || [], keep = options ? new Set(chosenOf(d, options)) : null;
   const variant = keep ? groups.map((g) => g.options.find((o) => keep.has(o.id)).name).join(', ') : '';
   const ings = keep ? dishIngredients(d, options) : d.ingredients;
@@ -259,8 +306,21 @@ export async function recipeSheet(dishId, persons, options) {
     ${steps.length ? `<div class="sec">Préparation</div><ol class="steps">${steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}
     ${d.notes ? `<div class="sec">Notes</div><p>${esc(d.notes)}</p>` : ''}
     ${d.url ? `<a class="btn sec2 full" href="${esc(d.url)}" target="_blank" rel="noopener">🔗 Ouvrir la recette en ligne</a>` : ''}
-    ${!ings.length && !groups.length && !steps.length && !d.notes && !d.url ? '<p class="muted">Aucune recette renseignée pour ce plat.</p>' : ''}
+    ${(d.parts || []).filter((x) => !partSkip.includes(x.dish_id)).map((x) => partRecipe(x, f)).join('')}
+    ${!ings.length && !groups.length && !steps.length && !d.notes && !d.url && !(d.parts || []).length ? '<p class="muted">Aucune recette renseignée pour ce plat.</p>' : ''}
     <div class="row end"><button class="btn sec2" data-a="close">Fermer</button></div>`);
+}
+// Recette d'un composant : quantites pour sa part du plat compose (facteur f du repas).
+const ingRow = (i, f) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span>${i.qty == null ? '<span class="pill p-grey">selon goût</span>' : `<b class="price">${esc(amountText(i.qty * f, i))}</b>`}</div>`;
+function partRecipe(x, f) {
+  const g = (f * x.portions) / x.dish_portions, steps = String(x.steps || '').split('\n').map((s) => s.trim()).filter(Boolean);
+  return `<div class="part-rec"><h4>🧩 ${esc(x.name)}${x.variant ? ` · ${esc(x.variant)}` : ''}</h4>
+    <p class="muted small">${x.time_text ? '⏱ ' + esc(x.time_text) + ' · ' : ''}${fmtQ(g * x.dish_portions)} portion${g * x.dish_portions > 1 ? 's' : ''} (recette pour ${x.dish_portions})</p>
+    ${(x.ingredients || []).map((i) => ingRow(i, g)).join('')}
+    ${steps.length ? `<ol class="steps">${steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}
+    ${x.notes ? `<p class="muted">${esc(x.notes)}</p>` : ''}
+    ${x.url ? `<a class="btn sec2 sm" href="${esc(x.url)}" target="_blank" rel="noopener">🔗 Recette en ligne</a>` : ''}
+    ${!(x.ingredients || []).length && !steps.length && !x.notes && !x.url ? '<p class="muted small">Pas encore de détail : <a href="#/plats/' + x.dish_id + '" data-a="close-nav">compléter la fiche</a>.</p>' : ''}</div>`;
 }
 on('click', 'recipe-view', (el) => recipeSheet(Number(el.dataset.id)));
 
