@@ -150,6 +150,7 @@ A.noop = () => toast('Dans l’app : action réelle');
 const JUMPS = [
   ['Accueil courses', () => tab('home')], ['Liste en cours', () => { tab('home'); go('list', { id: 'l13' }); }],
   ['Mode courses', () => { tab('home'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'co' }); }],
+  ['Mode courses (tout)', () => { tab('home'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'all' }); }],
   ['Scan du ticket', () => { tab('home'); go('scan', { id: 'l13', st: 'co' }); }],
   ['Menu', () => tab('menu')], ['Fiche repas (Mezze)', () => { tab('menu'); A['meal-open']({ dataset: { id: MEALS.find((m) => m.dish === 'mez').id } }); }],
   ['Plats', () => tab('dishes')], ['Plat composé', () => { tab('dishes'); go('dish', { id: 'mez' }); }], ['Plat à variantes', () => { tab('dishes'); go('dish', { id: 'sto' }); }],

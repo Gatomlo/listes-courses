@@ -250,31 +250,37 @@ A['prod-new-ok'] = () => {
 };
 
 // ---------- Mode courses ----------
+// Mode courses : un magasin (ses articles, dans l'ordre de ses rayons) ou tous les magasins
+// ensemble (st = 'all' : toute la liste, rayons dans l'ordre general, magasin indique par article).
+const inShop = (i, st) => st === 'all' || storeOf(i) === st;
+const shopName = (st) => (st === 'all' ? 'Tous les magasins' : STORES[st].n);
+const shopColor = (st) => (st === 'all' ? 'var(--accent)' : STORES[st].c);
 A['shop-pick'] = (el) => {
-  const l = listById(el.dataset.id);
-  sheet(`<h3>Mode courses</h3><p class="lead">Les articles du magasin, dans l’ordre de ses rayons. Fonctionne hors-ligne.</p>
-    <div class="group">${activeStores().map((s) => { const n = counted(l).filter((i) => storeOf(i) === s && !i.done).length; return `<button class="row tap" data-a="shop-go" data-id="${l.id}" data-st="${s}">${dotS(s)}<span class="grow"><b>${STORES[s].n}</b><span class="sub" style="display:block">${plural(n, 'article')} à prendre</span></span>${I('arrowR')}</button>`; }).join('')}</div>`);
+  const l = listById(el.dataset.id), sw = el.dataset.sw;
+  const all = counted(l).filter((i) => !i.done).length;
+  sheet(`<h3>Mode courses</h3><p class="lead">Un magasin à la fois, ou toute la liste sans séparation. Fonctionne hors-ligne.</p>
+    <div class="group"><button class="row tap" data-a="shop-go" data-id="${l.id}" data-st="all" data-sw="${sw || ''}"><span class="ico acc">${I('cart')}</span><span class="grow"><b>Tous les magasins</b><span class="sub" style="display:block">${plural(all, 'article')} · toute la liste, sans séparation</span></span>${I('arrowR')}</button>
+    ${activeStores().map((s) => { const n = counted(l).filter((i) => storeOf(i) === s && !i.done).length; return `<button class="row tap" data-a="shop-go" data-id="${l.id}" data-st="${s}" data-sw="${sw || ''}">${dotS(s)}<span class="grow"><b>${STORES[s].n}</b><span class="sub" style="display:block">${plural(n, 'article')} à prendre</span></span>${I('arrowR')}</button>`; }).join('')}</div>`);
 };
-A['shop-go'] = (el) => { closeSheet(); go('shop', { id: el.dataset.id, st: el.dataset.st }); };
+A['shop-go'] = (el) => { closeSheet(); (el.dataset.sw ? replace : go)('shop', { id: el.dataset.id, st: el.dataset.st }); };
 VIEWS.shop = (t) => {
-  const l = listById(t.id), st = t.st, mine = counted(l).filter((i) => storeOf(i) === st);
+  const l = listById(t.id), st = t.st, mine = counted(l).filter((i) => inShop(i, st)), col = shopColor(st);
   const todo = mine.filter((i) => !i.done), cart = mine.filter((i) => i.done);
   const pct = mine.length ? Math.round((cart.length / mine.length) * 100) : 0;
   return {
-    title: STORES[st].n, cls: 'shop', noTabs: true,
-    actions: `<button class="ib" data-a="shop-switch" data-id="${l.id}" data-st="${st}" aria-label="Autre magasin">${I('store')}</button>`,
-    body: `<div class="card" style="--c:${STORES[st].c};margin-bottom:6px;overflow:hidden;padding:0"><div class="shopbar"></div><div style="padding:14px 16px">
+    title: shopName(st), cls: 'shop', noTabs: true,
+    actions: `<button class="ib" data-a="shop-pick" data-id="${l.id}" data-sw="1" aria-label="Changer de magasin">${I('store')}</button>`,
+    body: `<div class="card" style="--c:${col};margin-bottom:6px;overflow:hidden;padding:0"><div class="shopbar"></div><div style="padding:14px 16px">
       <div class="between"><span class="mid">${cart.length} / ${mine.length}</span><span class="muted small">${listName(l)}</span></div>
-      <div class="prog" style="margin-top:10px"><i style="width:${pct}%;background:${STORES[st].c}"></i></div>
+      <div class="prog" style="margin-top:10px"><i style="width:${pct}%;background:${col}"></i></div>
       <div class="hstack small muted" style="margin-top:10px">${avatar(MEMBERS[1], 's')} Léa est aussi sur cette liste</div></div></div>
-      ${ORDER[st].map((c) => [c, todo.filter((i) => P[i.pid].cat === c)]).filter(([, xs]) => xs.length).map(([c, xs]) => `<div class="rayon">${CATS[c]}<span class="n">${xs.length}</span></div>
-        <div class="group">${xs.map((i) => `<div class="item"><button class="ck" data-a="shop-check" data-id="${i.id}" aria-label="Dans le caddie">${I('check')}</button><button class="grow" style="text-align:left" data-a="shop-check" data-id="${i.id}"><div class="nm">${P[i.pid].n}</div><div class="meta"><span>${qtyText(i)}</span>${i.note ? `<span>${esc(i.note)}</span>` : ''}${i.need ? `<span>${i.need}</span>` : ''}</div></button></div>`).join('')}</div>`).join('')}
+      ${(st === 'all' ? Object.keys(CATS) : ORDER[st]).map((c) => [c, todo.filter((i) => P[i.pid].cat === c)]).filter(([, xs]) => xs.length).map(([c, xs]) => `<div class="rayon">${CATS[c]}<span class="n">${xs.length}</span></div>
+        <div class="group">${xs.map((i) => `<div class="item"><button class="ck" data-a="shop-check" data-id="${i.id}" aria-label="Dans le caddie">${I('check')}</button><button class="grow" style="text-align:left" data-a="shop-check" data-id="${i.id}"><div class="nm">${P[i.pid].n}</div><div class="meta"><span>${qtyText(i)}</span>${i.note ? `<span>${esc(i.note)}</span>` : ''}${i.need ? `<span>${i.need}</span>` : ''}</div></button>${st === 'all' ? sp(storeOf(i)) : ''}</div>`).join('')}</div>`).join('')}
       ${!todo.length ? `<div class="empty">${I('check', 'l')}<p><b>Tout est dans le caddie.</b></p></div>` : ''}
       ${cart.length ? `<div class="rayon">${I('cart', 's')} Dans le caddie<span class="n">${cart.length}</span></div><div class="group">${cart.map((i) => `<div class="item done"><button class="ck on" data-a="shop-uncheck" data-id="${i.id}" aria-label="Retirer du caddie">${I('check')}</button><div class="grow"><div class="nm">${P[i.pid].n}</div></div>${i.paid ? `<b class="num small">${eur(i.paid)}</b>` : ''}</div>`).join('')}</div>` : ''}`,
-    dock: `<button class="btn full" style="background:${STORES[st].c}" data-a="shop-end" data-id="${l.id}" data-st="${st}">Terminer chez ${STORES[st].n}</button>`,
+    dock: `<button class="btn full" style="background:${col}" data-a="shop-end" data-id="${l.id}" data-st="${st}">${st === 'all' ? 'Terminer les courses' : 'Terminer chez ' + STORES[st].n}</button>`,
   };
 };
-A['shop-switch'] = (el) => { const o = activeStores().find((s) => s !== el.dataset.st); replace('shop', { id: el.dataset.id, st: o }); };
 A['shop-check'] = (el) => {
   const { i } = findItem(el.dataset.id);
   S.q.paid = '';
@@ -287,15 +293,17 @@ A.pad = (el) => { const k = el.dataset.k; S.q.paid = k === 'C' ? '' : k === '⌫
 A['shop-ok'] = (el) => { const { i } = findItem(el.dataset.id); i.done = true; if (!el.dataset.skip && S.q.paid) i.paid = Number(S.q.paid); queued(); closeSheet(); toast(`${P[i.pid].n} dans le caddie${i.paid ? ' · relevé ' + eur(i.paid) : ''}`); render(); };
 A['shop-uncheck'] = (el) => { findItem(el.dataset.id).i.done = false; queued(); render(); };
 A['shop-end'] = (el) => {
-  const l = listById(el.dataset.id), left = counted(l).filter((i) => storeOf(i) === el.dataset.st && !i.done);
-  sheet(`<h3>Terminer chez ${STORES[el.dataset.st].n}</h3><p class="lead">${left.length ? `${plural(left.length, 'article')} non pris : ${left.length > 1 ? 'ils seront marqués' : 'il sera marqué'} indisponible${left.length > 1 ? 's' : ''} et ${left.length > 1 ? 'restent' : 'reste'} dans la liste.` : 'Tout est pris.'}</p>
+  const st = el.dataset.st, l = listById(el.dataset.id), left = counted(l).filter((i) => inShop(i, st) && !i.done);
+  // Tous les magasins : un ticket par magasin.
+  const scans = st === 'all' ? activeStores() : [st];
+  sheet(`<h3>${st === 'all' ? 'Terminer les courses' : 'Terminer chez ' + STORES[st].n}</h3><p class="lead">${left.length ? `${plural(left.length, 'article')} non pris : ${left.length > 1 ? 'ils seront marqués' : 'il sera marqué'} indisponible${left.length > 1 ? 's' : ''} et ${left.length > 1 ? 'restent' : 'reste'} dans la liste.` : 'Tout est pris.'}</p>
     ${left.length ? `<div class="hstack" style="margin-bottom:12px">${left.map((i) => `<span class="pill">${P[i.pid].n}</span>`).join('')}</div>` : ''}
-    <button class="card tap" style="width:100%;text-align:left;background:var(--accent-soft);color:var(--accent)" data-a="end-scan" data-id="${l.id}" data-st="${el.dataset.st}"><div class="hstack">${I('camera', 'l')}<span class="grow"><b>Scanner le ticket</b><span class="small" style="display:block">Les prix du ticket deviennent des relevés. Lecture sur le téléphone.</span></span>${I('chev')}</div></button>
-    <div class="foot"><button class="btn" data-a="end-ok" data-id="${l.id}" data-st="${el.dataset.st}">Terminer sans ticket</button></div>`);
+    <div class="stack">${scans.map((s) => `<button class="card tap" style="width:100%;text-align:left;background:var(--accent-soft);color:var(--accent)" data-a="end-scan" data-id="${l.id}" data-st="${st}" data-ticket="${s}"><div class="hstack">${I('camera', 'l')}<span class="grow"><b>Scanner le ticket${st === 'all' ? ' ' + STORES[s].n : ''}</b><span class="small" style="display:block">Les prix du ticket deviennent des relevés. Lecture sur le téléphone.</span></span>${I('chev')}</div></button>`).join('')}</div>
+    <div class="foot"><button class="btn" data-a="end-ok" data-id="${l.id}" data-st="${st}">Terminer sans ticket</button></div>`);
 };
-const endShop = (l, st) => counted(l).filter((i) => storeOf(i) === st && !i.done).forEach((i) => { i.unav = true; });
+const endShop = (l, st) => counted(l).filter((i) => inShop(i, st) && !i.done).forEach((i) => { i.unav = true; });
 A['end-ok'] = (el) => { endShop(listById(el.dataset.id), el.dataset.st); closeSheet(); back(); toast('Courses terminées'); };
-A['end-scan'] = (el) => { endShop(listById(el.dataset.id), el.dataset.st); closeSheet(); replace('scan', { id: el.dataset.id, st: el.dataset.st }); };
+A['end-scan'] = (el) => { endShop(listById(el.dataset.id), el.dataset.st); closeSheet(); S.q.scanStep = null; replace('scan', { id: el.dataset.id, st: el.dataset.ticket }); };
 
 // ---------- Ticket ----------
 VIEWS.scan = (t) => {
