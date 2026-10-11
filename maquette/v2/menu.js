@@ -20,7 +20,7 @@ VIEWS.menu = () => {
     ${slotsOn().map((s) => `<span class="sl">${SLOTS[s]}</span>${w.map((d) => `<div class="cell">${at(d, s).map(mealBtn).join('') || ghost(d, s).replace(` ${SLOTS[s]}`, '')}</div>`).join('')}`).join('')}</div>`).join('');
   const wishes = WISHES.map((w) => { const d = DISHES[w.dish]; return `<div class="card wish">${tile(w.dish, '', w.status === 'pending' ? `<span class="pill warn">à valider</span>` : '')}
     <b>${d.draft ? I('edit', 's') + ' ' : ''}${d.n}</b><span class="sub">${w.by === 'Thomas' ? 'Votre envie' : 'Envie de ' + w.by}</span>
-    <div class="btn-row">${isM() && w.status === 'pending' ? bI('check', 'Valider l’envie', `data-a="wish-ok" data-id="${w.id}"`, 'sec sm') : ''}${bI('calendar', 'Mettre au menu', `data-a="wish-plan" data-id="${w.id}"`, 'sm')}</div></div>`; }).join('');
+    <div class="btn-row icons">${isM() && w.status === 'pending' ? bI('check', 'Valider l’envie', `data-a="wish-ok" data-id="${w.id}"`, 'sec sm') : ''}${bI('calendar', 'Mettre au menu', `data-a="wish-plan" data-id="${w.id}"`, 'sm')}</div></div>`; }).join('');
   return {
     title: 'Menu', sub: `${fmtD(MENU.start, { day: 'numeric', month: 'short' })} → ${fmtD(MENU.end, { day: 'numeric', month: 'short' })} · ${MENU.saved ? 'menu fixé' : 'période proposée'}`, large: true,
     actions: `<button class="ib" data-a="menu-share" aria-label="Partager">${I('share')}</button><button class="ib" data-a="menu-more" aria-label="Options">${I('sliders')}</button>`,
@@ -28,7 +28,7 @@ VIEWS.menu = () => {
       <div class="agenda">${agenda}</div>${grid}
       <p class="sub" style="margin:8px 2px">Les repas alimentent la liste de leur période : un repas en ${I('cart', 's')} jour de courses tombe dans cette liste. Appui long sur un repas pour le déplacer.</p>
       <div class="sh"><span>Envies de plats</span><button data-a="wish-add">＋ Proposer</button></div>
-      <div class="hscroll">${wishes}</div>
+      <div class="hscroll wishes">${wishes}</div>
       <div class="sh"><span>Remarques</span></div>
       ${isM() ? `<textarea class="in" rows="3" placeholder="Remarques sur ce menu (imprimées avec l’export)" data-ch="menu-note">${esc(MENU.note)}</textarea>` : `<div class="card">${esc(MENU.note) || '<span class="muted">Aucune remarque</span>'}</div>`}`,
   };

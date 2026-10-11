@@ -16,7 +16,7 @@ export function foyerView() {
       <span class="pill ${m.role === 'manager' ? 'p-leaf' : 'p-grey'}">${roleLabel(m.role)}</span>${mgr || m.me ? '<span class="muted">›</span>' : ''}</div>`).join('');
   const h = H.household;
   return {
-    title: h.name, sub: mgr ? 'Vous êtes gestionnaire' : 'Vous êtes membre',
+    cols: true, title: h.name, sub: mgr ? 'Vous êtes gestionnaire' : 'Vous êtes membre',
     right: '<button class="btn sm sec2" data-a="go" data-to="#/foyers">Mes foyers</button>',
     body: `${installCard()}${acc('mem', { icon: `${I('users', 's')} `, title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
         body: members + (mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="invite">＋ Inviter un membre</button>' : '') })}

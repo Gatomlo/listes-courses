@@ -109,6 +109,9 @@ a.item,button.item{color:inherit;cursor:pointer;text-decoration:none;width:100%;
 .btn.sec2{background:var(--sunk);color:var(--ink)}
 .btn.danger{background:var(--danger);color:#fff}
 .btn.danger-t{color:var(--danger)}
+/* Rangee « icones seules » (cartes etroites, ex. envies) : libelle en infobulle, partout. */
+.btn-row.icons .lbl{display:none}
+.btn-row.icons>.btn{padding:0;min-width:0}
 .btn.sm{min-height:34px;padding:0 12px;font-size:13.5px;border-radius:11px}
 .btn.full{width:100%}
 .btn.ghost{background:none;color:var(--leaf);padding:0 8px}
@@ -410,13 +413,13 @@ main.enter{animation:inR .26s cubic-bezier(.2,.8,.2,1)}
   .shell.nonav .dock{right:50%;transform:translateX(50%);bottom:18px}
   .has-dock main{padding-bottom:100px}
   .cols{columns:2;column-gap:16px}
-  @media (min-width:1500px){.cols{columns:3}.cards3{columns:4}.dgrid{grid-template-columns:repeat(5,1fr)}}
+  @media (min-width:1500px){.cards3{columns:4}}
   .cols>.acc,.cols>.group,.cols>.card{break-inside:avoid;display:inline-block;width:100%;vertical-align:top}
+  .cols>.card.row{display:flex}
   .cols>:not(.acc):not(.group):not(.card){column-span:all}
   .split{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px;align-items:start}
   .split>.side{position:sticky;top:80px}
   .home-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
-  .dgrid{grid-template-columns:repeat(4,1fr)}
   .agenda{display:none}
   .opt.sticky{top:62px}
   .fab{bottom:28px;right:32px}
@@ -427,6 +430,19 @@ main.enter{animation:inR .26s cubic-bezier(.2,.8,.2,1)}
   .sheet::before{display:none}
   .toast{left:auto;right:24px;bottom:24px;transform:none;width:380px;animation:none}
   .tile.hero-t{aspect-ratio:3.4}
+  /* Largeur exploitee : listes d'actions et promos en grille de tuiles, plats en petites vignettes,
+     envies en grille, colonnes plus nombreuses sur grand ecran. */
+  .group.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;background:none;overflow:visible}
+  .group.tiles>.item{background:var(--surface);border-radius:var(--r);border-top:0;padding:14px}
+  .group.tiles>.empty,.group.tiles>p{grid-column:1/-1}
+  .dgrid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+  .hscroll.wishes{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));overflow:visible;margin:0;padding:0}
+  .hscroll.wishes>.wish{width:auto}
+  .home-grid{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}
+}
+@media (min-width:1500px){
+  .split{grid-template-columns:minmax(0,1fr) 420px}
+  .cols{columns:3}
 }
 @media (max-width:899px){table.wk{display:none}}
 .pre{white-space:pre-wrap}

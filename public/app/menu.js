@@ -82,12 +82,12 @@ function wishCard(w) {
   if (mgr || (mine && w.status === 'pending')) acts.push(btnI('x', mgr && w.status === 'pending' ? 'Refuser l’envie' : 'Retirer l’envie', `data-a="wish-del" data-id="${w.id}"`, 'sec2 danger-t'));
   return `<div class="card wish">${tile(w.name, w.status === 'pending' ? '<span class="pill">à valider</span>' : '')}
     <b>${w.draft ? I('edit', 's') + ' ' : ''}${esc(w.name)}</b><span class="muted small">${w.created_by === S.me.id ? 'Votre envie' : `Envie de ${esc(w.created_by_name || '?')}`}</span>
-    <div class="btn-row">${acts.join('')}</div></div>`;
+    <div class="btn-row icons">${acts.join('')}</div></div>`;
 }
 function wishesHtml() {
   const ws = S.wishes || [];
   return `<div class="sec">Envies de plats <button data-a="wish-add">＋ Proposer</button></div>
-    ${ws.length ? `<div class="hscroll">${ws.map(wishCard).join('')}</div>` : '<p class="muted small" style="margin:0 4px">Aucune envie pour l’instant. Proposez des plats pour les prochains menus.</p>'}`;
+    ${ws.length ? `<div class="hscroll wishes">${ws.map(wishCard).join('')}</div>` : '<p class="muted small" style="margin:0 4px">Aucune envie pour l’instant. Proposez des plats pour les prochains menus.</p>'}`;
 }
 let wq = '';
 function wishSheet() {

@@ -16,14 +16,14 @@ export function plusView() {
   return {
     title: 'Plus', sub: H.household.name, large: true,
     body: `<a class="card click row" href="#/foyers"><span class="avatar">${esc((me.name || '?')[0])}</span><span class="grow"><b>${esc(S.me.name)}</b><span class="muted block">${isManager() ? 'Gestionnaire' : 'Membre'} · ${esc(H.household.name)} · changer de foyer</span></span>${I('chev', 's chev')}</a>
-      <div class="group">
+      <div class="group tiles">
         ${row('#/catalogue', 'tag', 'Produits', 'Prix moyens, relevés, magasin conseillé')}
         ${row('#/magasins', 'store', 'Magasins', 'Couleurs, magasins actifs, parcours des rayons')}
         ${row('#/promos', 'flame', 'Promos', 'Promos signalées en cours')}
         ${act('history', 'clock', 'Historique des listes', 'Listes clôturées')}
         ${row('#/foyer', 'users', 'Foyer', `${H.members.length} membre${H.members.length > 1 ? 's' : ''} · réglages · tags des plats`)}
       </div>
-      <div class="group">
+      <div class="group tiles">
         ${act('csv-open', 'upload', 'Importer des produits', 'Fichier CSV, avec relevés de prix')}
         ${row('#/menu/export', 'link', 'Export et lien d’affichage du menu', 'A4 à imprimer, page publique en lecture seule')}
         ${isInstalled() ? '' : act('install', 'phone', 'Installer l’app', 'Sur l’écran d’accueil, utilisable sans réseau', 'leaf')}
@@ -43,7 +43,7 @@ export function promosView() {
   const until = (p) => (p.list_id ? `courses du ${fmtDate(p.list_date)}` : `jusqu’au ${fmtDate(p.valid_until, { day: 'numeric', month: 'short' })}`);
   return {
     title: 'Promos', back: '#/plus', sub: 'Le prix promo remplace la moyenne pour le conseil, tant qu’il est valable',
-    body: `<div class="group">${promos.map((p) => { const s = storeById(p.store_id) || { name: '?', color: 'var(--muted)' };
+    body: `<div class="group tiles">${promos.map((p) => { const s = storeById(p.store_id) || { name: '?', color: 'var(--muted)' };
       return `<div class="item"><span class="dot" style="background:${esc(s.color)}"></span><a class="grow" style="color:inherit;text-decoration:none" href="#/catalogue/${p.product_id}"><b>${esc(p.product)}</b>
         <span class="muted block">${esc(s.name)} · ${until(p)}${p.note ? ` · ${esc(p.note)}` : ''}</span></a>
         <b class="price" style="color:var(--carrot)">${p.price_cents != null ? eur(p.price_cents) : 'promo'}</b><button class="ib" data-a="promo-x" data-id="${p.id}" aria-label="Retirer">${I('x', 's')}</button></div>`; }).join('')
