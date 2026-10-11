@@ -42,7 +42,9 @@ export const tagChips = (act, cur) => {
 // ---------- Liste des plats ----------
 // Vignette d'un plat : teinte tiree du nom, initiale, pastilles.
 const hue = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
-export const tile = (name, pills = '', cls = '') => `<div class="tile ${cls}" style="--h:${hue(name)}"><span class="mono-l">${esc(String(name || '?')[0].toUpperCase())}</span><div class="tb">${pills}</div></div>`;
+// Avec photo (adresse de l'API, ou image en attente d'enregistrement) : la photo remplace l'initiale.
+const photoSrc = (p) => (!p ? '' : /^(data:|https?:)/.test(p) ? p : `api/${p}`);
+export const tile = (name, pills = '', cls = '', photo = null) => `<div class="tile ${cls}${photo ? ' ph' : ''}" style="--h:${hue(name)}${photo ? `;background-image:url('${esc(photoSrc(photo)).replace(/'/g, '%27')}')` : ''}"><span class="mono-l">${esc(String(name || '?')[0].toUpperCase())}</span><div class="tb">${pills}</div></div>`;
 export function platsView() {
   const q = S.q.dish || '', f = S.q.dishFilter || 'all', tg = S.q.dishTag || '';
   const n = norm(q).trim();
@@ -52,7 +54,7 @@ export function platsView() {
   const card = (d) => {
     const hits = n && !norm(d.name).includes(n) ? [...(d.part_names || []), ...d.ingredient_names].filter((x) => norm(x).includes(n)) : [];
     const pills = `${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts}</span>` : ''}${d.has_recipe ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`;
-    return `<a class="dcard" href="#/plats/${d.id}">${tile(d.name, pills)}<div><h4>${esc(d.name)}</h4>
+    return `<a class="dcard" href="#/plats/${d.id}">${tile(d.name, pills, '', d.photo)}<div><h4>${esc(d.name)}</h4>
       <div class="muted small">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.next_date ? `<span style="color:var(--leaf);font-weight:600">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric' }))}</span>` : d.last_date ? `il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</div></div></a>`;
   };
   return {
@@ -142,7 +144,8 @@ export function dishView() {
     sub: ed.draft ? 'Proposition à valider par un gestionnaire' : ro ? 'Lecture seule (membre)' : '',
     right: ro ? '' : `${ed.id && mgr ? `<button class="ib" data-a="dish-del" aria-label="Supprimer">${I('trash')}</button>` : ''}<button class="btn sm" data-a="dish-save">${ed.draft && mgr ? 'Valider la fiche' : 'Enregistrer'}</button>`,
     body: `${ed.draft ? `<div class="banner">${I('edit')}<span>Proposé par un membre : ${mgr ? 'enregistrer valide la fiche' : 'à valider par un gestionnaire'}.</span></div>` : ''}
-      <div class="split"><div>${tile(ed.name || '?', pills, 'hero-t')}${info}
+      <div class="split dish"><div>${tile(ed.name || '?', pills, 'hero-t', curPhoto())}
+      ${ro ? '' : `<div class="btn-row" style="margin-top:8px">${btnI('camera', curPhoto() ? 'Changer la photo' : 'Ajouter une photo', 'data-a="dish-photo"')}${curPhoto() ? btnI('trash', 'Retirer la photo', 'data-a="dish-photo-x"', 'sec2 danger-t') : ''}</div>`}${info}
       ${ed.used_in.length ? `<p class="small" style="margin:8px 2px">${I('puzzle', 's')} Recette de ${ed.used_in.map((d) => `<a href="#/plats/${d.id}" style="color:var(--plum);font-weight:650">${esc(d.name)}</a>`).join(', ')}</p>` : ''}
       </div><div>
       <div class="seg" style="margin-top:14px">${tabs.map(([k, t]) => `<button class="${cur === k ? 'on' : ''}" data-a="dtab" data-k="${k}">${t}</button>`).join('')}</div>
@@ -151,6 +154,31 @@ export function dishView() {
   };
 }
 on('click', 'dtab', (el) => { S.q.dtab = el.dataset.k; render(); });
+// Photo : choisie sur l'appareil (redimensionnee a 1280 px, jpeg) ou reprise de la recette
+// importee ; envoyee avec l'enregistrement du plat.
+const curPhoto = () => (ed.photo_remove ? null : ed.photo_preview || ed.photo || null);
+on('click', 'dish-photo', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.addEventListener('change', async () => {
+    const f = input.files[0];
+    if (!f) return;
+    try {
+      const img = await createImageBitmap(f);
+      const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      ed.photo_data = c.toDataURL('image/jpeg', 0.84);
+      ed.photo_preview = ed.photo_data; ed.photo_url = null; ed.photo_remove = false;
+      toast('Photo prête · enregistrer pour la garder');
+      render();
+    } catch { toast('Image illisible', true); }
+  });
+  input.click();
+});
+on('click', 'dish-photo-x', () => { ed.photo_remove = true; ed.photo_data = null; ed.photo_url = null; ed.photo_preview = null; render(); });
 
 const mealRow = (m) => `<div class="item click" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted w8">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric', month: 'short' }))}</span><span class="grow">${SLOT[m.slot]} · ${m.persons} pers.${m.via ? ` <span class="pill p-plum">${I('puzzle', 's')} ${esc(m.via)}</span>` : ''}</span>${I('chev', 's chev')}</div>`;
 
@@ -258,7 +286,7 @@ on('click', 'tag-rm', (el) => { ed.tags.splice(Number(el.dataset.i), 1); render(
 on('click', 'dish-save', async () => {
   takeTagInput();
   const ings = (list) => list.map((i) => ({ product_id: i.product_id, qty: i.qty, unit: i.iunit || null, note: i.note }));
-  const body = { ...ed, ingredients: ings(ed.ingredients), parts: ed.used_in.length ? undefined : ed.parts.map((p) => ({ dish_id: p.dish_id, portions: p.portions })),
+  const body = { ...ed, ...(ed.photo_data ? { photo_data: ed.photo_data } : ed.photo_url ? { photo_url: ed.photo_url } : ed.photo_remove ? { photo: null } : {}), photo_preview: undefined, ingredients: ings(ed.ingredients), parts: ed.used_in.length ? undefined : ed.parts.map((p) => ({ dish_id: p.dish_id, portions: p.portions })),
     groups: ed.groups.map((g) => ({ name: g.name, options: g.options.map((o) => ({ id: o.id, name: o.name, ingredients: ings(o.ingredients) })) })) };
   const d = await attempt(() => (ed.id ? put(hp(`/dishes/${ed.id}`), body) : post(hp('/dishes'), body)));
   if (!d) return;
@@ -336,36 +364,63 @@ on('click', 'rec-import', async () => {
   if (!S.products) await loadProducts();
   const matched = matchLines(r.ingredients.map((g) => ({ ...g, label: g.name })), { products: S.products });
   imp = {
-    ...r, f: { name: !ed.name, portions: !!r.portions, time: !!r.time, steps: r.steps.length > 0 },
-    ing: matched.map((g) => ({ ...g, on: true, create: g.product_id ? null : { name: g.name.charAt(0).toUpperCase() + g.name.slice(1), category_id: categoryOrder()[0], unit: 'paquet', is_base: g.base } })),
+    ...r, f: { name: !ed.name, portions: !!r.portions, time: !!r.time, steps: r.steps.length > 0, photo: !!r.image && !ed.photo },
+    ing: matched.map((g) => { const p = g.product_id && S.products.find((x) => x.id === g.product_id);
+      return { ...g, on: true, label: p ? p.name : g.name.charAt(0).toUpperCase() + g.name.slice(1),
+        create: p ? null : { name: g.name.charAt(0).toUpperCase() + g.name.slice(1), category_id: categoryOrder()[0], unit: 'paquet', is_base: g.base } }; }),
   };
   importSheet();
 });
+// Ecran d'import : chaque ingredient peut etre renomme (nouveau produit) ou relie a un produit
+// existant (nom choisi dans la liste) ; la quantite lue est affichee pour verification.
+const impQty = (g) => (g.amount != null ? amountText(g.amount, { iunit: g.amount_unit, unit: 'emballage' }) : g.qty != null ? `${fmtQ(g.qty)}${g.unit ? ' ' + g.unit : ''} → 1 emballage` : '');
+function impMatch(g) {
+  const p = S.products.find((x) => norm(x.name) === norm(g.label));
+  g.product_id = p ? p.id : null;
+  if (!p) g.create = { ...(g.create || { category_id: categoryOrder()[0], unit: 'paquet', is_base: g.base }), name: g.label };
+}
 function importSheet() {
   const m = imp;
-  const prod = (id) => S.products.find((p) => p.id === id);
   sheet(`<h3>${I('book', 's')} ${esc(m.name || 'Recette')}</h3><p class="muted small">Trouvé sur la page : cocher ce qu'il faut reprendre.</p>
+    ${m.image ? `<label class="row line"><input type="checkbox" class="cb" data-ch="imp-f" data-k="photo" ${m.f.photo ? 'checked' : ''}><img src="${esc(m.image)}" alt="" style="width:72px;height:54px;object-fit:cover;border-radius:10px"><span class="grow"><b>Photo</b> de la recette</span></label>` : ''}
     ${[['name', 'Nom', m.name], ['portions', 'Portions', m.portions && `${m.portions} personnes`], ['time', 'Temps', m.time], ['steps', 'Étapes', m.steps.length && `${m.steps.length} étapes`]]
       .filter(([, , v]) => v).map(([k, t, v]) => `<label class="row line"><input type="checkbox" class="cb" data-ch="imp-f" data-k="${k}" ${m.f[k] ? 'checked' : ''}><span class="grow"><b>${t}</b> · ${esc(v)}</span></label>`).join('')}
     <div class="sec">Ingrédients (${m.ing.length})</div>
-    ${m.ing.map((g, i) => `<label class="row line top"><input type="checkbox" class="cb" data-ch="imp-ing" data-i="${i}" ${g.on ? 'checked' : ''}><span class="grow"><span class="muted small">« ${esc(g.raw)} »</span><br>
-      ${g.product_id ? `→ ${esc(prod(g.product_id).name)}` : `→ <span class="pill p-carrot">＋ créer</span> ${esc(g.create.name)} <span class="muted small">(${esc(catName(g.create.category_id))})</span>`}${g.base ? ' <span class="pill p-grey">de base</span>' : ''}</span></label>`).join('')}
-    <p class="muted small">Les produits manquants seront créés dans les produits (rayon modifiable ensuite). Les quantités en g, ml ou pièces sont converties en emballages dans les listes (contenance du produit).</p>
+    <p class="muted small" style="margin:-4px 0 8px">Nom modifiable : choisissez un produit existant dans la liste pour le relier, ou gardez un nouveau nom pour le créer.</p>
+    ${m.ing.map((g, i) => `<div class="imp-line"><input type="checkbox" class="cb" data-ch="imp-ing" data-i="${i}" ${g.on ? 'checked' : ''} aria-label="Reprendre">
+      <div class="grow"><div class="muted small">« ${esc(g.raw)} »${impQty(g) ? ` · <b>${esc(impQty(g))}</b>` : ''}</div>
+        <div class="row" style="margin-top:4px"><input class="txt sm grow" list="imp-dl" value="${esc(g.label)}" data-ch="imp-name" data-i="${i}" aria-label="Produit">
+        <span class="pill ${g.product_id ? 'p-leaf' : 'p-carrot'}" id="imp-st-${i}">${g.product_id ? 'existant' : 'nouveau'}</span></div>
+        <select class="txt sm" id="imp-cat-${i}" data-ch="imp-cat" data-i="${i}" style="margin-top:4px" ${g.product_id ? 'hidden' : ''} aria-label="Rayon du nouveau produit">${catOptions(g.create ? g.create.category_id : categoryOrder()[0])}</select></div></div>`).join('')}
+    <datalist id="imp-dl">${S.products.map((p) => `<option value="${esc(p.name)}">`).join('')}</datalist>
+    <p class="muted small">Les quantités en g, ml, pièces, cuillères sont converties en emballages dans les listes (contenance du produit).</p>
     <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="imp-ok">Appliquer au plat</button></div>`);
 }
 on('change', 'imp-f', (el) => { imp.f[el.dataset.k] = el.checked; });
 on('change', 'imp-ing', (el) => { imp.ing[Number(el.dataset.i)].on = el.checked; });
+// Sans redessiner le panneau (garde le defilement) : etat « existant / nouveau » mis a jour sur place.
+on('change', 'imp-name', (el) => {
+  const k = Number(el.dataset.i), g = imp.ing[k];
+  g.label = el.value.trim() || g.label;
+  impMatch(g);
+  const st = document.getElementById(`imp-st-${k}`), cat = document.getElementById(`imp-cat-${k}`);
+  st.textContent = g.product_id ? 'existant' : 'nouveau';
+  st.className = `pill ${g.product_id ? 'p-leaf' : 'p-carrot'}`;
+  cat.hidden = !!g.product_id;
+});
+on('change', 'imp-cat', (el) => { const g = imp.ing[Number(el.dataset.i)]; if (g.create) g.create.category_id = Number(el.value); });
 on('click', 'imp-ok', async () => {
   const m = imp;
   if (m.f.name && m.name) ed.name = m.name;
   if (m.f.portions && m.portions) ed.portions = m.portions;
   if (m.f.time && m.time) ed.time_text = m.time;
   if (m.f.steps) ed.steps = m.steps.join('\n');
+  if (m.f.photo && m.image) { ed.photo_url = m.image; ed.photo_data = null; ed.photo_preview = m.image; ed.photo_remove = false; }
   let created = 0;
   for (const g of m.ing.filter((x) => x.on)) {
     let p = g.product_id ? S.products.find((x) => x.id === g.product_id) : null;
     if (!p) {
-      p = await attempt(() => post(hp('/products'), g.create));
+      p = await attempt(() => post(hp('/products'), { ...g.create, name: g.label }));
       if (!p) continue;
       S.products.push(p);
       created++;

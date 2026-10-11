@@ -185,6 +185,7 @@ input.cb{width:22px;height:22px;flex:none;accent-color:var(--leaf)}
 /* ---------- Listes ---------- */
 .chk{width:28px;height:28px;border-radius:50%;border:2px solid var(--faint);background:transparent;flex:none;display:grid;place-items:center;color:transparent;padding:0;transition:all .18s}
 .chk svg{width:16px;height:16px;stroke-width:2.6}
+.chk.sq{border-radius:7px}
 .chk.on{background:var(--leaf);border-color:var(--leaf);color:var(--leaf-ink)}
 .item.done .nm{text-decoration:line-through;color:var(--faint)}
 .item.done .px{opacity:.5}
@@ -256,6 +257,10 @@ ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;
 .tile .tb{position:relative;display:flex;gap:4px;flex-wrap:wrap}
 .tile .tb .pill{background:color-mix(in srgb,var(--surface) 82%,transparent);color:var(--ink)}
 .tile.hero-t{aspect-ratio:2.1;border-radius:22px}
+.tile.ph{background-size:cover;background-position:center}
+.tile.ph::before,.tile.ph .mono-l{display:none}
+.imp-line{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.imp-line .cb{margin-top:2px}
 .tile.hero-t .mono-l{font-size:96px;right:16px}
 .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px 12px}
 .dcard{display:grid;gap:8px;text-decoration:none;color:inherit}
@@ -379,18 +384,21 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
 .pc,.pc-only{display:none}
 .prow .tag{flex:none}
 @media (min-width:900px){
-  .prow{display:grid!important;grid-template-columns:minmax(140px,1fr) minmax(80px,120px) repeat(var(--n),minmax(70px,96px)) 112px;gap:8px;align-items:center;min-height:0;padding:7px 0}
-  .prow .pc{display:block;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .prow .pc.muted{text-align:left}
+  /* Colonnes : (case) produit, emballage, de base, prix par magasin, conseil ; tout aligne a gauche. */
+  .prow{display:grid!important;grid-template-columns:minmax(140px,1fr) minmax(80px,130px) 62px repeat(var(--n),minmax(70px,96px)) 112px;gap:10px;align-items:center;min-height:0;padding:7px 0}
+  .prow.selectable{grid-template-columns:28px minmax(140px,1fr) minmax(80px,130px) 62px repeat(var(--n),minmax(70px,96px)) 112px}
+  .prow .pc{display:block;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prow .chk{width:22px;height:22px}
+  .prow.sel{background:var(--leaf-soft);border-radius:8px}
+  .bulk,.cols>.card.bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;position:sticky;top:70px;z-index:3;box-shadow:var(--shadow);column-span:all}
+  .bulk .txt{width:auto;min-width:150px}
   .prow .mob{display:none}
   .prow .nm .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
   .prow .pills{margin-top:2px}
   .prow .price.best{color:color-mix(in srgb,var(--c) 80%,var(--ink))}
-  .prow .tag{text-align:right}
+  .prow .tag{text-align:left}
   .prow.phead{display:grid!important;font-size:11.5px;font-weight:650;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:8px 0 4px}
   .pc-only{display:block}
-  .prow.phead .pc{text-align:right}
-  .prow.phead .pc:first-of-type{text-align:left}
   /* Formulaires des fiches : champs en deux colonnes quand c'est possible. */
   #prod-form .row.gap{flex-wrap:nowrap}
 }
@@ -460,6 +468,8 @@ main.enter{animation:inR .26s cubic-bezier(.2,.8,.2,1)}
   .cols>:not(.acc):not(.group):not(.card){column-span:all}
   .split{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px;align-items:start}
   .split>.side{position:sticky;top:80px}
+  /* Fiche plat : colonne de gauche (photo, informations) etroite, onglets larges. */
+  .split.dish{grid-template-columns:minmax(260px,340px) minmax(0,1fr)}
   .home-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
   .agenda{display:none}
   .opt.sticky{top:62px}

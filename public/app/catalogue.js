@@ -1,6 +1,6 @@
 // Catalogue commun du foyer : liste par rayon (recherche, filtres), fiche produit
 // (caracteristiques, prix moyens par magasin, releves), creation, fusion, suppression.
-import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
+import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc } from './ui.js';
 import { I, btnI } from './icons.js';
 import { get, post, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadProducts, loadHouse, activeStores, storeById, catName, categoryOrder } from './state.js';
@@ -24,26 +24,62 @@ export function catalogueView() {
     && (f === 'all' || (f === 'rec' && p.recurrence) || (f === 'base' && p.is_base) || (f === 'noprice' && noPrice(p)));
   const list = S.products.filter(ok);
   const groups = categoryOrder().map((cid) => [cid, list.filter((p) => p.category_id === cid)]).filter(([, ps]) => ps.length);
-  // Une ligne par produit ; sur PC, colonnes alignees (emballage, prix par magasin, conseil).
-  const stores = activeStores();
-  const pills = (p) => `${p.recurrence ? `<span class="pill p-leaf">${I('repeat', 's')} ${REC[p.recurrence]}</span>` : ''}${p.is_base ? '<span class="pill p-grey">de base</span>' : ''}${p.forced_store_id ? `<span class="pill p-plum">toujours ${esc((storeById(p.forced_store_id) || {}).name)}</span>` : ''}`;
-  const row = (p) => `<div class="item click prow" style="--n:${stores.length}" data-a="go" data-to="#/catalogue/${p.id}"><div class="grow nm"><span class="t">${esc(p.name)}</span>
+  // Une ligne par produit ; sur PC, colonnes alignees a gauche (selection, produit, emballage,
+  // de base, prix par magasin, conseil) et selection multiple pour modifier en masse.
+  const stores = activeStores(), mgr = isManager(), pc = isPc();
+  const sel = S.q.psel || (S.q.psel = new Set());
+  const pills = (p) => `${p.recurrence ? `<span class="pill p-leaf">${I('repeat', 's')} ${REC[p.recurrence]}</span>` : ''}${p.is_base && !pc ? '<span class="pill p-grey">de base</span>' : ''}${p.forced_store_id ? `<span class="pill p-plum">toujours ${esc((storeById(p.forced_store_id) || {}).name)}</span>` : ''}`;
+  const box = (on, a, attrs) => (mgr && pc ? `<button class="chk sq${on ? ' on' : ''}" data-a="${a}" ${attrs} aria-label="Sélectionner">${I('check')}</button>` : '');
+  const row = (p) => `<div class="item click prow${mgr && pc ? ' selectable' : ''}${sel.has(p.id) ? ' sel' : ''}" style="--n:${stores.length}" data-a="go" data-to="#/catalogue/${p.id}">${box(sel.has(p.id), 'psel', `data-id="${p.id}"`)}<div class="grow nm"><span class="t">${esc(p.name)}</span>
     <span class="mob muted small block">${esc(p.unit)}${p.contenance ? ' · ' + esc(p.contenance) : ''} · ${stores.map((s) => `${esc(s.name)} ${eur(p.prices[s.id] && p.prices[s.id].avg)}`).join(' · ')}</span>
     ${pills(p) ? `<span class="pills">${pills(p)}</span>` : ''}</div>
     <span class="pc muted small">${esc(p.unit)}${p.contenance ? ' · ' + esc(p.contenance) : ''}</span>
+    <span class="pc small">${p.is_base ? I('check', 's') : ''}</span>
     ${stores.map((s) => `<span class="pc price small${p.best_store_id === s.id ? ' best' : ''}" style="--c:${esc(s.color)}">${eur(p.prices[s.id] && p.prices[s.id].avg)}</span>`).join('')}
     <span class="tag">${p.best_store_id ? stTag(p.best_store_id) : '<span class="muted small">prix ?</span>'}</span></div>`;
-  const head = `<div class="item prow phead pc-only" style="--n:${stores.length}"><span class="grow">Produit</span><span class="pc">Emballage</span>${stores.map((s) => `<span class="pc">${esc(s.name)}</span>`).join('')}<span class="tag">Conseil</span></div>`;
+  const head = (cid, ps) => `<div class="item prow phead pc-only${mgr && pc ? ' selectable' : ''}" style="--n:${stores.length}">${box(ps.every((p) => sel.has(p.id)), 'psel-all', `data-cid="${cid}"`)}<span class="grow">Produit</span><span class="pc">Emballage</span><span class="pc">De base</span>${stores.map((s) => `<span class="pc">${esc(s.name)}</span>`).join('')}<span class="tag">Conseil</span></div>`;
+  const opts = (list, ph) => `<option value="">${ph}</option>${list}`;
+  const bulk = sel.size ? `<div class="card bulk"><b>${sel.size} sélectionné${sel.size > 1 ? 's' : ''}</b>
+      <select class="txt sm" data-ch="bulk" data-k="category_id" aria-label="Rayon">${opts(catOptions(), 'Rayon…')}</select>
+      <select class="txt sm" data-ch="bulk" data-k="is_base" aria-label="De base">${opts('<option value="1">De base : oui</option><option value="0">De base : non</option>', 'De base…')}</select>
+      <select class="txt sm" data-ch="bulk" data-k="forced_store_id" aria-label="Magasin imposé">${opts(`<option value="none">Magasin : conseil (aucun imposé)</option>${stores.map((s) => `<option value="${s.id}">Toujours ${esc(s.name)}</option>`).join('')}`, 'Magasin imposé…')}</select>
+      ${btnI('trash', 'Supprimer', 'data-a="bulk-del"', 'sec2 danger-t sm')}${btnI('x', 'Annuler la sélection', 'data-a="bulk-clear"', 'sec2 sm')}</div>` : '';
   return {
-    cols: 'wide-cols', title: 'Produits', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer`,
-    right: isManager() ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button>' : '',
+    cols: 'wide-cols', title: 'Produits', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer${mgr && pc ? ' · cocher pour modifier en masse' : ''}`,
+    right: mgr ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button>' : '',
     body: `<div class="search">${I('search')}<input class="txt" id="cat-q" placeholder="Rechercher un produit…" value="${esc(q)}" data-in="cat-q"></div>
       <div class="opt">${[['all', 'Tous'], ['rec', `${I('repeat', 's')} Récurrents`], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
-      ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: head + ps.map(row).join('') })).join('')
+      ${bulk}
+      ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: head(cid, ps) + ps.map(row).join('') })).join('')
         || `<p class="muted">Aucun produit.</p>${q ? `<button class="btn" data-a="prod-new" data-name="${esc(q)}">＋ Créer « ${esc(q)} »</button>` : ''}`}`,
     dock: `<button class="addbar" data-a="prod-new">${I('plus')}<span class="grow">Nouveau produit</span></button>`,
   };
 }
+
+// ---------- Selection multiple (PC, gestionnaire) ----------
+const visible = () => { const q = S.q.cat || ''; return S.products.filter((p) => !q || norm(p.name).includes(norm(q))); };
+on('click', 'psel', (el) => { const id = Number(el.dataset.id), s = S.q.psel; if (s.has(id)) s.delete(id); else s.add(id); render(); });
+on('click', 'psel-all', (el) => {
+  const ids = visible().filter((p) => p.category_id === Number(el.dataset.cid)).map((p) => p.id), s = S.q.psel;
+  if (ids.every((id) => s.has(id))) ids.forEach((id) => s.delete(id)); else ids.forEach((id) => s.add(id));
+  render();
+});
+on('click', 'bulk-clear', () => { S.q.psel.clear(); render(); });
+on('change', 'bulk', async (el) => {
+  if (!el.value) return;
+  const k = el.dataset.k, v = el.value === 'none' ? null : k === 'is_base' ? el.value === '1' : Number(el.value);
+  const n = S.q.psel.size;
+  const r = await attempt(() => post(hp('/products/bulk'), { ids: [...S.q.psel], set: { [k]: v } }));
+  if (r) { await loadProducts(); toast(`${n} produit${n > 1 ? 's' : ''} modifié${n > 1 ? 's' : ''}`); render(); }
+});
+on('click', 'bulk-del', async () => {
+  const n = S.q.psel.size;
+  const ok = await confirmSheet({ title: `Supprimer ${n} produit${n > 1 ? 's' : ''} ?`, ok: 'Supprimer', danger: true,
+    text: 'Ils sont retirés des listes en cours et des plats, leurs relevés de prix sont effacés. Ceux qui figurent dans l’historique y restent, barrés.' });
+  if (!ok) return;
+  const r = await attempt(() => post(hp('/products/bulk'), { ids: [...S.q.psel], delete: true }));
+  if (r) { S.q.psel.clear(); await loadProducts(); toast(`${n} produit${n > 1 ? 's' : ''} supprimé${n > 1 ? 's' : ''}`); render(); }
+});
 
 on('input', 'cat-q', (el) => {
   S.q.cat = el.value;

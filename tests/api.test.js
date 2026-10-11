@@ -79,6 +79,21 @@ test('magasins : ajout, desactivation, au moins un actif', async () => {
   await thomas.patch(`${h}/stores/${im.id}`, { active: true });
 });
 
+test('produits : modification et suppression en masse', async () => {
+  const H = (await thomas.get(h)).data, cat = H.categories.at(-1).id;
+  const ids = [];
+  for (const n of ['Masse A', 'Masse B', 'Masse C']) ids.push((await thomas.post(`${h}/products`, { name: n, category_id: H.categories[0].id })).data.id);
+  let r = await thomas.post(`${h}/products/bulk`, { ids: ids.slice(0, 2), set: { category_id: cat, is_base: true, forced_store_id: H.stores[1].id } });
+  assert.deepEqual(r.data, { updated: 2 });
+  const p = (await thomas.get(`${h}/products/${ids[0]}`)).data;
+  assert.deepEqual([p.category_id, p.is_base, p.forced_store_id], [cat, true, H.stores[1].id]);
+  assert.equal((await thomas.get(`${h}/products/${ids[2]}`)).data.category_id, H.categories[0].id);
+  assert.equal((await lea.post(`${h}/products/bulk`, { ids, delete: true })).status, 403);
+  r = await thomas.post(`${h}/products/bulk`, { ids, delete: true });
+  assert.deepEqual(r.data, { deleted: 3 });
+  assert.equal((await thomas.get(`${h}/products/${ids[1]}`)).status, 404);
+});
+
 test('rayons propres a chaque magasin : pharmacie sans rayons, rayon d un seul magasin, retrait', async () => {
   let stores = (await thomas.post(`${h}/stores`, { name: 'Pharmacie', color: '#1f6fb2', copy_from: 'none' })).data;
   const ph = stores.find((x) => x.name === 'Pharmacie');
