@@ -1,6 +1,7 @@
 // Installation de l'app (PWA) : invite du navigateur quand il en propose une (Android,
 // Chrome / Edge sur PC), sinon la marche a suivre (iPhone : Safari > Partager).
 import { esc, on, sheet, toast } from './ui.js';
+import { I } from './icons.js';
 import { render } from './state.js';
 
 let deferred = null; // invite d'installation retenue par le navigateur
@@ -39,5 +40,5 @@ on('click', 'install', async () => {
         + step(2, 'Choisissez <b>Installer l’application</b> ou <b>Ajouter à l’écran d’accueil</b>.')
       : step(1, 'Dans Chrome ou Edge : cliquez sur l’icône d’installation <b>⊕</b> à droite de la barre d’adresse, ou menu <b>⋮</b> → <b>Installer Le Cabas</b>.')
         + step(2, 'Sur téléphone, ouvrez plutôt cette adresse dans le navigateur du téléphone :<br><code>' + esc(location.href.split('#')[0]) + '</code>');
-  sheet(`<h3>📲 Installer l’app</h3>${steps}<p class="muted small">Ensuite, ouvrez Le Cabas depuis son icône : il s’affiche en plein écran et garde vos listes pour les magasins sans réseau.</p>`);
+  sheet(`<h3>${I('phone', 's')} Installer l’app</h3>${steps}<p class="muted small">Ensuite, ouvrez Le Cabas depuis son icône : il s’affiche en plein écran et garde vos listes pour les magasins sans réseau.</p>`);
 });

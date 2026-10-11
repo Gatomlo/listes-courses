@@ -55,10 +55,11 @@ export function sheet(html) {
   closeSheet();
   const bg = document.createElement('div');
   bg.className = 'sheet-bg';
-  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><button class="ib x" data-a="close" aria-label="Fermer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>${html}</div>`;
   bg.addEventListener('click', (e) => { if (e.target === bg) closeSheet(); });
   document.body.appendChild(bg);
-  const first = bg.querySelector('input,select,textarea');
+  // Sur telephone, pas de clavier qui s'ouvre d'office (sauf champ marque autofocus).
+  const first = bg.querySelector(isPc() ? 'input,select,textarea' : '[autofocus]');
   if (first) first.focus();
   return bg.querySelector('.sheet');
 }

@@ -1,6 +1,7 @@
 // Catalogue commun du foyer : liste par rayon (recherche, filtres), fiche produit
 // (caracteristiques, prix moyens par magasin, releves), creation, fusion, suppression.
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
+import { I } from './icons.js';
 import { get, post, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadProducts, loadHouse, activeStores, storeById, catName, categoryOrder } from './state.js';
 
@@ -25,16 +26,16 @@ export function catalogueView() {
   const groups = categoryOrder().map((cid) => [cid, list.filter((p) => p.category_id === cid)]).filter(([, ps]) => ps.length);
   const row = (p) => `<div class="item click" data-a="go" data-to="#/catalogue/${p.id}"><div class="grow"><div class="nm">${esc(p.name)}</div>
     <div class="muted">${esc(p.unit)}${p.contenance ? ' · ' + esc(p.contenance) : ''} · ${activeStores().map((s) => `${esc(s.name)} ${eur(p.prices[s.id] && p.prices[s.id].avg)}`).join(' · ')}</div>
-    <div class="pills">${p.recurrence ? `<span class="pill p-leaf">🔁 ${REC[p.recurrence]}</span>` : ''}${p.is_base ? '<span class="pill p-grey">de base</span>' : ''}${p.forced_store_id ? `<span class="pill p-plum">toujours ${esc((storeById(p.forced_store_id) || {}).name)}</span>` : ''}</div></div>
+    <div class="pills">${p.recurrence ? `<span class="pill p-leaf">${I('repeat', 's')} ${REC[p.recurrence]}</span>` : ''}${p.is_base ? '<span class="pill p-grey">de base</span>' : ''}${p.forced_store_id ? `<span class="pill p-plum">toujours ${esc((storeById(p.forced_store_id) || {}).name)}</span>` : ''}</div></div>
     ${p.best_store_id ? stTag(p.best_store_id) : '<span class="muted small">prix ?</span>'}</div>`;
   return {
     cols: true, title: 'Produits', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer`,
     right: isManager() ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button>' : '',
-    body: `<input class="txt" id="cat-q" placeholder="🔍 Rechercher un produit…" value="${esc(q)}" data-in="cat-q">
-      <div class="opt">${[['all', 'Tous'], ['rec', '🔁 Récurrents'], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
+    body: `<div class="search">${I('search')}<input class="txt" id="cat-q" placeholder="Rechercher un produit…" value="${esc(q)}" data-in="cat-q"></div>
+      <div class="opt">${[['all', 'Tous'], ['rec', `${I('repeat', 's')} Récurrents`], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
       ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: ps.map(row).join('') })).join('')
-        || `<p class="muted">Aucun produit.</p>${q ? `<button class="btn" data-a="prod-new" data-name="${esc(q)}">＋ Créer « ${esc(q)} »</button>` : ''}`}
-      <button class="fab" data-a="prod-new" title="Nouveau produit">＋</button>`,
+        || `<p class="muted">Aucun produit.</p>${q ? `<button class="btn" data-a="prod-new" data-name="${esc(q)}">＋ Créer « ${esc(q)} »</button>` : ''}`}`,
+    dock: `<button class="addbar" data-a="prod-new">${I('plus')}<span class="grow">Nouveau produit</span></button>`,
   };
 }
 
@@ -134,13 +135,13 @@ export function productView() {
   const stores = activeStores();
   return {
     cols: true, title: p.name, sub: `${catName(p.category_id)} · prix par ${p.unit}`, back: '#/catalogue',
-    body: `${acc('p_prix', { icon: '💶', title: 'Prix moyen', sum: ` · par ${esc(p.unit)}, ${S.house.household.avg_records} derniers relevés`, def: true,
+    body: `${acc('p_prix', { icon: `${I('tag', 's')} `, title: 'Prix moyen', sum: ` · par ${esc(p.unit)}, ${S.house.household.avg_records} derniers relevés`, def: true,
         body: `<div class="pad">${stores.map((s) => {
           const pr = p.prices[s.id];
           return `<div class="row line">${stTag(s.id)}<span class="grow muted">${pr ? `${pr.n} relevé${pr.n > 1 ? 's' : ''} · dernier le ${fmtDate(pr.last)}` : 'aucun relevé'}</span><span class="price">${eur(pr && pr.avg)}</span>${p.best_store_id === s.id ? `<span class="pill p-leaf">${p.forced_store_id ? 'imposé' : 'conseillé'}</span>` : ''}</div>`;
         }).join('')}<p class="muted small">Moyenne hors promotions, relevés de moins de 6 mois.</p>
-        ${p.promos.length ? `<div class="pills">${p.promos.map((x) => `<span class="pill p-carrot">🏷 ${esc((storeById(x.store_id) || {}).name || '')} ${x.price_cents != null ? eur(x.price_cents) : 'promo'} · ${x.list_id ? `courses du ${esc(fmtDate(x.list_date))}` : `jusqu'au ${esc(fmtDate(x.valid_until))}`}${x.note ? ' · ' + esc(x.note) : ''}</span>`).join('')}</div>` : ''}</div>` })}
-      ${acc('p_fiche', { icon: '🏷', title: 'Caractéristiques', sum: ` · ${esc(catName(p.category_id))}, ${esc(p.unit)}${p.recurrence ? ', 🔁 ' + REC[p.recurrence] : ''}`,
+        ${p.promos.length ? `<div class="pills">${p.promos.map((x) => `<span class="pill p-carrot">${I('tag', 's')} ${esc((storeById(x.store_id) || {}).name || '')} ${x.price_cents != null ? eur(x.price_cents) : 'promo'} · ${x.list_id ? `courses du ${esc(fmtDate(x.list_date))}` : `jusqu'au ${esc(fmtDate(x.valid_until))}`}${x.note ? ' · ' + esc(x.note) : ''}</span>`).join('')}</div>` : ''}</div>` })}
+      ${acc('p_fiche', { icon: `${I('tag', 's')} `, title: 'Caractéristiques', sum: ` · ${esc(catName(p.category_id))}, ${esc(p.unit)}${p.recurrence ? `, ${I('repeat', 's')} ` + REC[p.recurrence] : ''}`,
         body: `<div class="form" id="prod-form">
           <label class="muted">Nom</label><input class="txt" name="name" value="${esc(p.name)}" ${dis}>
           <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id" ${dis}>${catOptions(p.category_id)}</select></label>
@@ -148,14 +149,14 @@ export function productView() {
           ${contField(p.contenance, dis)}
           <p class="muted small">${p.size ? `1 ${esc(p.unit)} = <b>${esc(sizeText(p.size))}</b>. ` : ''}Sert à convertir les quantités des recettes (g, ml, pièces) en emballages.</p>
           <label class="row"><span class="grow"><b>Poids d'une pièce</b><span class="muted block">Facultatif, en g (ou ml) : relie « 2 oignons » à un filet au kg</span></span><input class="txt w5 c" name="piece_qty" inputmode="decimal" value="${p.piece_qty != null ? String(p.piece_qty).replace('.', ',') : ''}" placeholder="g" ${dis}></label>
-          <label class="row"><span class="grow"><b>🔁 Récurrent</b><span class="muted block">Ajouté aux nouvelles listes datées</span></span><select class="txt w12" name="recurrence" ${dis}>
+          <label class="row"><span class="grow"><b>${I('repeat', 's')} Récurrent</b><span class="muted block">Ajouté aux nouvelles listes datées</span></span><select class="txt w12" name="recurrence" ${dis}>
             <option value="">non</option>${[1, 2, 3].map((n) => `<option value="${n}" ${p.recurrence === n ? 'selected' : ''}>${REC[n]}</option>`).join('')}</select></label>
           <label class="row"><span class="grow"><b>Ingrédient de base</b><span class="muted block">Proposé « à vérifier », jamais ajouté d'office</span></span><input type="checkbox" class="cb" name="is_base" ${p.is_base ? 'checked' : ''} ${dis}></label>
           <label class="row"><span class="grow"><b>Magasin imposé</b><span class="muted block">Ignore le conseil prix (qualité, habitude)</span></span><select class="txt w12" name="forced_store_id" ${dis}>
             <option value="">aucun</option>${stores.map((s) => `<option value="${s.id}" ${p.forced_store_id === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
           ${mgr ? '<div class="row end"><button class="btn" data-a="prod-save">Enregistrer</button></div>' : ''}</div>` })}
-      ${acc('p_hist', { icon: '🧾', title: 'Derniers relevés', sum: ` · ${p.records.length}`,
-        body: `${p.records.map((r) => `<div class="item"><span class="muted w5">${fmtDate(r.date)}</span>${stTag(r.store_id)}<span class="grow muted">${SRC[r.source]}${r.promo ? ' · 🏷 promo' : ''}${r.user ? ' · ' + esc(r.user) : ''}</span><span class="price">${eur(r.price_cents)}</span>${mgr ? `<button class="ic" title="Supprimer ce relevé" data-a="rec-del" data-id="${r.id}">✕</button>` : ''}</div>`).join('') || '<p class="muted">Aucun relevé.</p>'}
+      ${acc('p_hist', { icon: `${I('receipt', 's')} `, title: 'Derniers relevés', sum: ` · ${p.records.length}`,
+        body: `${p.records.map((r) => `<div class="item"><span class="muted w5">${fmtDate(r.date)}</span>${stTag(r.store_id)}<span class="grow muted">${SRC[r.source]}${r.promo ? ` · ${I('tag', 's')} promo` : ''}${r.user ? ' · ' + esc(r.user) : ''}</span><span class="price">${eur(r.price_cents)}</span>${mgr ? `<button class="ic" title="Supprimer ce relevé" data-a="rec-del" data-id="${r.id}">✕</button>` : ''}</div>`).join('') || '<p class="muted">Aucun relevé.</p>'}
           <button class="btn sec2 full" style="margin:8px 0" data-a="rec-add">＋ Ajouter un relevé</button>` })}
       ${mgr ? `<div class="row end wide"><button class="btn sec2" data-a="prod-merge">⇄ Fusionner avec…</button><button class="btn sec2 danger-t" data-a="prod-del">Supprimer</button></div>` : ''}`,
   };

@@ -2,6 +2,7 @@
 // premier compte, compte cree par une invitation, nouveau mot de passe par un lien,
 // choix / creation de foyer.
 import { esc, on, toast, sheet, closeSheet, formData } from './ui.js';
+import { I } from './icons.js';
 import { get, post, patch, attempt, clearLocal } from './api.js';
 import { S, render, loadHouse, go } from './state.js';
 
@@ -36,7 +37,7 @@ export function loginView() {
   const mode = pending.reset ? 'reset' : o.setup ? 'setup' : pending.mode || (inv ? 'register' : 'login');
   let form;
   if (pending.sent) {
-    form = `<b>📧 Lien envoyé</b><p class="muted">Un lien de connexion a été envoyé à <b>${esc(pending.sent)}</b>. Il est valable 15 minutes et ne sert qu'une fois.</p>
+    form = `<b>${I('mail', 's')} Lien envoyé</b><p class="muted">Un lien de connexion a été envoyé à <b>${esc(pending.sent)}</b>. Il est valable 15 minutes et ne sert qu'une fois.</p>
       <button class="btn sec2" data-a="auth-mode" data-m="login">Retour</button>`;
   } else if (mode === 'reset') {
     form = `<h4>Choisir un nouveau mot de passe</h4>${pwd('password', 'Nouveau mot de passe (8 caractères minimum)', 'new-password')}${pwd('password2', 'Confirmer', 'new-password')}
@@ -124,10 +125,13 @@ export function foyersView() {
   const hs = S.me.households;
   return {
     title: 'Mes foyers', sub: hs.length ? 'Choisir le foyer affiché' : 'Créez votre premier foyer', back: hs.length ? '#/listes' : null, noNav: !hs.length,
-    body: `${hs.map((h) => `<button class="card click row" data-a="foyer-pick" data-id="${h.id}"><span class="acc-i">🏡</span><span class="grow"><b>${esc(h.name)}</b><span class="muted block">${h.members} membre${h.members > 1 ? 's' : ''} · ${h.role === 'manager' ? 'gestionnaire' : 'membre'}</span></span>${h.id === S.me.householdId ? '<span class="pill p-leaf">actuel</span>' : ''}</button>`).join('')}
+    body: `${hs.map((h) => `<button class="card click row" data-a="foyer-pick" data-id="${h.id}"><span class="acc-i">${I('users', 's')}</span><span class="grow"><b>${esc(h.name)}</b><span class="muted block">${h.members} membre${h.members > 1 ? 's' : ''} · ${h.role === 'manager' ? 'gestionnaire' : 'membre'}</span></span>${h.id === S.me.householdId ? '<span class="pill p-leaf">actuel</span>' : ''}</button>`).join('')}
       <div class="card narrow"><label class="muted" for="new-house">Nouveau foyer</label><input class="txt" id="new-house" placeholder="ex. Foyer Phoenix" data-enter="foyer-create">
       <button class="btn full" style="margin-top:8px" data-a="foyer-create">＋ Créer le foyer</button><p class="muted small">Vous en serez gestionnaire. Magasins et rayons de départ : Intermarché, Colruyt, rayons courants (modifiables).</p></div>
-      <div class="sec">Compte</div><div class="card row"><div class="grow"><b>${esc(S.me.name)}</b><div class="muted">${esc(S.me.email)}</div></div><button class="btn sm sec2" data-a="me-name">Renommer</button><button class="btn sm sec2" data-a="me-password">🔑 Mot de passe</button><button class="btn sm sec2" data-a="logout">Se déconnecter</button></div>`,
+      <div class="sec">Compte</div><div class="group"><div class="item"><span class="avatar">${esc((S.me.name || '?')[0])}</span><div class="grow"><b>${esc(S.me.name)}</b><div class="muted small">${esc(S.me.email)}</div></div></div>
+        <button class="item click" data-a="me-name"><span class="ico">${I('edit')}</span><b class="grow">Changer mon nom</b>${I('chev', 's chev')}</button>
+        <button class="item click" data-a="me-password"><span class="ico">${I('lock')}</span><b class="grow">${S.me.hasPassword ? 'Changer mon mot de passe' : 'Choisir un mot de passe'}</b>${I('chev', 's chev')}</button>
+        <button class="item click danger-t" data-a="logout"><span class="ico">${I('logout')}</span><b class="grow">Se déconnecter</b></button></div>`,
   };
 }
 

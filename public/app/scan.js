@@ -2,6 +2,7 @@
 // (Tesseract.js, rien n'est envoye a un service tiers) -> lignes rapprochees du
 // catalogue -> validation -> operation receipt.save (fonctionne aussi hors-ligne).
 import { esc, eur, on, acc, sheet, closeSheet, toast, formData } from './ui.js';
+import { I } from './icons.js';
 import { get, sync, newOp, attempt } from './api.js';
 import { S, hp, render, go, loadProducts, activeStores, storeById, catName, categoryOrder } from './state.js';
 import { parseTicket, detectStore, matchLines } from './ticket.mjs';
@@ -127,7 +128,7 @@ export function scanView() {
     };
   }
   if (scan.status === 'error') {
-    return { title: 'Ticket', back, body: `<div class="card error">${esc(scan.error)}</div><button class="btn" data-a="scan-start" data-lid="${scan.listId || ''}" data-sid="${scan.storeId || ''}">📷 Reprendre une photo</button>` };
+    return { title: 'Ticket', back, body: `<div class="card error">${esc(scan.error)}</div><button class="btn" data-a="scan-start" data-lid="${scan.listId || ''}" data-sid="${scan.storeId || ''}">${I('camera', 's')} Reprendre une photo</button>` };
   }
   const st = storeById(scan.storeId);
   const on_ = scan.lines.filter((l) => l.on && l.product_id !== 'ignore');
@@ -152,10 +153,10 @@ export function scanView() {
     body: `<div class="card"><div class="row gap"><label class="grow"><span class="muted">Magasin</span><select class="txt" data-ch="scan-store">${activeStores().map((s) => `<option value="${s.id}" ${s.id === scan.storeId ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
       <label class="grow"><span class="muted">Date</span><input class="txt" type="date" value="${scan.date}" data-ch="scan-date"></label></div>
       <p class="muted small">Chaque ligne validée devient un prix relevé ${st ? 'chez ' + esc(st.name) : ''} et coche l'article de la liste. Les associations sont mémorisées pour les prochains tickets.</p></div>
-      ${acc('scan_lines', { icon: '🧾', title: 'Lignes du ticket', sum: ` · ${on_.length} retenue${on_.length > 1 ? 's' : ''}`, def: true,
+      ${acc('scan_lines', { icon: `${I('receipt', 's')} `, title: 'Lignes du ticket', sum: ` · ${on_.length} retenue${on_.length > 1 ? 's' : ''}`, def: true,
         body: (rows || '<p class="muted">Aucune ligne reconnue. Reprenez la photo bien à plat, avec de la lumière.</p>') + '<button class="btn sm sec2" style="margin:8px 0" data-a="scan-add">＋ Ajouter une ligne</button>' })}
-      ${acc('scan_text', { icon: '🔤', title: 'Texte lu', sum: ' · pour vérifier', body: `<pre class="ocr">${esc(scan.text || '')}</pre>` })}
-      <div class="row end wide"><button class="btn sec2" data-a="scan-start" data-lid="${scan.listId || ''}" data-sid="${scan.storeId || ''}">📷 Reprendre</button><button class="btn" data-a="scan-save" ${todo ? 'disabled title="Des lignes sont à associer, à créer ou à ignorer"' : ''}>Valider et mettre à jour les prix</button></div>`,
+      ${acc('scan_text', { icon: `${I('doc', 's')} `, title: 'Texte lu', sum: ' · pour vérifier', body: `<pre class="ocr">${esc(scan.text || '')}</pre>` })}
+      <div class="row end wide"><button class="btn sec2" data-a="scan-start" data-lid="${scan.listId || ''}" data-sid="${scan.storeId || ''}">${I('camera', 's')} Reprendre</button><button class="btn" data-a="scan-save" ${todo ? 'disabled title="Des lignes sont à associer, à créer ou à ignorer"' : ''}>Valider et mettre à jour les prix</button></div>`,
   };
 }
 

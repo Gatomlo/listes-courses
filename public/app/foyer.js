@@ -1,5 +1,6 @@
 // Ecran Foyer : membres et invitations, reglages, tags des plats.
 import { esc, eur, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
+import { I } from './icons.js';
 import { patch, post, del, attempt } from './api.js';
 import { S, hp, isManager, render, loadHouse } from './state.js';
 import { installCard } from './install.js';
@@ -17,9 +18,9 @@ export function foyerView() {
   return {
     title: h.name, sub: mgr ? 'Vous êtes gestionnaire' : 'Vous êtes membre',
     right: '<button class="btn sm sec2" data-a="go" data-to="#/foyers">Mes foyers</button>',
-    body: `${installCard()}${acc('mem', { icon: '👥', title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
+    body: `${installCard()}${acc('mem', { icon: `${I('users', 's')} `, title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
         body: members + (mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="invite">＋ Inviter un membre</button>' : '') })}
-      ${acc('set', { icon: '⚙️', title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, ${h.avg_records} relevés, courses ${h.rhythm_days} j, menu ${h.menu_days} j dès le ${DOW[h.menu_start_dow]}`,
+      ${acc('set', { icon: `${I('sliders', 's')} `, title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, ${h.avg_records} relevés, courses ${h.rhythm_days} j, menu ${h.menu_days} j dès le ${DOW[h.menu_start_dow]}`,
         body: `<div class="form">
           <label class="row"><span class="grow"><b>Nom du foyer</b></span><input class="txt w12" name="name" value="${esc(h.name)}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Seuil « 2 magasins »</b><span class="muted block">Économie minimale (€) pour conseiller de faire les deux</span></span><input class="txt w5" name="threshold" inputmode="decimal" value="${(h.threshold_cents / 100).toFixed(2).replace('.', ',')}" ${mgr ? '' : 'disabled'}></label>
@@ -28,7 +29,7 @@ export function foyerView() {
           <label class="row"><span class="grow"><b>Durée d'un menu</b><span class="muted block">Jours proposés pour un nouveau menu</span></span><input class="txt w5" type="number" min="1" max="62" name="menu_days" value="${h.menu_days}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Premier jour d'un menu</b><span class="muted block">Quand aucun menu n'est enregistré avant</span></span><select class="txt w8" name="menu_start_dow" ${mgr ? '' : 'disabled'}>${[1, 2, 3, 4, 5, 6, 0].map((i) => `<option value="${i}" ${i === h.menu_start_dow ? 'selected' : ''}>${DOW[i]}</option>`).join('')}</select></label>
           ${mgr ? '<div class="row end"><button class="btn" data-a="settings-save">Enregistrer</button></div>' : ''}</div>` })}
-      ${acc('tags', { icon: '🏷', title: 'Tags des plats', sum: ` · ${H.tags.length}`,
+      ${acc('tags', { icon: `${I('tag', 's')} `, title: 'Tags des plats', sum: ` · ${H.tags.length}`,
         body: H.tags.map((t) => `<div class="ord"><span class="grow">#${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}</span></span>
           ${mgr ? `<button class="ic" title="Renommer" data-a="tag-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="tag-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="tag-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
           || '<p class="muted">Aucun tag : ajoutez-en depuis la fiche d’un plat.</p>' })}`,
@@ -55,7 +56,7 @@ on('click', 'member', (el) => {
     ${mgr ? `<label class="muted">Nom affiché dans ce foyer</label><input class="txt" name="display_name" value="${esc(m.name)}">
     <div class="sec">Profil</div><div class="seg">${['member', 'manager'].map((r) => `<button class="${m.role === r ? 'on' : ''}" data-a="member-role" data-id="${m.id}" data-role="${r}" ${last && r === 'member' ? 'disabled title="Dernier gestionnaire"' : ''}>${roleLabel(r)}</button>`).join('')}</div>
     <p class="muted small">${m.role === 'manager' ? 'Ajoute directement, valide les suggestions, gère plats, produits, magasins et membres.' : 'Consulte, coche en magasin, scanne les tickets et suggère articles et plats.'}${last ? ' Il faut au moins un gestionnaire dans le foyer.' : ''}</p>` : ''}
-    ${mgr && !m.me ? `<div class="sec">Mot de passe oublié</div><button class="btn sec2 sm" data-a="member-reset" data-id="${m.id}">🔑 Créer un lien de réinitialisation</button><div id="reset-out"></div>` : ''}
+    ${mgr && !m.me ? `<div class="sec">Mot de passe oublié</div><button class="btn sec2 sm" data-a="member-reset" data-id="${m.id}">${I('lock', 's')} Créer un lien de réinitialisation</button><div id="reset-out"></div>` : ''}
     <div class="row end">${!last ? `<button class="btn sec2 danger-t" data-a="member-del" data-id="${m.id}">${m.me ? 'Quitter le foyer' : 'Retirer du foyer'}</button>` : ''}${mgr ? `<button class="btn" data-a="member-save" data-id="${m.id}">Enregistrer</button>` : ''}</div>`);
 });
 on('click', 'member-role', async (el) => {
@@ -90,9 +91,9 @@ on('click', 'invite-ok', async () => {
   const f = formData(document.querySelector('.sheet'));
   const r = await attempt(() => post(hp('/invitations'), f));
   if (!r) return;
-  document.getElementById('invite-out').innerHTML = `<div class="card" style="margin-top:12px">${r.sent ? `<p>📧 Invitation envoyée à <b>${esc(f.email)}</b>.</p>` : ''}
+  document.getElementById('invite-out').innerHTML = `<div class="card" style="margin-top:12px">${r.sent ? `<p>${I('mail', 's')} Invitation envoyée à <b>${esc(f.email)}</b>.</p>` : ''}
     <label class="muted">Lien d'invitation (valable 7 jours, usage unique)</label><input class="txt" readonly value="${esc(r.url)}" id="invite-url">
-    <button class="btn sec2 full" style="margin-top:8px" data-a="invite-copy">🔗 Copier le lien</button></div>`;
+    <button class="btn sec2 full" style="margin-top:8px" data-a="invite-copy">${I('link', 's')} Copier le lien</button></div>`;
 });
 on('click', 'invite-copy', async () => {
   const input = document.getElementById('invite-url');
@@ -136,7 +137,7 @@ on('click', 'member-reset', async (el) => {
   if (!r) return;
   document.getElementById('reset-out').innerHTML = `<input class="txt" readonly value="${esc(r.url)}" id="reset-url" style="margin-top:8px">
     <p class="muted small">Valable 48 h, une seule fois. À transmettre au membre (message, SMS…) : il y choisira un nouveau mot de passe.</p>
-    <button class="btn sec2 sm" data-a="reset-copy">🔗 Copier</button>`;
+    <button class="btn sec2 sm" data-a="reset-copy">${I('link', 's')} Copier</button>`;
 });
 on('click', 'reset-copy', async () => {
   const i = document.getElementById('reset-url');

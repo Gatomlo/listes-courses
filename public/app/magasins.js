@@ -1,6 +1,7 @@
 // Ecran Magasins : magasins (nom, couleur, actif) et ordre des rayons de chacun ; rayons
 // communs (ajout, renommage, suppression).
 import { esc, on, acc, sheet, closeSheet, toast, formData } from './ui.js';
+import { I } from './icons.js';
 import { patch, post, put, del, attempt } from './api.js';
 import { S, hp, isManager, render, loadHouse } from './state.js';
 
@@ -24,8 +25,8 @@ export function magasinsView() {
   const n = H.stores.filter((s) => s.active).length;
   return {
     cols: true, title: 'Magasins', sub: `${n} actif${n > 1 ? 's' : ''} · rayons dans l'ordre du parcours`,
-    body: `${stores || '<p class="muted">Aucun magasin.</p>'}
-      ${mgr ? '<button class="fab" data-a="store-edit" title="Nouveau magasin">＋</button>' : ''}`,
+    body: `${stores || '<p class="muted">Aucun magasin.</p>'}`,
+    dock: mgr ? `<button class="addbar" data-a="store-edit">${I('plus')}<span class="grow">Nouveau magasin</span></button>` : null,
   };
 }
 

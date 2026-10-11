@@ -1,6 +1,8 @@
 // Point d'entree : connexion (lien e-mail, invitation), navigation par #, cadre de
 // l'ecran (en-tete, navigation en bas sur mobile / barre laterale sur PC).
-import { esc, on, toggleAcc, isPc, toast } from './ui.js';
+import { esc, on, toggleAcc, isPc, toast, closeSheet } from './ui.js';
+import { I } from './icons.js';
+import { plusView, promosView, loadPromos } from './plus.js';
 import { get, post, ApiError, net, outbox, onNetChange, onFlushed, flush } from './api.js';
 import { S, setRenderer, render, loadHouse, loadProducts, go, hp, isManager } from './state.js';
 import { loginView, foyersView, setInvite, setReset, loadOptions, loadInvitation, acceptPending, resetPending } from './connexion.js';
@@ -9,20 +11,16 @@ import { magasinsView } from './magasins.js';
 import './install.js'; // tot : retient l'invite d'installation du navigateur
 import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
-import { platsView, dishView, loadDishes, loadDish } from './plats.js';
+import { platsView, dishView, cookView, loadDishes, loadDish } from './plats.js';
 import { menuView, exportView, publicView, loadMenu, loadExport, loadPublic } from './menu.js';
 import { listesView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList } from './listes.js';
 
 const app = document.getElementById('app');
 
-const NAV = [
-  ['listes', 'Listes', '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>'],
-  ['menu', 'Menu', '<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/>'],
-  ['plats', 'Plats', '<path d="M5 4.5A1.5 1.5 0 016.5 3H19v15H6.5A1.5 1.5 0 005 19.5v-15zM5 19.5A1.5 1.5 0 006.5 21H19"/>'],
-  ['catalogue', 'Produits', '<path d="M4 7l8-4 8 4-8 4-8-4zM4 12l8 4 8-4M4 17l8 4 8-4"/>'],
-  ['magasins', 'Magasins', '<path d="M3 9l1.5-5h15L21 9M3 9h18M3 9a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0M5 12v8h14v-8M10 20v-5h4v5"/>'],
-  ['foyer', 'Foyer', '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.8c1.9.7 3 2.4 3.5 5.2"/>'],
-];
+// Onglets : Courses, Menu, ＋ (ajout rapide), Plats, Plus ; sur PC, barre laterale avec
+// en plus les acces directs de l'onglet Plus.
+const NAV = [['listes', 'Courses', 'basket'], ['menu', 'Menu', 'calendar'], ['+'], ['plats', 'Plats', 'bowl'], ['plus', 'Plus', 'grid']];
+const PC_EXTRA = [['catalogue', 'Produits', 'tag'], ['magasins', 'Magasins', 'store'], ['foyer', 'Foyer', 'users']];
 
 const ROUTES = {
   listes: listesView,
@@ -32,29 +30,48 @@ const ROUTES = {
   menuexport: exportView,
   plats: platsView,
   plat: dishView,
+  cuisine: cookView,
   catalogue: catalogueView,
   produit: productView,
   magasins: magasinsView,
   foyer: foyerView,
   foyers: foyersView,
   scan: scanView,
+  plus: plusView,
+  promos: promosView,
 };
 
+// Ecran : { title, sub, back, right, body, large (grand titre d'onglet), dock (barre du bas), noNav, cols, wide }.
+let lastRoute = '';
 function shell(v) {
-  const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes', magasin: 'listes', scan: 'listes', plat: 'plats', menuexport: 'menu' }[S.route[0]] || S.route[0];
-  const badge = S.house && S.house.role === 'manager' && S.house.pending ? `<span class="badge">${S.house.pending}</span>` : '';
-  const wbadge = S.house && S.house.role === 'manager' && S.house.wishesPending ? `<span class="badge">${S.house.wishesPending}</span>` : '';
-  const nav = v.noNav ? '' : `<nav class="tabs">${isPc() ? `<div class="brand">🧺 Le Cabas<small>${esc(S.house ? S.house.household.name : '')}</small></div>` : ''}
-    ${NAV.map(([k, t, svg]) => `<a href="#/${k}" class="${tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg><span>${t}</span>${k === 'listes' ? badge : k === 'menu' ? wbadge : ''}</a>`).join('')}</nav>`;
-  app.className = 'shell' + (v.noNav ? ' nonav' : '') + (v.wide ? ' wide' : '');
+  const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes', magasin: 'listes', scan: 'listes', plat: 'plats', cuisine: 'plats', menuexport: 'menu', promos: 'plus' }[S.route[0]] || S.route[0];
+  const inPlus = ['catalogue', 'magasins', 'foyer', 'plus'].includes(tab);
+  const mgr = S.house && S.house.role === 'manager';
+  const badge = { listes: mgr && S.house.pending, menu: mgr && S.house.wishesPending };
+  const link = ([k, t, ic], on) => `<a href="#/${k}" class="${on ? 'on' : ''}">${I(ic, 'l')}<span>${t}</span>${badge[k] ? `<span class="badge">${badge[k]}</span>` : ''}</a>`;
+  const nav = v.noNav || !S.house ? '' : `<nav class="tabs"><div class="brand"><span class="logo">${I('basket')}</span>Le Cabas</div>
+    <a class="hh" href="#/foyers">${I('users', 's')}<span class="grow">${esc(S.house.household.name)}</span>${I('down', 's')}</a>
+    ${NAV.map((n) => (n[0] === '+' ? `<button class="plus" data-a="quick" aria-label="Ajouter">${I('plus', 'l')}<span>Ajouter</span></button>`
+      : isPc() && n[0] === 'plus' ? PC_EXTRA.map((x) => link(x, tab === x[0])).join('') : link(n, n[0] === 'plus' ? inPlus : tab === n[0]))).join('')}</nav>`;
+  // Ecrans de l'onglet Plus : retour vers Plus (sur telephone).
+  if (!v.back && !isPc() && ['catalogue', 'magasins', 'foyer'].includes(S.route[0])) v = { ...v, back: '#/plus' };
+  app.className = 'shell' + (v.noNav ? ' nonav' : '') + (v.wide ? ' wide' : '') + (v.dock ? ' has-dock' : '');
   const pending = S.me ? outbox().length : 0;
   const hhmm = (t) => new Date(t).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
   const banner = !S.me ? '' : !net.online
-    ? `<div class="net off">📴 <b>Hors-ligne</b>${net.syncedAt ? ` · données du ${hhmm(net.syncedAt)}` : ''}${pending ? ` · ${pending} modification${pending > 1 ? 's' : ''} en attente` : ''}</div>`
-    : pending ? `<div class="net wait">⏳ ${pending} modification${pending > 1 ? 's' : ''} en cours d'envoi…</div>` : '';
-  app.innerHTML = `<header class="top">${v.back ? `<a class="back" href="${v.back}" aria-label="Retour">‹</a>` : ''}<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>${v.right || ''}</header>
-    <main>${banner}<div class="${v.cols ? 'cols' : ''}">${v.body}</div></main>${nav}`;
+    ? `<div class="net off">${I('wifioff')}<span><b>Hors-ligne</b>${net.syncedAt ? ` · données du ${hhmm(net.syncedAt)}` : ''}${pending ? ` · ${pending} modification${pending > 1 ? 's' : ''} en attente` : ''}</span></div>`
+    : pending ? `<div class="net wait">${I('clock')}<span>${pending} modification${pending > 1 ? 's' : ''} en cours d'envoi…</span></div>` : '';
+  const key = location.hash.split('?')[0];
+  const enter = key !== lastRoute;
+  lastRoute = key;
+  app.innerHTML = `<header class="top${v.large ? ' large' : ''}">${v.back ? `<a class="back" href="${v.back}" aria-label="Retour">${I('back')}</a>` : ''}<h2>${esc(v.title)}${v.sub && !v.large ? `<small>${esc(v.sub)}</small>` : ''}</h2><div class="acts-r">${v.right || ''}</div></header>
+    <main class="${enter ? 'enter' : ''}">${v.large ? `<h1 class="ltitle">${esc(v.title)}</h1>${v.sub ? `<p class="lsub root">${esc(v.sub)}</p>` : ''}` : ''}${banner}<div class="${v.cols ? 'cols' : ''}">${v.body}</div></main>
+    ${v.dock ? `<div class="dock">${v.dock}</div>` : ''}${nav}`;
+  onScroll();
 }
+// En-tete : bordure et petit titre une fois le grand titre passe.
+function onScroll() { document.querySelector('header.top')?.classList.toggle('scrolled', window.scrollY > 30); }
+window.addEventListener('scroll', onScroll, { passive: true });
 
 // Raccourcis de l'icone (appui long, manifest.json) : ouvre l'ecran puis declenche l'action.
 let pendingClick = null;
@@ -87,7 +104,7 @@ async function route() {
   let [name, arg] = parts;
   if (name === 'catalogue' && arg) name = 'produit';
   if (name === 'listes' && arg) name = parts[2] === 'magasin' ? 'magasin' : 'liste';
-  if (name === 'plats' && arg) name = 'plat';
+  if (name === 'plats' && arg) name = parts[2] === 'cuisine' ? 'cuisine' : 'plat';
   if (name === 'menu' && arg === 'export') name = 'menuexport';
   if (name === 'raccourci') return shortcut(arg);
   if (!ROUTES[name]) { go('#/listes'); return; }
@@ -100,7 +117,8 @@ async function route() {
     if (name === 'listes') await Promise.all([loadSummary(), loadSuggestions()]);
     if (name === 'liste' || name === 'magasin') await loadList(arg);
     if (name === 'plats') { S.dishReturn = null; await loadDishes(); }
-    if (name === 'plat') await loadDish(arg);
+    if (name === 'plat' || name === 'cuisine') await loadDish(arg);
+    if (name === 'promos') await loadPromos();
     if (name === 'menu') await loadMenu();
     if (name === 'menuexport') await loadExport();
     shell(ROUTES[name]());
@@ -111,7 +129,7 @@ async function route() {
     if (e instanceof ApiError && e.status === 404 && name === 'plat') { go('#/plats'); return; }
     if (e instanceof ApiError && e.status === 401) { location.href = './'; return; }
     if (e instanceof ApiError && e.status === 0) {
-      shell({ title: 'Hors-ligne', back: '#/listes', body: '<div class="card"><h4>📴 Pas de réseau</h4><p class="muted">Cette page n’a pas encore été ouverte avec du réseau sur cet appareil. Les listes à venir, elles, sont gardées dès l’ouverture de l’app.</p></div>' });
+      shell({ title: 'Hors-ligne', back: '#/listes', body: '<div class="card"><h4>Pas de réseau</h4><p class="muted">Cette page n’a pas encore été ouverte avec du réseau sur cet appareil. Les listes à venir, elles, sont gardées dès l’ouverture de l’app.</p></div>' });
       return;
     }
     app.innerHTML = `<div class="card error">${esc(e.message)}</div>`;
@@ -130,7 +148,8 @@ setRenderer(() => {
   window.scrollTo(0, y);
 });
 
-window.addEventListener('hashchange', () => { route().then(() => window.scrollTo(0, 0)); });
+// Changement d'ecran : un panneau ouvert se ferme (retour du navigateur compris).
+window.addEventListener('hashchange', () => { closeSheet(); route().then(() => window.scrollTo(0, 0)); });
 // Passage mobile <-> PC : la mise en page et l'etat des accordeons changent.
 window.matchMedia('(min-width: 900px)').addEventListener('change', () => render());
 
