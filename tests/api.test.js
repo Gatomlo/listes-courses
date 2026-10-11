@@ -79,16 +79,24 @@ test('magasins : ajout, desactivation, au moins un actif', async () => {
   await thomas.patch(`${h}/stores/${im.id}`, { active: true });
 });
 
-test('parcours incomplet repare : rayons manquants remis en fin de parcours', async () => {
-  const { db } = require('../lib/db');
-  const before = (await thomas.get(h)).data;
-  const s = before.stores[0], keep = s.categoryOrder[2];
-  db.prepare('DELETE FROM store_category_order WHERE store_id = ? AND category_id <> ?').run(s.id, keep);
-  const after = (await thomas.get(h)).data;
-  const fixed = after.stores.find((x) => x.id === s.id);
-  assert.equal(fixed.categoryOrder.length, before.categories.length);
-  assert.equal(fixed.categoryOrder[0], keep);
-  assert.ok(after.stores.every((x) => x.categoryOrder.length === after.categories.length));
+test('rayons propres a chaque magasin : pharmacie sans rayons, rayon d un seul magasin, retrait', async () => {
+  let stores = (await thomas.post(`${h}/stores`, { name: 'Pharmacie', color: '#1f6fb2', copy_from: 'none' })).data;
+  const ph = stores.find((x) => x.name === 'Pharmacie');
+  assert.deepEqual(ph.categoryOrder, []);
+  const r = await thomas.post(`${h}/categories`, { name: 'Médicaments', store_ids: [ph.id] });
+  const med = r.data.categories.find((c) => c.name === 'Médicaments');
+  assert.deepEqual(r.data.stores.find((x) => x.id === ph.id).categoryOrder, [med.id]);
+  assert.ok(r.data.stores.filter((x) => x.id !== ph.id).every((x) => !x.categoryOrder.includes(med.id)));
+  // Retirer un rayon d'un magasin seulement ; le rayon reste ailleurs.
+  const co = r.data.stores.find((x) => x.name === 'Colruyt');
+  stores = (await thomas.put(`${h}/stores/${co.id}/order`, { categoryIds: co.categoryOrder.slice(1) })).data;
+  assert.equal(stores.find((x) => x.id === co.id).categoryOrder.length, co.categoryOrder.length - 1);
+  assert.ok(stores.find((x) => x.name === 'Intermarché').categoryOrder.includes(co.categoryOrder[0]));
+  assert.equal((await thomas.put(`${h}/stores/${co.id}/order`, { categoryIds: [999999] })).status, 400);
+  await thomas.put(`${h}/stores/${co.id}/order`, { categoryIds: co.categoryOrder });
+  // Nouveau magasin copie d'un autre.
+  stores = (await thomas.post(`${h}/stores`, { name: 'Pharma 2', copy_from: ph.id })).data;
+  assert.deepEqual(stores.find((x) => x.name === 'Pharma 2').categoryOrder, [med.id]);
 });
 
 test('rayons : ajout en fin de parcours, ordre, suppression avec transfert', async () => {
@@ -99,7 +107,6 @@ test('rayons : ajout en fin de parcours, ordre, suppression avec transfert', asy
   const order = [bio.id, ...store.categoryOrder.filter((id) => id !== bio.id)];
   const s2 = (await thomas.put(`${h}/stores/${store.id}/order`, { categoryIds: order })).data;
   assert.equal(s2[0].categoryOrder[0], bio.id);
-  assert.equal((await thomas.put(`${h}/stores/${store.id}/order`, { categoryIds: [bio.id] })).status, 400);
   const p = (await thomas.post(`${h}/products`, { name: 'Quinoa', category_id: bio.id })).data;
   assert.equal((await thomas.del(`${h}/categories/${bio.id}`)).status, 400);
   const epicerie = r.data.categories.find((c) => c.name === 'Épicerie');

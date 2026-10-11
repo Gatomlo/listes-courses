@@ -159,6 +159,12 @@ test('lecture des ingredients et des recettes', () => {
   assert.deepEqual(ka('3 oignons'), [3, null, 'oignons', 3, 'pc']);
   assert.deepEqual(ka('2 boîtes de pois chiches'), [2, 'boîtes', 'pois chiches', 2, null]);
   assert.deepEqual(ka("2 c. à s. d'huile").slice(3), [2, 'cs']);
+  assert.deepEqual(ka('1 C. à café cumin').slice(2), ['cumin', 1, 'cc']);
+  assert.deepEqual(ka("2 C. à soupe d'huile d'olive").slice(2), ["huile d'olive", 2, 'cs']);
+  assert.deepEqual(ka('1 càs de miel').slice(2), ['miel', 1, 'cs']);
+  assert.deepEqual(ka('3 cuillerées à café de thé').slice(2), ['thé', 3, 'cc']);
+  assert.deepEqual(ka('2 cacahuètes').slice(2), ['cacahuètes', 2, 'pc']);
+  assert.equal(parseRecipeHtml(`<script type="application/ld+json">${JSON.stringify({ '@type': 'Recipe', name: 'X', image: [{ '@type': 'ImageObject', url: 'https://ex.be/p.jpg' }] })}</script>`).image, 'https://ex.be/p.jpg');
   assert.equal(parseIngredient('Sel, poivre').base, true);
   assert.equal(parseIngredient('½ litre de lait').qty, 0.5);
   const html = `<html><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage"},{"@type":"Recipe","name":"Gratin dauphinois","recipeYield":"6 personnes","totalTime":"PT1H30M",
@@ -175,6 +181,31 @@ test('lecture des ingredients et des recettes', () => {
   assert.equal(ent.ingredients[0].raw, "200 g d'emmental");
   assert.deepEqual(ent.steps, ["Préchauffer l'four"]);
   assert.ok(privateIp('127.0.0.1') && privateIp('10.1.2.3') && privateIp('192.168.1.1') && privateIp('::1') && !privateIp('8.8.8.8'));
+});
+
+test('photo d un plat : envoi, lecture, photo d une recette importee, retrait', async () => {
+  const { baseUrl } = require('./helpers');
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  let r = await thomas.post(`${h}/dishes`, { name: 'Tarte photo', photo_data: `data:image/png;base64,${png}` });
+  assert.equal(r.status, 201);
+  const d = r.data;
+  assert.match(d.photo, /^h\/\d+\/dishes\/\d+\/photo\?v=/);
+  const get = await fetch(`${baseUrl()}/api/${d.photo}`, { headers: { cookie: thomas.cookie() } });
+  assert.equal(get.status, 200);
+  assert.equal(Buffer.from(await get.arrayBuffer()).toString('base64'), png);
+  assert.equal((await fetch(`${baseUrl()}/api/${d.photo}`)).status, 401, 'connexion requise');
+  assert.equal((await thomas.put(`${h}/dishes/${d.id}`, { name: 'Tarte photo', photo_data: 'data:text/html;base64,AAAA' })).status, 400);
+  // Photo de la recette (adresse) telechargee par le serveur.
+  const img = http.createServer((req, res) => { res.setHeader('content-type', 'image/png'); res.end(Buffer.from(png, 'base64')); }).listen(0);
+  await new Promise((ok) => img.once('listening', ok));
+  r = await thomas.put(`${h}/dishes/${d.id}`, { name: 'Tarte photo', photo_url: `http://127.0.0.1:${img.address().port}/p.png` });
+  img.close();
+  assert.equal(r.status, 200);
+  assert.notEqual(r.data.photo, d.photo);
+  assert.ok((await thomas.get(`${h}/dishes`)).data.find((x) => x.id === d.id).photo);
+  r = await thomas.put(`${h}/dishes/${d.id}`, { name: 'Tarte photo', photo: null });
+  assert.equal(r.data.photo, null);
+  assert.equal((await thomas.get(`${h}/dishes/${d.id}/photo`)).status, 404);
 });
 
 test('import depuis un lien (page servie en local) ; page sans recette', async () => {

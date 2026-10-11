@@ -18,7 +18,9 @@ export const catName = (id) => (S.house.categories.find((c) => c.id === id) || {
 // Rayons dans l'ordre du premier magasin actif (parcours de reference).
 export function categoryOrder() {
   const first = activeStores()[0];
-  return first ? first.categoryOrder : S.house.categories.map((c) => c.id);
+  // Rayons du premier magasin, puis ceux des autres magasins (et sans magasin) : tous les rayons.
+  const ids = [...(first ? first.categoryOrder : []), ...S.house.stores.flatMap((s) => s.categoryOrder), ...S.house.categories.map((c) => c.id)];
+  return [...new Set(ids)];
 }
 
 export async function loadHouse() {
