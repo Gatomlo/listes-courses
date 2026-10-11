@@ -18,11 +18,16 @@ function noPrice(p) {
   return forced ? !p.prices[forced.id] : !activeStores().some((s) => p.prices[s.id]);
 }
 
+// Produits affiches : recherche, filtre (recurrents, de base, prix manquant) et rayon.
+const visible = () => {
+  const q = S.q.cat || '', f = S.q.catFilter || 'all', r = Number(S.q.catRayon) || 0;
+  return S.products.filter((p) => (!q || norm(p.name).includes(norm(q))) && (!r || p.category_id === r)
+    && (f === 'all' || (f === 'rec' && p.recurrence) || (f === 'base' && p.is_base) || (f === 'noprice' && noPrice(p))));
+};
+
 export function catalogueView() {
-  const q = S.q.cat || '', f = S.q.catFilter || 'all';
-  const ok = (p) => (!q || norm(p.name).includes(norm(q)))
-    && (f === 'all' || (f === 'rec' && p.recurrence) || (f === 'base' && p.is_base) || (f === 'noprice' && noPrice(p)));
-  const list = S.products.filter(ok);
+  const q = S.q.cat || '', f = S.q.catFilter || 'all', r = Number(S.q.catRayon) || 0;
+  const list = visible();
   const groups = categoryOrder().map((cid) => [cid, list.filter((p) => p.category_id === cid)]).filter(([, ps]) => ps.length);
   // Une ligne par produit ; sur PC, colonnes alignees a gauche (selection, produit, emballage,
   // de base, prix par magasin, conseil) et selection multiple pour modifier en masse.
@@ -49,15 +54,15 @@ export function catalogueView() {
     right: mgr ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button>' : '',
     body: `<div class="search">${I('search')}<input class="txt" id="cat-q" placeholder="Rechercher un produit…" value="${esc(q)}" data-in="cat-q"></div>
       <div class="opt">${[['all', 'Tous'], ['rec', `${I('repeat', 's')} Récurrents`], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
+      <select class="txt sm cat-rayon" data-ch="cat-rayon" aria-label="Filtrer par rayon"><option value="">Tous les rayons</option>${catOptions(r)}</select>
       ${bulk}
-      ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: head(cid, ps) + ps.map(row).join('') })).join('')
+      ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all' || r), body: head(cid, ps) + ps.map(row).join('') })).join('')
         || `<p class="muted">Aucun produit.</p>${q ? `<button class="btn" data-a="prod-new" data-name="${esc(q)}">＋ Créer « ${esc(q)} »</button>` : ''}`}`,
     dock: `<button class="addbar" data-a="prod-new">${I('plus')}<span class="grow">Nouveau produit</span></button>`,
   };
 }
 
 // ---------- Selection multiple (PC, gestionnaire) ----------
-const visible = () => { const q = S.q.cat || ''; return S.products.filter((p) => !q || norm(p.name).includes(norm(q))); };
 on('click', 'psel', (el) => { const id = Number(el.dataset.id), s = S.q.psel; if (s.has(id)) s.delete(id); else s.add(id); render(); });
 on('click', 'psel-all', (el) => {
   const ids = visible().filter((p) => p.category_id === Number(el.dataset.cid)).map((p) => p.id), s = S.q.psel;
@@ -70,7 +75,7 @@ on('change', 'bulk', async (el) => {
   const k = el.dataset.k, v = el.value === 'none' ? null : k === 'is_base' ? el.value === '1' : Number(el.value);
   const n = S.q.psel.size;
   const r = await attempt(() => post(hp('/products/bulk'), { ids: [...S.q.psel], set: { [k]: v } }));
-  if (r) { await loadProducts(); toast(`${n} produit${n > 1 ? 's' : ''} modifié${n > 1 ? 's' : ''}`); render(); }
+  if (r) { S.q.psel.clear(); await loadProducts(); toast(`${n} produit${n > 1 ? 's' : ''} modifié${n > 1 ? 's' : ''}`); render(); }
 });
 on('click', 'bulk-del', async () => {
   const n = S.q.psel.size;
@@ -88,6 +93,7 @@ on('input', 'cat-q', (el) => {
   i.focus(); i.setSelectionRange(i.value.length, i.value.length);
 });
 on('click', 'cat-filter', (el) => { S.q.catFilter = el.dataset.f; render(); });
+on('change', 'cat-rayon', (el) => { S.q.catRayon = el.value; render(); });
 
 // ---------- Creation ----------
 export const unitOptions = (cur) => S.house.units.map((u) => `<option ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('');

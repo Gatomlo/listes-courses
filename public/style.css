@@ -139,6 +139,7 @@ input.txt,select.txt,textarea.txt{width:100%;min-height:44px;border:1px solid va
 input.txt:focus,select.txt:focus,textarea.txt:focus{border-color:var(--leaf);background:var(--surface)}
 input.txt:disabled,select.txt:disabled{background:var(--sunk);opacity:.8}
 .search{position:relative}
+.cat-rayon{display:block;width:100%;max-width:320px;margin:0 0 10px}
 .search svg{position:absolute;left:14px;top:13px;color:var(--faint)}
 .search input.txt{padding-left:42px;background:var(--surface);border-color:transparent;box-shadow:var(--shadow-s)}
 .w5,.txt.w5{width:84px;flex:none}.txt.w6{width:100px;flex:none}.w12,.txt.w12{width:180px;flex:none}
