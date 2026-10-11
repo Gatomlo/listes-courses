@@ -2,7 +2,7 @@
 // l'ecran (en-tete, navigation en bas sur mobile / barre laterale sur PC).
 import { esc, on, toggleAcc, isPc, toast } from './ui.js';
 import { get, post, ApiError, net, outbox, onNetChange, onFlushed, flush } from './api.js';
-import { S, setRenderer, render, loadHouse, loadProducts, go } from './state.js';
+import { S, setRenderer, render, loadHouse, loadProducts, go, hp, isManager } from './state.js';
 import { loginView, foyersView, setInvite, setReset, loadOptions, loadInvitation, acceptPending, resetPending } from './connexion.js';
 import { foyerView } from './foyer.js';
 import { magasinsView } from './magasins.js';
@@ -56,6 +56,23 @@ function shell(v) {
     <main>${banner}<div class="${v.cols ? 'cols' : ''}">${v.body}</div></main>${nav}`;
 }
 
+// Raccourcis de l'icone (appui long, manifest.json) : ouvre l'ecran puis declenche l'action.
+let pendingClick = null;
+async function shortcut(kind) {
+  let to = '#/listes';
+  try {
+    if (!S.house) await loadHouse();
+    if (kind === 'article') {
+      const s = await get(hp('/lists'));
+      const l = s.upcoming[0] || s.backlog; // prochaine liste datee en cours, sinon « À prevoir »
+      if (l) { to = `#/listes/${l.id}`; pendingClick = 'add-open'; } else toast('Aucune liste en cours');
+    } else if (kind === 'plat' && isManager()) to = '#/plats/nouveau';
+    else if (kind === 'envie' || kind === 'plat') { to = '#/menu'; pendingClick = 'wish-add'; }
+  } catch { /* hors-ligne : ecran des listes */ }
+  history.replaceState(null, '', location.pathname + location.search + to); // le raccourci ne reste pas dans l'historique
+  return route();
+}
+
 async function route() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
   // Affichage public du menu : sans connexion.
@@ -72,6 +89,7 @@ async function route() {
   if (name === 'listes' && arg) name = parts[2] === 'magasin' ? 'magasin' : 'liste';
   if (name === 'plats' && arg) name = 'plat';
   if (name === 'menu' && arg === 'export') name = 'menuexport';
+  if (name === 'raccourci') return shortcut(arg);
   if (!ROUTES[name]) { go('#/listes'); return; }
   S.route = [name, arg, parts[3]];
   connectEvents();
@@ -86,6 +104,7 @@ async function route() {
     if (name === 'menu') await loadMenu();
     if (name === 'menuexport') await loadExport();
     shell(ROUTES[name]());
+    if (pendingClick) { const a = pendingClick; pendingClick = null; document.querySelector(`[data-a="${a}"]`)?.click(); }
   } catch (e) {
     if (e instanceof ApiError && e.status === 404 && name === 'produit') { go('#/catalogue'); return; }
     if (e instanceof ApiError && e.status === 404 && name === 'liste') { go('#/listes'); return; }
