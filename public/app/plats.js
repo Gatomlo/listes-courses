@@ -1,6 +1,6 @@
 // Plats : liste (recherche par nom ou ingredient, filtres), fiche (informations,
 // ingredients, recette facultative avec import depuis un lien, menu et historique).
-import { esc, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
+import { esc, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc } from './ui.js';
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder } from './state.js';
 import { matchLines } from './ticket.mjs';
@@ -554,32 +554,105 @@ on('click', 'imp-ok', async () => {
   render();
 });
 
-// ---------- Mode cuisine : plein ecran, quantites ajustees, recettes enchainees ----------
+// ---------- Mode cuisine : quantites ajustees, recettes enchainees ----------
+// Telephone : pas a pas (ingredients, puis une etape par ligne des consignes ; bouton
+// « Ingrédients » sur chaque etape ; glisser a gauche / a droite pour changer d'etape).
+// PC : tout sur une page. L'ecran reste allume tant que le mode cuisine est ouvert.
+const stepsOf = (x) => String(x || '').split('\n').map((t) => t.trim()).filter(Boolean);
+// Recettes du mode cuisine : le plat puis ses composants, chacun avec son facteur.
+function cookParts() {
+  const d = ed, p = Number(S.q[`cp${d.id}`] || S.route[2] || d.portions), f = p / d.portions;
+  return { p, list: [{ ...d, ingredients: dishIngredients(d, null), g: f, own: true },
+    ...(d.parts || []).map((x) => ({ ...x, g: (f * x.portions) / x.dish_portions }))] };
+}
+const ingCard = (list, g) => (list.length ? `<div class="card">${list.map((i) => `<div class="ing"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span><span class="q">${i.qty == null ? '<span class="muted">selon goût</span>' : esc(amountText(i.qty * g, i))}</span></div>`).join('')}</div>` : '');
+const partHead = (x) => `<div class="mid">${esc(x.name)}${x.variant ? ` · ${esc(x.variant)}` : ''}</div>
+  <p class="muted small" style="margin:2px 0 8px">${x.time_text ? `⏱ ${esc(x.time_text)} · ` : ''}${fmtQ(x.g * x.dish_portions)} portions (recette pour ${x.dish_portions})</p>`;
+const variantsNote = (d) => ((d.groups || []).length ? `<p class="muted small" style="margin:0 4px 10px">Variantes : ${d.groups.map((g) => `${esc(g.name)} (${g.options.map((o) => esc(o.name)).join(' / ')})`).join(' ; ')}. Quantités de la 1re option.</p>` : '');
+// Tous les ingredients (par recette pour un plat compose).
+const allIngs = (list) => list.map((x) => (x.own ? `${ingCard(x.ingredients || [], x.g)}${variantsNote(x)}` : (x.ingredients || []).length ? `<div class="part">${partHead(x)}${ingCard(x.ingredients, x.g)}</div>` : '')).join('')
+  || '<div class="empty">Pas d’ingrédients renseignés.</div>';
+const stepperHtml = (p) => `<div class="card row"><span class="grow"><b>Pour ${p} personne${p > 1 ? 's' : ''}</b><span class="muted block">quantités ajustées</span></span>
+  <span class="stepper"><button data-a="cook-p" data-d="-1" aria-label="Moins">${I('minus')}</button><b>${p}</b><button data-a="cook-p" data-d="1" aria-label="Plus">${I('plus')}</button></span></div>`;
+const cookStep = () => Number(S.q[`cs${ed.id}`] || 0);
+
 export function cookView() {
-  const d = ed, k = `cp${d.id}`, p = Number(S.q[k] || S.route[2] || d.portions), f = p / d.portions;
-  const stepsOf = (x) => String(x || '').split('\n').map((t) => t.trim()).filter(Boolean);
-  const ings = (list, g) => (list.length ? `<div class="card">${list.map((i) => `<div class="ing"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span><span class="q">${i.qty == null ? '<span class="muted">selon goût</span>' : esc(amountText(i.qty * g, i))}</span></div>`).join('')}</div>` : '');
-  const block = (x, g) => { const st = stepsOf(x.steps); return `${ings(x.ingredients || [], g)}${st.length ? `<div class="card"><ol class="steps">${st.map((t) => `<li>${esc(t)}</li>`).join('')}</ol></div>` : ''}${x.notes ? `<p class="muted pre" style="margin:0 4px 10px">${esc(x.notes)}</p>` : ''}${x.url ? `<a class="btn sec2 sm" href="${esc(x.url)}" target="_blank" rel="noopener">${I('link', 's')} Recette en ligne</a>` : ''}`; };
-  const own = dishIngredients(d, null);
-  return {
-    title: d.name, back: `#/plats/${d.id}`, noNav: true, sub: d.time_text ? `⏱ ${d.time_text}` : '',
-    right: `<button class="ib" data-a="wake" aria-label="Garder l’écran allumé">${I('eye')}</button>`,
-    body: `<div class="card row"><span class="grow"><b>Pour ${p} personne${p > 1 ? 's' : ''}</b><span class="muted block">quantités ajustées</span></span>
-      <span class="stepper"><button data-a="cook-p" data-d="-1" aria-label="Moins">${I('minus')}</button><b>${p}</b><button data-a="cook-p" data-d="1" aria-label="Plus">${I('plus')}</button></span></div>
-      ${block({ ...d, ingredients: own }, f)}
-      ${(d.groups || []).length ? `<p class="muted small" style="margin:0 4px 10px">Variantes : ${d.groups.map((g) => `${esc(g.name)} (${g.options.map((o) => esc(o.name)).join(' / ')})`).join(' ; ')}. Quantités de la 1re option.</p>` : ''}
-      ${(d.parts || []).map((x) => { const g = (f * x.portions) / x.dish_portions; return `<div class="part"><div class="mid">${esc(x.name)}${x.variant ? ` · ${esc(x.variant)}` : ''}</div>
-        <p class="muted small" style="margin:2px 0 8px">${x.time_text ? `⏱ ${esc(x.time_text)} · ` : ''}${fmtQ(g * x.dish_portions)} portions (recette pour ${x.dish_portions})</p>${block(x, g)}</div>`; }).join('')}`,
-  };
+  setTimeout(syncWake);
+  const d = ed, { p, list } = cookParts();
+  const head = { title: d.name, back: `#/plats/${d.id}`, noNav: true, sub: `${d.time_text ? `⏱ ${d.time_text}` : ''}${wakeLock ? `${d.time_text ? ' · ' : ''}écran allumé` : ''}` };
+  if (isPc()) {
+    const block = (x) => { const st = stepsOf(x.steps); return `${ingCard(x.ingredients || [], x.g)}${st.length ? `<div class="card"><ol class="steps">${st.map((t) => `<li>${esc(t)}</li>`).join('')}</ol></div>` : ''}${x.notes ? `<p class="muted pre" style="margin:0 4px 10px">${esc(x.notes)}</p>` : ''}${x.url ? `<a class="btn sec2 sm" href="${esc(x.url)}" target="_blank" rel="noopener">${I('link', 's')} Recette en ligne</a>` : ''}`; };
+    return { ...head, body: `${stepperHtml(p)}${block(list[0])}${variantsNote(d)}${list.slice(1).map((x) => `<div class="part">${partHead(x)}${block(x)}</div>`).join('')}` };
+  }
+  // Telephone : etape 0 = ingredients, puis une etape par ligne des consignes.
+  const steps = list.flatMap((x) => stepsOf(x.steps).map((t) => ({ text: t, part: x.own ? null : x.name })));
+  const n = steps.length, k = Math.min(cookStep(), n);
+  const bar = `<div class="ck-bar">${[0, ...steps.map((_, i) => i + 1)].map((i) => `<span class="${i === k ? 'on' : i < k ? 'past' : ''}"></span>`).join('')}</div>`;
+  const links = list.filter((x) => x.url).map((x) => `<a class="btn sec2 sm" href="${esc(x.url)}" target="_blank" rel="noopener">${I('link', 's')} ${list.length > 1 ? esc(x.name) : 'Recette en ligne'}</a>`).join(' ');
+  const notes = list.filter((x) => x.notes).map((x) => `<p class="muted pre small" style="margin:10px 4px">${list.length > 1 ? `<b>${esc(x.name)}</b> · ` : ''}${esc(x.notes)}</p>`).join('');
+  let body, dock;
+  if (k === 0) {
+    body = `${n ? bar : ''}<div class="ck-label">Ingrédients</div>${stepperHtml(p)}${allIngs(list)}
+      ${n ? '' : `<p class="muted" style="margin:10px 4px">Pas d’étapes renseignées.</p>${links}`}${n ? '' : notes}`;
+    dock = n ? `<button class="btn full" data-a="ck-go" data-d="1">Commencer · ${n} étape${n > 1 ? 's' : ''} ${I('arrowR', 's')}</button>` : null;
+  } else {
+    const st = steps[k - 1], prevPart = k > 1 ? steps[k - 2].part : null;
+    body = `${bar}<div class="ck-label">Étape ${k} sur ${n}${st.part ? ` · ${esc(st.part)}` : ''}</div>
+      ${st.part && st.part !== prevPart ? `<p class="muted small" style="margin:0 2px 8px">${I('puzzle', 's')} Recette « ${esc(st.part)} »</p>` : ''}
+      <div class="ck-step" data-swipe="1">${esc(st.text)}</div>
+      ${k === n ? `${notes}${links ? `<div style="margin-top:12px">${links}</div>` : ''}` : ''}`;
+    dock = `<button class="btn sec2" data-a="ck-go" data-d="-1" aria-label="Étape précédente">${I('back')}</button>
+      <button class="btn sec2 grow" data-a="ck-ings">${I('bowl', 's')} Ingrédients</button>
+      ${k < n ? `<button class="btn" data-a="ck-go" data-d="1" aria-label="Étape suivante">Suivante ${I('arrowR', 's')}</button>` : `<a class="btn" href="#/plats/${d.id}">${I('check', 's')} Terminé</a>`}`;
+  }
+  return { ...head, body, dock };
 }
 on('click', 'cook-p', (el) => { const k = `cp${ed.id}`; S.q[k] = Math.max(1, Number(S.q[k] || S.route[2] || ed.portions) + Number(el.dataset.d)); render(); });
-// Ecran allume pendant la cuisine (si le navigateur le permet).
-let wakeLock = null;
-on('click', 'wake', async () => {
-  try {
-    if (wakeLock) { await wakeLock.release(); wakeLock = null; toast('Écran : veille normale'); return; }
-    wakeLock = await navigator.wakeLock.request('screen');
-    wakeLock.addEventListener('release', () => { wakeLock = null; });
-    toast('L’écran reste allumé');
-  } catch { toast('Ce navigateur ne peut pas garder l’écran allumé', true); }
+function ckGo(delta) {
+  const { list } = cookParts(), n = list.reduce((a, x) => a + stepsOf(x.steps).length, 0);
+  const k = Math.max(0, Math.min(n, cookStep() + delta));
+  if (k === cookStep()) return;
+  S.q[`cs${ed.id}`] = k;
+  render();
+  window.scrollTo(0, 0);
+}
+on('click', 'ck-go', (el) => ckGo(Number(el.dataset.d)));
+// Ingredients sans quitter l'etape (panneau), personnes modifiables.
+on('click', 'ck-ings', () => {
+  const { p, list } = cookParts();
+  sheet(`<h3>${I('bowl', 's')} Ingrédients · ${p} personne${p > 1 ? 's' : ''}</h3>${allIngs(list)}`);
 });
+// Glisser horizontalement sur l'etape : suivante / precedente.
+let swipe = null;
+document.addEventListener('touchstart', (e) => {
+  if (!location.hash.includes('/cuisine') || isPc() || e.touches.length > 1 || e.target.closest('.sheet, .dock, button, a, input')) { swipe = null; return; }
+  swipe = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: true });
+document.addEventListener('touchend', (e) => {
+  if (!swipe) return;
+  const t = e.changedTouches[0], dx = t.clientX - swipe.x, dy = t.clientY - swipe.y;
+  swipe = null;
+  if (Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy)) ckGo(dx < 0 ? 1 : -1);
+}, { passive: true });
+
+// Ecran allume tant que le mode cuisine est ouvert et visible (si le navigateur le
+// permet) ; le navigateur relache le verrou quand l'app passe en arriere-plan.
+let wakeLock = null, wakeBusy = false;
+async function syncWake() {
+  const want = location.hash.includes('/cuisine') && document.visibilityState === 'visible';
+  if (want && !wakeLock && !wakeBusy && 'wakeLock' in navigator) {
+    wakeBusy = true;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; if (location.hash.includes('/cuisine')) render(); });
+      if (location.hash.includes('/cuisine')) render();
+    } catch { /* refuse (economie d'energie, page non securisee) : veille normale */ }
+    wakeBusy = false;
+  } else if (!want && wakeLock) { const w = wakeLock; wakeLock = null; w.release().catch(() => {}); }
+}
+// Entree dans le mode cuisine : on repart des ingredients.
+window.addEventListener('hashchange', (e) => {
+  if (location.hash.includes('/cuisine') && !String(e.oldURL).includes('/cuisine')) Object.keys(S.q).filter((k) => /^cs\d/.test(k)).forEach((k) => delete S.q[k]);
+  syncWake();
+});
+document.addEventListener('visibilitychange', syncWake);
