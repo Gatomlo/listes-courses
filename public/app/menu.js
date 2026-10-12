@@ -62,11 +62,11 @@ export function menuView() {
   return {
     title: 'Menu', sub: `${range} · ${p.saved ? 'menu enregistré' : 'période proposée'}`, large: true,
     // PC : actions dans la barre ; telephone : un bouton d'options.
-    right: isPc() ? menuActions().map(([a, t, ic]) => `<button class="btn sm sec2" data-a="${a}">${I(ic, 's')} ${t}</button>`).join('') : `<button class="ib" data-a="menu-export" aria-label="Exporter et partager">${I('share')}</button><button class="ib" data-a="menu-more" aria-label="Options du menu">${I('sliders')}</button>`,
+    right: isPc() ? menuActions().map(([a, t, ic]) => `<button class="btn sm sec2" data-a="${a}">${I(ic, 's')} ${t}</button>`).join('') : `${mgr && menu.to >= today() ? `<button class="ib" data-a="menu-gen" aria-label="Générer le menu" title="Générer le menu">${I('spark')}</button>` : ''}<button class="ib" data-a="menu-export" aria-label="Exporter et partager">${I('share')}</button><button class="ib" data-a="menu-more" aria-label="Options du menu">${I('sliders')}</button>`,
     body: `<div class="row"><button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.from, -1)}" aria-label="Menu précédent">${I('back', 's')}</button>
       <div class="grow c"><b>${range}</b><span class="muted small block">${days.length} jours</span></div>
       <button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.to, 1)}" aria-label="Menu suivant">${I('chev', 's')}</button></div>
-      <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}${mgr && menu.to >= today() ? `<button class="btn sm" data-a="menu-gen">${I('spark', 's')} Générer le menu</button>` : ''}</div>
+      <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}</div>
       ${body}
       ${wishesHtml()}
       ${mgr ? `<div class="sec">Remarques</div><textarea class="txt" rows="3" maxlength="2000" placeholder="Remarques sur ce menu (imprimées avec l’export)" data-ch="menu-note">${esc(menu.note || '')}</textarea>`
@@ -320,6 +320,7 @@ async function moveMeal(id, date, slot) {
 }
 function menuActions() {
   return [
+    ...(isManager() && menu.to >= today() ? [['menu-gen', 'Générer le menu', 'spark']] : []),
     ...(isManager() ? [['menu-dates', menu.period.saved ? 'Modifier les dates' : 'Fixer les dates', 'calendar']] : []),
     ['menu-slots', 'Repas affichés', 'eye'],
     ['menu-export', 'Exporter et partager', 'doc'],
