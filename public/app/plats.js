@@ -112,8 +112,8 @@ export function dishView() {
   const steps = String(ed.steps || '').split('\n').map((x) => x.trim()).filter(Boolean);
   const tabRec = ro ? `${ed.url ? `<a class="card click row" href="${esc(ed.url)}" target="_blank" rel="noopener">${I('link')}<span class="grow small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(ed.url)}</span>${I('arrowR', 's')}</a>` : ''}
       ${steps.length ? `<div class="card"><ol class="steps">${steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></div>` : '<div class="empty">Pas d’étapes renseignées.</div>'}${ed.notes ? `<div class="sec">Notes</div><div class="card pre">${esc(ed.notes)}</div>` : ''}`
-    : `<div class="card form"><label class="muted small">Lien vers une recette en ligne</label><div class="row gap"><input class="txt grow" value="${esc(ed.url)}" placeholder="https://…" data-ch="ed" data-f="url">${mgr ? `<button class="btn sm" data-a="rec-import">${I('upload', 's')} Importer</button>` : ''}</div>
-      ${mgr ? '<p class="muted small">Importer lit nom, portions, temps, ingrédients et étapes quand le site les publie.</p>' : ''}
+    : `<div class="card form"><label class="muted small">Lien vers une recette en ligne</label><div class="row gap"><input class="txt grow" value="${esc(ed.url)}" placeholder="https://…" data-ch="ed" data-f="url">${mgr ? `<button class="btn sm" data-a="rec-import">${I('upload', 's')} Importer</button><button class="btn sm sec2" data-a="rec-paste" title="Coller la liste des ingrédients">Coller</button>` : ''}</div>
+      ${mgr ? '<p class="muted small">Importer lit nom, portions, temps, ingrédients et étapes quand le site les publie. Si le site refuse, « Coller » reprend la liste des ingrédients copiée depuis la page.</p>' : ''}
       <label class="muted small">Étapes (une par ligne)</label><textarea class="txt" rows="7" data-ch="ed" data-f="steps">${esc(ed.steps)}</textarea>
       <label class="muted small">Notes</label><textarea class="txt" rows="2" data-ch="ed" data-f="notes">${esc(ed.notes)}</textarea></div>`;
   // Plat compose : recettes (autres plats) a preparer ensemble ; un seul niveau.
@@ -379,8 +379,29 @@ on('click', 'rec-import', async () => {
   const url = (ed.url || '').trim();
   if (!url) { toast('Collez d’abord le lien de la recette.', true); return; }
   sheet('<h3>Chargement de la recette…</h3><p class="muted">Lecture des données de la page (schema.org/Recipe).</p>');
-  const r = await attempt(() => post(hp('/recipe-import'), { url }));
-  if (!r) { closeSheet(); return; }
+  let r;
+  try { r = await post(hp('/recipe-import'), { url }); } catch (e) {
+    // Site qui refuse le serveur ou page sans recette lisible : repli sur le collage.
+    if (e.status === 502 || e.status === 422) pasteSheet(e.message);
+    else { closeSheet(); toast(e.status === 0 ? 'Pas de réseau : action possible seulement en ligne.' : e.message, true); }
+    return;
+  }
+  await showImport(r);
+});
+// Repli : ingredients copies depuis la page, une ligne chacun.
+function pasteSheet(why) {
+  sheet(`<h3>Coller les ingrédients</h3>${why ? `<p class="muted small">${esc(why)}</p>` : ''}
+    <p class="muted small">Copiez la liste des ingrédients depuis la page de la recette, une ligne par ingrédient (ex. « 300 g de farine »).</p>
+    <textarea class="txt" id="rec-text" rows="8" placeholder="300 g de farine&#10;3 oeufs&#10;60 cl de lait"></textarea>
+    <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="rec-paste-ok">Lire les ingrédients</button></div>`);
+  setTimeout(() => document.getElementById('rec-text')?.focus());
+}
+on('click', 'rec-paste', () => pasteSheet(''));
+on('click', 'rec-paste-ok', async () => {
+  const r = await attempt(() => post(hp('/recipe-import'), { text: document.getElementById('rec-text').value }));
+  if (r) await showImport(r);
+});
+async function showImport(r) {
   if (!S.products) await loadProducts();
   const matched = matchLines(r.ingredients.map((g) => ({ ...g, label: g.name })), { products: S.products });
   imp = {
@@ -393,7 +414,7 @@ on('click', 'rec-import', async () => {
         create: p ? null : { name: g.name.charAt(0).toUpperCase() + g.name.slice(1), category_id: categoryOrder()[0], unit: 'paquet', is_base: g.base } }; }),
   };
   importSheet();
-});
+}
 // Ecran d'import : chaque ingredient peut etre renomme (nouveau produit) ou relie a un produit
 // existant (nom choisi dans la liste) ; quantite et unite pre-remplies depuis la recette, modifiables.
 function impMatch(g) {

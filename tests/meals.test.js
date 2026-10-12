@@ -211,6 +211,7 @@ test('photo d un plat : envoi, lecture, photo d une recette importee, retrait', 
 test('import depuis un lien (page servie en local) ; page sans recette', async () => {
   const page = http.createServer((req, res) => {
     if (req.url === '/redir') { res.writeHead(302, { location: '/recette' }); return res.end(); }
+    if (req.url === '/interdit') { res.writeHead(403); return res.end(); }
     res.setHeader('content-type', 'text/html');
     res.end(req.url === '/recette' ? '<script type="application/ld+json">{"@type":"Recipe","name":"Soupe","recipeYield":4,"recipeIngredient":["3 poireaux"],"recipeInstructions":"Mixer."}</script>' : '<p>Rien</p>');
   }).listen(0);
@@ -224,5 +225,14 @@ test('import depuis un lien (page servie en local) ; page sans recette', async (
   assert.equal(r.status, 422);
   r = await thomas.post(`${h}/recipe-import`, { url: 'ftp://exemple.be/x' });
   assert.equal(r.status, 400);
+  // Site qui refuse le serveur : message lisible (pas « erreur interne »).
+  r = await thomas.post(`${h}/recipe-import`, { url: `${base}/interdit` });
+  assert.equal(r.status, 502);
+  assert.match(r.data.error, /refuse la lecture automatique \(403\)/);
+  // Repli : ingredients colles.
+  r = await thomas.post(`${h}/recipe-import`, { text: '• 300 g de farine\n\n3 oeufs\n' });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data.ingredients.map((g) => [g.amount, g.amount_unit]), [[300, 'g'], [3, 'pc']]);
+  assert.equal((await thomas.post(`${h}/recipe-import`, { text: ' ' })).status, 400);
   page.close();
 });
