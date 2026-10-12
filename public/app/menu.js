@@ -152,7 +152,7 @@ function genSheet() {
     <div class="sec">Modèle de semaine</div>
     <select class="txt" data-ch="gen-model"><option value="none" ${gen.model === 'none' ? 'selected' : ''}>Aucun modèle (repas libres)</option>${(S.house.models || []).map((m) => `<option value="${m.id}" ${String(m.id) === gen.model ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>
     <p class="muted small">${gen.model !== 'none' ? (gen.rules.length ? `Par semaine : ${gen.rules.map(ruleText).join(' · ')}.` : 'Ce modèle n’a pas de règle.') : 'Seuls le délai et les tags guident le choix.'} Les modèles se créent et se modifient dans Foyer → Modèles de semaine.</p>
-    <p class="muted small">${I('bulb', 's')} Les envies passent en premier. Un plat n’est proposé que pour ses repas possibles (fiche du plat ; par défaut midi et soir).</p>
+    <p class="muted small">${I('bulb', 's')} Les envies passent en premier, même sans tag ni type (seuls le repas, le délai et les règles du modèle comptent). Un plat n’est proposé que pour ses repas possibles (fiche du plat ; par défaut midi et soir).</p>
     <div class="row end"><button class="btn" data-a="gen-go">${I('spark', 's')} Proposer</button></div>`);
 }
 function genResult() {
@@ -163,6 +163,8 @@ function genResult() {
     <p class="muted small">${r.meals.length} repas proposé${r.meals.length > 1 ? 's' : ''}${r.empty.length ? ` · ${r.empty.length} créneau${r.empty.length > 1 ? 'x' : ''} sans plat (aucun plat ne respecte le délai de ${r.gap_days} j pour ce repas)` : ''}. Retirez ce qui ne convient pas, ou demandez une autre proposition.</p>
     ${(r.unmet || []).length ? `<div class="card" style="border-color:var(--carrot)"><b>Règles non tenues</b> <span class="muted small">(pas assez de plats de ce type qui respectent le délai et le repas)</span>
       ${r.unmet.map((u) => `<div class="small">${esc(u.type)}${u.slot ? ` (${SLOT[u.slot].toLowerCase()})` : ''} : ${u.got} sur ${u.want} · semaine du ${esc(fmtDate(u.week, { day: 'numeric', month: 'short' }))}</div>`).join('')}</div>` : ''}
+    ${(r.wishes_skipped || []).length ? `<div class="card"><b>${I('bulb', 's')} Envies non placées</b>
+      ${r.wishes_skipped.map((w) => `<div class="small"><b>${esc(w.dish)}</b> : ${esc(w.reason)}</div>`).join('')}</div>` : ''}
     ${r.meals.length ? [...byDay].map(([d, ms]) => `<div class="sec">${esc(fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</div>
       ${ms.map(([m, k]) => `<div class="row line"><span class="muted w6">${SLOT[m.slot]}</span><span class="grow"><b>${esc(m.dish)}</b> ${why(m)}</span><button class="ib" data-a="gen-x" data-k="${k}" aria-label="Retirer">${I('x', 's')}</button></div>`).join('')}`).join('')
       : '<div class="empty">Aucun plat ne convient. Réduisez le délai, choisissez d’autres repas ou indiquez les repas possibles sur les fiches des plats.</div>'}

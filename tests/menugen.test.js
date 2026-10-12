@@ -37,9 +37,11 @@ test('génération : tags (tous > certains > aucun), envies, délai, créneaux o
   assert.equal((await lea.post(`${h}/menu/generate`, body)).status, 403);
   let g = (await thomas.post(`${h}/menu/generate`, body)).data;
   assert.equal(g.gap_days, 30);
+  // L'envie d'abord (même sans tag), puis tous les tags, au moins un, aucun.
   assert.deepEqual(g.meals.map((m) => [m.date, m.slot, m.dish]), [
-    [from, 'midi', 'Wok'], [from, 'soir', 'Croque'], [addDays(11), 'midi', 'Raclette'], [addDays(11), 'soir', 'Couscous'],
+    [from, 'midi', 'Raclette'], [from, 'soir', 'Wok'], [addDays(11), 'midi', 'Croque'], [addDays(11), 'soir', 'Couscous'],
   ]);
+  assert.deepEqual(g.wishes_skipped, []);
   assert.ok(g.meals.find((m) => m.dish === 'Raclette').wish);
   assert.equal(g.empty.length, 2);
   // Porridge (petit-déjeuner seulement) n'est jamais proposé le midi ou le soir.
@@ -55,7 +57,10 @@ test('génération : tags (tous > certains > aucun), envies, délai, créneaux o
   g = (await thomas.post(`${h}/menu/generate`, body)).data;
   assert.ok(!g.meals.some((m) => m.date === from && m.slot === 'midi'));
   assert.ok(!g.meals.some((m) => m.dish === 'Wok'));
-  assert.equal(g.meals[0].dish, 'Croque');
+  assert.equal(g.meals[0].dish, 'Raclette');
+  // Envie servie dans le délai : non placée, raison donnée.
+  const g4 = (await thomas.post(`${h}/menu/generate`, { ...body, slots: ['pdj'] })).data;
+  assert.match(g4.wishes_skipped[0].reason, /repas non demandés/);
 
   // Petit-déjeuner sans délai : le porridge chaque jour.
   g = (await thomas.post(`${h}/menu/generate`, { from, to, slots: ['pdj'], gap_days: 0 })).data;
@@ -122,4 +127,15 @@ test('import CSV de plats : colonne variantes', async () => {
     ['Viande', [['saucisse', ['Saucisse 4pc']], ['haché', ['Haché 400g', 'Chapelure 1']]]],
     ['Légume', [['carottes', ['Carottes 500g']], ['nature', []]]],
   ]);
+});
+
+test('génération : envie déjà servie dans le délai, raison donnée', async () => {
+  const f = await dish({ name: 'Fondue' });
+  const from = addDays(40), to = addDays(42);
+  await thomas.post(`${h}/meals`, { date: addDays(38), slot: 'soir', dish_id: f.id });
+  await thomas.post(`${h}/wishes`, { dish_id: f.id });
+  const g = (await thomas.post(`${h}/menu/generate`, { from, to, slots: ['midi', 'soir'], gap_days: 30 })).data;
+  const s = g.wishes_skipped.find((w) => w.dish === 'Fondue');
+  assert.match(s.reason, /délai de 30 j/);
+  assert.match(s.reason, new RegExp(addDays(38).split('-').reverse().join('/')));
 });
