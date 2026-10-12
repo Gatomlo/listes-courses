@@ -106,3 +106,20 @@ test('import CSV de plats : aperçu, création, mise à jour, erreurs', async ()
   // Réimporter : rien de nouveau.
   assert.equal((await thomas.post(`${h}/dishes/import`, { csv })).data.created.length, 0);
 });
+
+test('import CSV de plats : colonne variantes', async () => {
+  const csv = 'nom;ingrédients;variantes\n'
+    + 'Stoemp;Pommes de terre : 1 kg;"Viande : saucisse (Saucisse : 4 pièces) / haché (Haché : 400 g + Chapelure : 1) | Légume : carottes (Carottes : 500 g) / nature"\n'
+    + 'Raté;;Viande saucisse / haché\n'
+    + 'Raté 2;;Viande : (Saucisse)\n';
+  const r = (await thomas.post(`${h}/dishes/import`, { csv })).data;
+  assert.deepEqual(r.created, ['Stoemp']);
+  assert.deepEqual(r.errors.map((e) => e.line), [3, 4]);
+  const id = (await thomas.get(`${h}/dishes`)).data.find((d) => d.name === 'Stoemp').id;
+  const d = (await thomas.get(`${h}/dishes/${id}`)).data;
+  assert.deepEqual(d.ingredients.map((i) => i.name), ['Pommes de terre']);
+  assert.deepEqual(d.groups.map((g) => [g.name, g.options.map((o) => [o.name, o.ingredients.map((i) => `${i.name} ${i.qty}${i.iunit || ''}`)])]), [
+    ['Viande', [['saucisse', ['Saucisse 4pc']], ['haché', ['Haché 400g', 'Chapelure 1']]]],
+    ['Légume', [['carottes', ['Carottes 500g']], ['nature', []]]],
+  ]);
+});

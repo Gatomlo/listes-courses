@@ -78,15 +78,15 @@ on('click', 'dish-tag', (el) => { S.q.dishTag = S.q.dishTag === el.dataset.t ? '
 on('click', 'dish-new-named', () => { pendingName = S.q.dish; go('#/plats/nouveau'); });
 
 // ---------- Import CSV de plats (gestionnaire) : apercu puis import ----------
-const DCSV_HEAD = 'nom;portions;temps;repas;types;tags;lien;ingrédients;étapes;notes';
+const DCSV_HEAD = 'nom;portions;temps;repas;types;tags;lien;ingrédients;variantes;étapes;notes';
 let dcsvText = '';
 on('click', 'dish-csv-open', () => {
   dcsvText = '';
   sheet(`<h3>${I('upload', 's')} Importer des plats</h3>
     <p class="muted small">Fichier CSV (séparateur « ; » ou « , »), une ligne d'en-tête puis un plat par ligne :<br><code style="word-break:break-all">${DCSV_HEAD}</code></p>
     <p class="muted small">Seul <b>nom</b> est obligatoire. <b>repas</b> : petit-déjeuner, midi, soir, collation (plusieurs séparés par « , » ; vide = midi et soir). <b>types</b> (poisson, pâtes…) et <b>tags</b> séparés par « , » ou « | ».
-      <b>ingrédients</b> séparés par « | », chacun « Produit » ou « Produit : quantité unité » (ex. <code>Spaghetti : 500 g | Œufs : 3 pièces | Sel</code>) ; produit inconnu : créé. <b>étapes</b> séparées par « | ».
-      Plat déjà connu : seuls ses repas, ses types et ses tags sont complétés. Réimporter le même fichier ne double rien.</p>
+      <b>ingrédients</b> séparés par « | », chacun « Produit » ou « Produit : quantité unité » (ex. <code>Spaghetti : 500 g | Œufs : 3 pièces | Sel</code>) ; produit inconnu : créé. <b>variantes</b> : groupes séparés par « | », chacun « Groupe : option / option », ingrédients d’une option entre parenthèses séparés par « + » (ex. <code>Viande : saucisse (Saucisse : 4 pièces) / haché (Haché : 400 g) | Légume : carottes / épinards</code>). <b>étapes</b> séparées par « | ».
+      Plat déjà connu : seuls ses repas, ses types et ses tags sont complétés (ingrédients et variantes inchangés). Réimporter le même fichier ne double rien.</p>
     <button class="btn sec2 sm" data-a="dish-csv-model">Télécharger un modèle</button>
     <label class="muted" style="display:block;margin-top:10px">Fichier</label><input class="txt" type="file" accept=".csv,text/csv,text/plain" data-ch="dish-csv-file">
     <div id="dcsv-res"></div>`);
@@ -94,9 +94,10 @@ on('click', 'dish-csv-open', () => {
 on('click', 'dish-csv-model', () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['\uFEFF' + DCSV_HEAD + '\r\n'
-    + 'Spaghetti bolognaise;4;45 min;midi, soir;pâtes, bœuf;rapide;;Spaghetti : 500 g | Haché : 400 g | Tomates pelées : 2 | Oignon : 1 pièce | Ail : 2 gousses;Faire revenir l\'oignon | Ajouter le haché puis les tomates | Cuire les pâtes;\r\n'
-    + 'Pancakes;4;20 min;petit-déjeuner, collation;;sucré;;Farine : 250 g | Lait : 50 cl | Œufs : 2 pièces;;\r\n'
-    + 'Soupe de légumes;6;1 h;soir;soupe;hiver, végé;https://exemple.be/soupe;;;Se congèle bien\r\n'], { type: 'text/csv' }));
+    + 'Spaghetti bolognaise;4;45 min;midi, soir;pâtes, bœuf;rapide;;Spaghetti : 500 g | Haché : 400 g | Tomates pelées : 2 | Oignon : 1 pièce | Ail : 2 gousses;;Faire revenir l\'oignon | Ajouter le haché puis les tomates | Cuire les pâtes;\r\n'
+    + 'Pancakes;4;20 min;petit-déjeuner, collation;;sucré;;Farine : 250 g | Lait : 50 cl | Œufs : 2 pièces;Garniture : sucre / chocolat (Pâte à tartiner : 1) / fruits (Fraises : 250 g);;\r\n'
+    + 'Soupe de légumes;6;1 h;soir;soupe;hiver, végé;https://exemple.be/soupe;;;;Se congèle bien\r\n'
+    + 'Stoemp;4;40 min;midi, soir;belge;hiver;;Pommes de terre : 1 kg | Beurre : 50 g;Viande : saucisse (Saucisse : 4 pièces) / boulettes (Haché : 500 g + Chapelure : 1) | Légume : carottes (Carottes : 600 g) / poireaux (Poireaux : 2 pièces);Cuire les pommes de terre et le légume | Écraser avec le beurre | Servir avec la viande;\r\n'], { type: 'text/csv' }));
   a.download = 'modele-plats.csv';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
