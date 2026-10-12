@@ -1,9 +1,10 @@
 // Ecran Foyer : membres et invitations, reglages, tags des plats.
 import { esc, eur, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
 import { I } from './icons.js';
-import { patch, post, del, attempt } from './api.js';
+import { patch, post, put, del, attempt } from './api.js';
 import { S, hp, isManager, render, loadHouse } from './state.js';
 import { installCard } from './install.js';
+import { rulesHtml, editRules, ruleText, copyRules } from './modeles.js';
 
 const DOW = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 
@@ -33,7 +34,16 @@ export function foyerView() {
       ${acc('tags', { icon: `${I('tag', 's')} `, title: 'Tags des plats', sum: ` · ${H.tags.length}`,
         body: H.tags.map((t) => `<div class="ord"><span class="grow">#${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}</span></span>
           ${mgr ? `<button class="ic" title="Renommer" data-a="tag-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="tag-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="tag-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
-          || '<p class="muted">Aucun tag : ajoutez-en depuis la fiche d’un plat.</p>' })}`,
+          || '<p class="muted">Aucun tag : ajoutez-en depuis la fiche d’un plat.</p>' })}
+      ${acc('types', { icon: `${I('bowl', 's')} `, title: 'Types de plats', sum: ` · ${H.types.length}`,
+        body: `${H.types.map((t) => `<div class="ord"><span class="grow">${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}</span></span>
+          ${mgr ? `<button class="ic" title="Renommer" data-a="type-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="type-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="type-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
+          || '<p class="muted">Aucun type. Ex. poisson, pâtes, riz, porc, poulet : un plat peut en avoir plusieurs, les modèles de semaine s’en servent.</p>'}
+          ${mgr ? '<div class="row gap" style="margin-top:8px"><input class="txt grow" id="type-in" placeholder="Nouveau type (ex. poisson)" data-enter="type-add"><button class="btn sm sec2" data-a="type-add">＋</button></div>' : ''}` })}
+      ${acc('models', { icon: `${I('calendar', 's')} `, title: 'Modèles de semaine', sum: ` · ${H.models.length}`,
+        body: `${H.models.map((m) => `<div class="item${mgr ? ' click' : ''}" ${mgr ? `data-a="model-edit" data-id="${m.id}"` : ''}><span class="grow"><b>${esc(m.name)}</b><span class="muted block">${m.rules.map(ruleText).join(' · ') || 'aucune règle'}</span></span>${mgr ? '<span class="muted">›</span>' : ''}</div>`).join('')
+          || '<p class="muted">Aucun modèle. Un modèle fixe la composition d’une semaine pour « Générer le menu » : ex. exactement 1 poisson, 2 pâtes, au plus 1 porc.</p>'}
+          ${mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="model-edit">＋ Nouveau modèle</button>' : ''}` })}`,
   };
 }
 
@@ -130,6 +140,67 @@ on('click', 'tag-del', async (el) => {
   const t = tagById(el.dataset.id);
   if (!(await confirmSheet({ title: `Supprimer #${t.name} ?`, text: `Il est retiré de ${t.dishes} plat${t.dishes > 1 ? 's' : ''}.`, ok: 'Supprimer', danger: true }))) return;
   if (await attempt(() => del(hp(`/tags/${t.id}`)))) await tagsDone('Tag supprimé');
+});
+
+// ---------- Types de plats ----------
+const typeById = (id) => S.house.types.find((t) => t.id === Number(id));
+on('click', 'type-add', async () => {
+  const i = document.getElementById('type-in');
+  if (!i.value.trim()) return;
+  if (await attempt(() => post(hp('/types'), { name: i.value }))) await tagsDone('Type créé');
+});
+on('click', 'type-rename', (el) => {
+  const t = typeById(el.dataset.id);
+  sheet(`<h3>Renommer « ${esc(t.name)} »</h3><input class="txt" name="name" value="${esc(t.name)}" data-enter="type-rename-ok" data-id="${t.id}">
+    <p class="muted small">Le nom d’un type existant fusionne les deux.</p><div class="row end"><button class="btn" data-a="type-rename-ok" data-id="${t.id}">Enregistrer</button></div>`);
+});
+on('click', 'type-rename-ok', async (el) => {
+  const name = document.querySelector('.sheet [name=name]').value;
+  if (await attempt(() => patch(hp(`/types/${el.dataset.id}`), { name }))) await tagsDone('Type renommé');
+});
+on('click', 'type-merge', (el) => {
+  const t = typeById(el.dataset.id), others = S.house.types.filter((x) => x.id !== t.id);
+  if (!others.length) { toast('Aucun autre type'); return; }
+  sheet(`<h3>Fusionner « ${esc(t.name)} »</h3><p class="muted">${t.dishes > 1 ? `Ses ${t.dishes} plats et les règles des modèles reçoivent` : t.dishes ? 'Son plat et les règles des modèles reçoivent' : 'Les règles des modèles reçoivent'} le type choisi, puis « ${esc(t.name)} » disparaît.</p>
+    <select class="txt" name="into">${others.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select>
+    <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="type-merge-ok" data-id="${t.id}">Fusionner</button></div>`);
+});
+on('click', 'type-merge-ok', async (el) => {
+  const into = document.querySelector('.sheet [name=into]').value;
+  if (await attempt(() => post(hp(`/types/${el.dataset.id}/merge`), { into }))) await tagsDone('Types fusionnés');
+});
+on('click', 'type-del', async (el) => {
+  const t = typeById(el.dataset.id), n = S.house.models.filter((m) => m.rules.some((r) => r.type_id === t.id)).length;
+  if (!(await confirmSheet({ title: `Supprimer « ${t.name} » ?`, ok: 'Supprimer', danger: true,
+    text: `Il est retiré de ${t.dishes} plat${t.dishes > 1 ? 's' : ''}${n ? ` et ses règles de ${n} modèle${n > 1 ? 's' : ''}` : ''}.` }))) return;
+  if (await attempt(() => del(hp(`/types/${t.id}`)))) await tagsDone('Type supprimé');
+});
+
+// ---------- Modeles de semaine ----------
+let model = null; // { id, name, rules }
+function modelSheet() {
+  editRules(model.rules, modelSheet);
+  sheet(`<h3>${model.id ? 'Modèle de semaine' : 'Nouveau modèle de semaine'}</h3>
+    <label class="muted">Nom</label><input class="txt" id="model-name" data-in="model-name" value="${esc(model.name)}" placeholder="ex. Semaine normale, Été…">
+    <div class="sec">Règles par semaine</div>
+    <p class="muted small">Comptées en repas sur 7 jours (au prorata pour une fin de menu plus courte), repas déjà prévus compris. Les autres repas restent libres.</p>
+    ${rulesHtml()}
+    <div class="row end" style="margin-top:12px">${model.id ? '<button class="btn sec2 danger-t" data-a="model-del">Supprimer</button>' : ''}<button class="btn" data-a="model-save">Enregistrer</button></div>`);
+}
+on('click', 'model-edit', (el) => {
+  const m = S.house.models.find((x) => x.id === Number(el.dataset.id));
+  model = m ? { id: m.id, name: m.name, rules: copyRules(m.rules) } : { id: null, name: '', rules: [] };
+  modelSheet();
+});
+on('input', 'model-name', (el) => { model.name = el.value; });
+on('click', 'model-save', async () => {
+  model.name = document.getElementById('model-name').value;
+  const body = { name: model.name, rules: model.rules };
+  if (await attempt(() => (model.id ? put(hp(`/menu-models/${model.id}`), body) : post(hp('/menu-models'), body)))) { closeSheet(); toast('Modèle enregistré'); await refresh(); }
+});
+on('click', 'model-del', async () => {
+  if (!(await confirmSheet({ title: `Supprimer « ${model.name} » ?`, ok: 'Supprimer', danger: true, text: 'Les menus déjà générés ne changent pas.' }))) return;
+  if (await attempt(() => del(hp(`/menu-models/${model.id}`)))) { toast('Modèle supprimé'); await refresh(); }
 });
 
 // Lien de reinitialisation du mot de passe (48 h), a transmettre au membre.

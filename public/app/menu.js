@@ -5,6 +5,7 @@ import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
 import { SLOT, tagChips, allTags, loadDishes, recipeSheet, newDishFrom, chosenOf, dishIngredients, tile } from './plats.js';
 import { I, btnI } from './icons.js';
+import { rulesHtml, editRules, copyRules } from './modeles.js';
 
 const SLOTS = ['pdj', 'midi', 'soir', 'coll'];
 const today = () => new Date().toISOString().slice(0, 10);
@@ -125,16 +126,21 @@ on('click', 'menu-nav', async (el) => { S.menuAt = el.dataset.d || null; await l
 // Remplit les creneaux libres de la periode affichee (a partir d'aujourd'hui) : repas
 // demandes, delai depuis la derniere fois (reglage du foyer, modifiable ici), tags
 // (tous, sinon au moins un, sinon aucun), envies d'abord. Apercu avant d'enregistrer.
-const gen = { slots: null, gap: null, tags: [], persons: 4, res: null };
+const gen = { slots: null, gap: null, tags: [], persons: 4, res: null, model: '', rules: [] };
 const genFrom = () => (menu.from < today() ? today() : menu.from);
 on('click', 'menu-gen', () => {
   if (!gen.slots) gen.slots = slotsShown();
   if (gen.gap == null) gen.gap = S.house.household.menu_gap_days;
   gen.tags = gen.tags.filter((t) => allTags().includes(t));
+  // Modele retenu la fois precedente (s'il existe encore), sinon le premier ; regles a jour.
+  const ms = S.house.models || [];
+  if (!ms.some((m) => String(m.id) === gen.model)) gen.model = ms.length && gen.model !== 'none' ? String(ms[0].id) : 'none';
+  gen.rules = copyRules((ms.find((m) => String(m.id) === gen.model) || {}).rules);
   gen.res = null;
   genSheet();
 });
 function genSheet() {
+  editRules(gen.rules, genSheet);
   const tags = allTags();
   sheet(`<h3>${I('spark', 's')} Générer le menu</h3>
     <p class="muted small">Du ${esc(fmtDate(genFrom(), { weekday: 'short', day: 'numeric', month: 'short' }))} au ${esc(fmtDate(menu.to, { weekday: 'short', day: 'numeric', month: 'short' }))} (menu affiché) : seuls les créneaux libres sont remplis. Aperçu avant d’enregistrer.</p>
@@ -144,15 +150,20 @@ function genSheet() {
     <div class="sec">Tags${gen.tags.length ? ` · ${gen.tags.length}` : ''}</div>
     ${tags.length ? `<div class="opt tags">${tags.map((t) => `<button class="${gen.tags.includes(t) ? 'on' : ''}" data-a="gen-tag" data-t="${esc(t)}">#${esc(t)}</button>`).join('')}</div>
       <p class="muted small">D’abord les plats qui ont tous les tags choisis, puis ceux qui en ont au moins un, sinon les autres (le délai est toujours respecté).</p>` : '<p class="muted small">Aucun tag : ajoutez-en sur les fiches des plats.</p>'}
+    <div class="sec">Modèle de semaine</div>
+    <select class="txt" data-ch="gen-model"><option value="none" ${gen.model === 'none' ? 'selected' : ''}>Aucun (repas libres)</option>${(S.house.models || []).map((m) => `<option value="${m.id}" ${String(m.id) === gen.model ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>
+    ${gen.model !== 'none' || gen.rules.length ? `<p class="muted small">Règles par semaine, modifiables pour cette fois (le modèle se gère dans Foyer → Modèles de semaine) :</p>${rulesHtml()}` : `<p class="muted small">Créez des modèles (ex. 1 poisson, 2 pâtes par semaine) dans Foyer → Modèles de semaine.${(S.house.types || []).length ? ' <button class="btn sec2 sm" data-a="rule-add">＋ Règle pour cette fois</button>' : ''}</p>`}
     <p class="muted small">${I('bulb', 's')} Les envies passent en premier. Un plat n’est proposé que pour ses repas possibles (fiche du plat ; par défaut midi et soir).</p>
     <div class="row end"><button class="btn" data-a="gen-go">${I('spark', 's')} Proposer</button></div>`);
 }
 function genResult() {
   const r = gen.res, byDay = new Map();
   r.meals.forEach((m, k) => { if (!byDay.has(m.date)) byDay.set(m.date, []); byDay.get(m.date).push([m, k]); });
-  const why = (m) => (m.wish ? `<span class="pill p-carrot">${I('bulb', 's')} envie</span>` : '') + (gen.tags.length && m.tier ? `<span class="pill p-grey">${m.tier === 1 ? 'une partie des tags' : 'sans ces tags'}</span>` : '');
+  const why = (m) => (m.types || []).map((t) => `<span class="pill">${esc(t)}</span>`).join('') + (m.wish ? `<span class="pill p-carrot">${I('bulb', 's')} envie</span>` : '') + (gen.tags.length && m.tier ? `<span class="pill p-grey">${m.tier === 1 ? 'une partie des tags' : 'sans ces tags'}</span>` : '');
   sheet(`<h3>${I('spark', 's')} Proposition</h3>
     <p class="muted small">${r.meals.length} repas proposé${r.meals.length > 1 ? 's' : ''}${r.empty.length ? ` · ${r.empty.length} créneau${r.empty.length > 1 ? 'x' : ''} sans plat (aucun plat ne respecte le délai de ${r.gap_days} j pour ce repas)` : ''}. Retirez ce qui ne convient pas, ou demandez une autre proposition.</p>
+    ${(r.unmet || []).length ? `<div class="card" style="border-color:var(--carrot)"><b>Règles non tenues</b> <span class="muted small">(pas assez de plats de ce type qui respectent le délai et le repas)</span>
+      ${r.unmet.map((u) => `<div class="small">${esc(u.type)}${u.slot ? ` (${SLOT[u.slot].toLowerCase()})` : ''} : ${u.got} sur ${u.want} · semaine du ${esc(fmtDate(u.week, { day: 'numeric', month: 'short' }))}</div>`).join('')}</div>` : ''}
     ${r.meals.length ? [...byDay].map(([d, ms]) => `<div class="sec">${esc(fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</div>
       ${ms.map(([m, k]) => `<div class="row line"><span class="muted w6">${SLOT[m.slot]}</span><span class="grow"><b>${esc(m.dish)}</b> ${why(m)}</span><button class="ib" data-a="gen-x" data-k="${k}" aria-label="Retirer">${I('x', 's')}</button></div>`).join('')}`).join('')
       : '<div class="empty">Aucun plat ne convient. Réduisez le délai, choisissez d’autres repas ou indiquez les repas possibles sur les fiches des plats.</div>'}
@@ -166,12 +177,13 @@ on('click', 'gen-slot', (el) => {
 on('click', 'gen-tag', (el) => { const t = el.dataset.t; gen.tags = gen.tags.includes(t) ? gen.tags.filter((x) => x !== t) : [...gen.tags, t]; genSheet(); });
 on('change', 'gen-gap', (el) => { const n = parseInt(el.value, 10); gen.gap = Number.isFinite(n) ? Math.min(365, Math.max(0, n)) : gen.gap; });
 on('click', 'gen-p', (el) => { gen.persons = Math.max(1, Math.min(50, gen.persons + Number(el.dataset.d))); document.getElementById('gen-persons').textContent = gen.persons; });
+on('change', 'gen-model', (el) => { gen.model = el.value; gen.rules = copyRules(((S.house.models || []).find((m) => String(m.id) === gen.model) || {}).rules); genSheet(); });
 on('click', 'gen-back', () => { gen.res = null; genSheet(); });
 on('click', 'gen-go', async () => {
   if (!gen.slots.length) { toast('Choisissez au moins un repas'); return; }
   const gap = document.querySelector('.sheet [data-ch="gen-gap"]');
   if (gap) { const n = parseInt(gap.value, 10); if (Number.isFinite(n)) gen.gap = Math.min(365, Math.max(0, n)); }
-  const r = await attempt(() => post(hp('/menu/generate'), { from: menu.from, to: menu.to, slots: gen.slots, gap_days: gen.gap, tags: gen.tags }));
+  const r = await attempt(() => post(hp('/menu/generate'), { from: menu.from, to: menu.to, slots: gen.slots, gap_days: gen.gap, tags: gen.tags, rules: gen.rules }));
   if (r) { gen.res = r; genResult(); }
 });
 on('click', 'gen-x', (el) => { gen.res.meals.splice(Number(el.dataset.k), 1); genResult(); });

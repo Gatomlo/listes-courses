@@ -33,6 +33,8 @@ function convertible(i) {
   return p.size.u === u || (mass(p.size.u) && mass(u)) || p.piece_qty > 0;
 }
 
+// Types de plats : ceux du foyer et ceux du plat edite.
+const allTypes = () => [...new Set([...(S.house.types || []).map((t) => t.name), ...(ed ? ed.types : [])])].sort((a, b) => a.localeCompare(b, 'fr'));
 export async function loadDishes() { S.dishes = await get(hp('/dishes')); }
 // Tags connus : ceux du foyer (S.house.tags) et ceux des plats charges.
 export const allTags = () => [...new Set([...(S.house.tags || []).map((t) => t.name), ...(S.dishes || []).flatMap((d) => d.tags)])].sort((a, b) => a.localeCompare(b, 'fr'));
@@ -51,7 +53,7 @@ export const tile = (name, pills = '', cls = '', photo = null) => `<div class="t
 export function platsView() {
   const q = S.q.dish || '', f = S.q.dishFilter || 'all', tg = S.q.dishTag || '';
   const n = norm(q).trim();
-  const list = S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)) || (d.part_names || []).some((x) => norm(x).includes(n)))
+  const list = S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || (d.types || []).some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)) || (d.part_names || []).some((x) => norm(x).includes(n)))
     && (!tg || d.tags.includes(tg))
     && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients && !d.parts) || (f === 'planned' && d.next_date) || (f === 'draft' && d.draft) || (f === 'parts' && d.parts)));
   const card = (d) => {
@@ -76,15 +78,15 @@ on('click', 'dish-tag', (el) => { S.q.dishTag = S.q.dishTag === el.dataset.t ? '
 on('click', 'dish-new-named', () => { pendingName = S.q.dish; go('#/plats/nouveau'); });
 
 // ---------- Import CSV de plats (gestionnaire) : apercu puis import ----------
-const DCSV_HEAD = 'nom;portions;temps;repas;tags;lien;ingrédients;étapes;notes';
+const DCSV_HEAD = 'nom;portions;temps;repas;types;tags;lien;ingrédients;étapes;notes';
 let dcsvText = '';
 on('click', 'dish-csv-open', () => {
   dcsvText = '';
   sheet(`<h3>${I('upload', 's')} Importer des plats</h3>
     <p class="muted small">Fichier CSV (séparateur « ; » ou « , »), une ligne d'en-tête puis un plat par ligne :<br><code style="word-break:break-all">${DCSV_HEAD}</code></p>
-    <p class="muted small">Seul <b>nom</b> est obligatoire. <b>repas</b> : petit-déjeuner, midi, soir, collation (plusieurs séparés par « , » ; vide = midi et soir). <b>tags</b> séparés par « , » ou « | ».
+    <p class="muted small">Seul <b>nom</b> est obligatoire. <b>repas</b> : petit-déjeuner, midi, soir, collation (plusieurs séparés par « , » ; vide = midi et soir). <b>types</b> (poisson, pâtes…) et <b>tags</b> séparés par « , » ou « | ».
       <b>ingrédients</b> séparés par « | », chacun « Produit » ou « Produit : quantité unité » (ex. <code>Spaghetti : 500 g | Œufs : 3 pièces | Sel</code>) ; produit inconnu : créé. <b>étapes</b> séparées par « | ».
-      Plat déjà connu : seuls ses repas et ses tags sont complétés. Réimporter le même fichier ne double rien.</p>
+      Plat déjà connu : seuls ses repas, ses types et ses tags sont complétés. Réimporter le même fichier ne double rien.</p>
     <button class="btn sec2 sm" data-a="dish-csv-model">Télécharger un modèle</button>
     <label class="muted" style="display:block;margin-top:10px">Fichier</label><input class="txt" type="file" accept=".csv,text/csv,text/plain" data-ch="dish-csv-file">
     <div id="dcsv-res"></div>`);
@@ -92,16 +94,16 @@ on('click', 'dish-csv-open', () => {
 on('click', 'dish-csv-model', () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['\uFEFF' + DCSV_HEAD + '\r\n'
-    + 'Spaghetti bolognaise;4;45 min;midi, soir;rapide, pâtes;;Spaghetti : 500 g | Haché : 400 g | Tomates pelées : 2 | Oignon : 1 pièce | Ail : 2 gousses;Faire revenir l\'oignon | Ajouter le haché puis les tomates | Cuire les pâtes;\r\n'
-    + 'Pancakes;4;20 min;petit-déjeuner, collation;sucré;;Farine : 250 g | Lait : 50 cl | Œufs : 2 pièces;;\r\n'
-    + 'Soupe de légumes;6;1 h;soir;hiver, végé;https://exemple.be/soupe;;;Se congèle bien\r\n'], { type: 'text/csv' }));
+    + 'Spaghetti bolognaise;4;45 min;midi, soir;pâtes, bœuf;rapide;;Spaghetti : 500 g | Haché : 400 g | Tomates pelées : 2 | Oignon : 1 pièce | Ail : 2 gousses;Faire revenir l\'oignon | Ajouter le haché puis les tomates | Cuire les pâtes;\r\n'
+    + 'Pancakes;4;20 min;petit-déjeuner, collation;;sucré;;Farine : 250 g | Lait : 50 cl | Œufs : 2 pièces;;\r\n'
+    + 'Soupe de légumes;6;1 h;soir;soupe;hiver, végé;https://exemple.be/soupe;;;Se congèle bien\r\n'], { type: 'text/csv' }));
   a.download = 'modele-plats.csv';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
 const dcsvSummary = (r) => `<div class="card" style="margin-top:10px">
-  <p><b>${r.created.length}</b> plat${r.created.length > 1 ? 's' : ''} ${r.dry ? 'à créer' : 'créé' + (r.created.length > 1 ? 's' : '')} · <b>${r.updated.length}</b> déjà connu${r.updated.length > 1 ? 's' : ''} (repas et tags complétés)${r.products.length ? ` · ${plural(r.products.length, 'produit')} ${r.dry ? 'à créer' : 'créé' + (r.products.length > 1 ? 's' : '')}` : ''}</p>
+  <p><b>${r.created.length}</b> plat${r.created.length > 1 ? 's' : ''} ${r.dry ? 'à créer' : 'créé' + (r.created.length > 1 ? 's' : '')} · <b>${r.updated.length}</b> déjà connu${r.updated.length > 1 ? 's' : ''} (repas, types et tags complétés)${r.products.length ? ` · ${plural(r.products.length, 'produit')} ${r.dry ? 'à créer' : 'créé' + (r.products.length > 1 ? 's' : '')}` : ''}</p>
   ${r.created.length ? `<p class="muted small">${r.created.map(esc).join(' · ')}</p>` : ''}
   ${r.products.length ? `<p class="small">Nouveaux produits (rayon Épicerie, à compléter) : ${r.products.map(esc).join(', ')}</p>` : ''}
   ${r.errors.length ? `<p class="small" style="color:var(--danger)">${plural(r.errors.length, 'ligne')} ignorée${r.errors.length > 1 ? 's' : ''} :<br>${r.errors.map((e) => `ligne ${e.line} : ${esc(e.msg)}`).join('<br>')}</p>` : ''}</div>`;
@@ -133,7 +135,7 @@ export function newDishFrom(name, ret) { pendingName = name || ''; S.dishReturn 
 export async function loadDish(id) {
   if (!S.products) await loadProducts();
   if (id === 'nouveau') {
-    ed = { id: null, name: pendingName || '', slots: ['midi', 'soir'], portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], groups: [], parts: [], used_in: [], tags: [], upcoming: [], past: [], times: 0 };
+    ed = { id: null, name: pendingName || '', slots: ['midi', 'soir'], types: [], portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], groups: [], parts: [], used_in: [], tags: [], upcoming: [], past: [], times: 0 };
     pendingName = '';
   } else {
     S.dishReturn = null;
@@ -184,12 +186,15 @@ export function dishView() {
   const cur = tabs.some(([k]) => k === S.q.dtab) ? S.q.dtab : ed.parts.length ? 'parts' : 'ing';
   const pills = `${ed.parts.length ? `<span class="pill">${I('puzzle', 's')} plat composé</span>` : ''}${ed.tags.map((t) => `<span class="pill">#${esc(t)}</span>`).join('')}`;
   const info = ro ? `<h1 class="mid" style="font-size:26px;margin:14px 2px 4px">${esc(ed.name)}</h1>
-      <p class="row small muted" style="margin:0 2px;flex-wrap:wrap">${I('users', 's')} ${ed.portions} pers.${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''} · ${slotsLabel(ed.slots)}</p>`
+      <p class="row small muted" style="margin:0 2px;flex-wrap:wrap">${I('users', 's')} ${ed.portions} pers.${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''} · ${slotsLabel(ed.slots)}${ed.types.length ? ` · ${ed.types.map(esc).join(', ')}` : ''}</p>`
     : `<div class="card form" style="margin-top:12px"><label class="muted small">Nom</label><input class="txt" value="${esc(ed.name)}" data-ch="ed" data-f="name">
       <div class="row gap"><label class="grow"><span class="muted small">Portions de référence</span><input class="txt" type="number" min="1" value="${ed.portions}" data-ch="ed" data-f="portions"></label>
       <label class="grow"><span class="muted small">Temps</span><input class="txt" value="${esc(ed.time_text)}" placeholder="ex. 45 min" data-ch="ed" data-f="time_text"></label></div>
       <label class="muted small">Repas possibles <span class="fw4">(génération du menu)</span></label>
       <div class="opt" style="margin:4px 0 8px;padding:2px 0;flex-wrap:wrap">${SLOT_ORDER.map((k) => `<button class="${ed.slots.includes(k) ? 'on' : ''}" data-a="ed-slot" data-s="${k}">${SLOT[k]}</button>`).join('')}</div>
+      <label class="muted small">Types <span class="fw4">(modèles de semaine)</span></label>
+      <div class="opt" style="margin:4px 0 4px;padding:2px 0;flex-wrap:wrap">${allTypes().map((t) => `<button class="${ed.types.includes(t) ? 'on' : ''}" data-a="ed-type" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <div class="row gap" style="margin-bottom:8px"><input class="txt grow" id="type-new" placeholder="Autre type (ex. poisson, pâtes…)" data-enter="type-new"><button class="btn sm sec2" data-a="type-new">＋</button></div>
       <label class="muted small">Tags</label>
       <div class="pills">${ed.tags.map((t, k) => `<span class="pill p-grey">#${esc(t)} <button class="x" data-a="tag-rm" data-i="${k}" aria-label="Retirer">✕</button></span>`).join('')}</div>
       <div class="row gap" style="margin-top:6px"><input class="txt grow" id="tag-in" list="tag-dl" placeholder="ex. rapide, végé, hiver…" data-enter="tag-add"><button class="btn sm sec2" data-a="tag-add">＋</button></div>
@@ -212,6 +217,14 @@ on('click', 'ed-slot', (el) => {
   const k = el.dataset.s, v = ed.slots || ['midi', 'soir'];
   if (v.includes(k) && v.length === 1) { toast('Au moins un repas'); return; }
   ed.slots = v.includes(k) ? v.filter((x) => x !== k) : [...v, k];
+  render();
+});
+on('click', 'ed-type', (el) => { const t = el.dataset.t; ed.types = ed.types.includes(t) ? ed.types.filter((x) => x !== t) : [...ed.types, t]; render(); });
+on('click', 'type-new', () => {
+  const i = document.getElementById('type-new'), n = i.value.trim();
+  if (!n) return;
+  const known = allTypes().find((t) => norm(t) === norm(n));
+  if (!ed.types.includes(known || n)) ed.types.push(known || n);
   render();
 });
 on('click', 'dtab', (el) => { S.q.dtab = el.dataset.k; render(); });
