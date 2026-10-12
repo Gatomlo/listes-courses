@@ -73,9 +73,9 @@ export function platsView() {
   const card = (d) => {
     const hits = n && !norm(d.name).includes(n) ? [...(d.part_names || []), ...d.ingredient_names].filter((x) => norm(x).includes(n)) : [];
     const pills = `${d.wish ? `<span class="pill" title="Envie">${I('bulb', 's')}</span>` : ''}${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts}</span>` : ''}${d.has_recipe ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`;
-    // Tags sous le nom : 3 au plus, puis « +N ».
-    const tags = d.tags.length ? `<div class="dtags">${d.tags.slice(0, 3).map((t) => `<span>#${esc(t)}</span>`).join('')}${d.tags.length > 3 ? `<span class="more">+${d.tags.length - 3}</span>` : ''}</div>` : '';
-    return `<a class="dcard" href="#/plats/${d.id}">${tile(d.name, pills, '', d.photo)}<div><h4>${esc(d.name)}</h4>${tags}
+    // Tags en badges sur la photo : 3 au plus, puis « +N ».
+    const tags = d.tags.slice(0, 3).map((t) => `<span class="pill">#${esc(t)}</span>`).join('') + (d.tags.length > 3 ? `<span class="pill">+${d.tags.length - 3}</span>` : '');
+    return `<a class="dcard" href="#/plats/${d.id}">${tile(d.name, pills + tags, '', d.photo)}<div><h4>${esc(d.name)}</h4>
       <div class="muted small">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.next_date ? `<span style="color:var(--leaf);font-weight:600">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric' }))}</span>` : d.last_date ? `il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</div></div></a>`;
   };
   const search = `<div class="search grow">${I('search')}<input class="txt" id="dish-q" placeholder="Plat, ingrédient, recette…" value="${esc(q)}" data-in="dish-q"></div>`;
