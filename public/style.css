@@ -261,6 +261,7 @@ ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;
 .tile.ph::before,.tile.ph .mono-l{display:none}
 .imp-line{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
 .imp-line .cb{margin-top:2px}
+button.pill{border:0;cursor:pointer;font-family:inherit}
 .tile.hero-t .mono-l{font-size:96px;right:16px}
 .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px 12px}
 .dcard{display:grid;gap:8px;text-decoration:none;color:inherit}
