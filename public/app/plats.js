@@ -78,10 +78,11 @@ export function platsView() {
   };
   const search = `<div class="search grow">${I('search')}<input class="txt" id="dish-q" placeholder="Plat, ingrédient, recette…" value="${esc(q)}" data-in="dish-q"></div>`;
   // Telephone : filtres dans un panneau (bouton a cote de la recherche), filtres actifs en pastilles.
+  // PC : tous les filtres sur une ligne (passe a la ligne si la place manque).
   const filters = isPc() ? `${search}
-      <div class="opt">${FILTERS.map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
-      ${filterRow('Repas', SLOT_ORDER.map((k) => [k, SLOT[k]]), sl, 'dish-slot')}
-      <div class="row gap" style="margin:2px 0 4px">${ddBtn('type', 'Type', ty, 'Tous')}${ddBtn('tag', 'Tag', tg && `#${tg}`, 'Tous')}</div>`
+      <div class="frow"><div class="fgrp">${FILTERS.map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
+      <div class="fgrp"><span class="flbl">Repas</span>${SLOT_ORDER.map((k) => `<button class="${sl === k ? 'on' : ''}" data-a="dish-slot" data-t="${k}">${SLOT[k]}</button>`).join('')}</div>
+      <div class="fgrp">${ddBtn('type', 'Type', ty, 'Tous')}${ddBtn('tag', 'Tag', tg && `#${tg}`, 'Tous')}</div></div>`
     : `<div class="row gap">${search}<button class="btn sec2 fbtn" data-a="dish-filters" aria-label="Filtres">${I('sliders')}${act.length ? `<span class="badge">${act.length}</span>` : ''}</button></div>
       ${act.length ? `<div class="pills" style="margin:8px 2px 0">${act.map(([k, t]) => `<button class="pill p-grey" data-a="dish-unset" data-k="${k}">${esc(t)} ✕</button>`).join('')}</div>` : ''}`;
   return {
@@ -167,8 +168,6 @@ on('input', 'dish-q', (el) => { S.q.dish = el.value; render(); const i = documen
 on('click', 'dish-filter', (el) => { S.q.dishFilter = el.dataset.f; render(); });
 on('click', 'dish-slot', (el) => { S.q.dishSlot = S.q.dishSlot === el.dataset.t ? '' : el.dataset.t; render(); });
 on('click', 'dish-unfilter', () => { S.q.dishFilter = ''; S.q.dishTag = ''; S.q.dishType = ''; S.q.dishSlot = ''; render(); });
-// Rangee de filtres (un choix par rangee, cliquer a nouveau = retirer) : [valeur, libelle].
-const filterRow = (label, items, cur, act) => (items.length ? `<div class="opt tags"><span class="flbl">${label}</span>${items.map(([v, t]) => `<button class="${cur === v ? 'on' : ''}" data-a="${act}" data-t="${esc(v)}">${esc(t)}</button>`).join('')}</div>` : '');
 on('click', 'dish-new-named', () => { pendingName = S.q.dish; go('#/plats/nouveau'); });
 
 // ---------- Import CSV de plats (gestionnaire) : apercu puis import ----------
