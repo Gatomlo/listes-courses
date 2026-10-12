@@ -20,7 +20,7 @@ export function foyerView() {
     right: '<button class="btn sm sec2" data-a="go" data-to="#/foyers">Mes foyers</button>',
     body: `${installCard()}${acc('mem', { icon: `${I('users', 's')} `, title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
         body: members + (mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="invite">＋ Inviter un membre</button>' : '') })}
-      ${acc('set', { icon: `${I('sliders', 's')} `, title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, ${h.avg_records} relevés, courses ${h.rhythm_days} j, menu ${h.menu_days} j dès le ${DOW[h.menu_start_dow]}`,
+      ${acc('set', { icon: `${I('sliders', 's')} `, title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, ${h.avg_records} relevés, courses ${h.rhythm_days} j, menu ${h.menu_days} j dès le ${DOW[h.menu_start_dow]}, plat ≥ ${h.menu_gap_days} j`,
         body: `<div class="form">
           <label class="row"><span class="grow"><b>Nom du foyer</b></span><input class="txt w12" name="name" value="${esc(h.name)}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Seuil « 2 magasins »</b><span class="muted block">Économie minimale (€) pour conseiller de faire les deux</span></span><input class="txt w5" name="threshold" inputmode="decimal" value="${(h.threshold_cents / 100).toFixed(2).replace('.', ',')}" ${mgr ? '' : 'disabled'}></label>
@@ -28,6 +28,7 @@ export function foyerView() {
           <label class="row"><span class="grow"><b>Rythme des courses</b><span class="muted block">Jours entre deux listes (date proposée)</span></span><input class="txt w5" type="number" min="1" max="90" name="rhythm_days" value="${h.rhythm_days}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Durée d'un menu</b><span class="muted block">Jours proposés pour un nouveau menu</span></span><input class="txt w5" type="number" min="1" max="62" name="menu_days" value="${h.menu_days}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Premier jour d'un menu</b><span class="muted block">Quand aucun menu n'est enregistré avant</span></span><select class="txt w8" name="menu_start_dow" ${mgr ? '' : 'disabled'}>${[1, 2, 3, 4, 5, 6, 0].map((i) => `<option value="${i}" ${i === h.menu_start_dow ? 'selected' : ''}>${DOW[i]}</option>`).join('')}</select></label>
+          <label class="row"><span class="grow"><b>Délai avant de reproposer un plat</b><span class="muted block">Génération du menu : jours sans ce plat avant de le proposer à nouveau</span></span><input class="txt w5" type="number" min="0" max="365" name="menu_gap_days" value="${h.menu_gap_days}" ${mgr ? '' : 'disabled'}></label>
           ${mgr ? '<div class="row end"><button class="btn" data-a="settings-save">Enregistrer</button></div>' : ''}</div>` })}
       ${acc('tags', { icon: `${I('tag', 's')} `, title: 'Tags des plats', sum: ` · ${H.tags.length}`,
         body: H.tags.map((t) => `<div class="ord"><span class="grow">#${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}</span></span>
@@ -41,7 +42,7 @@ const refresh = async () => { await loadHouse(); render(); };
 on('click', 'settings-save', async () => {
   const f = formData(document.querySelector('.acc .form'));
   const threshold_cents = Math.round(parseFloat(String(f.threshold).replace(',', '.')) * 100);
-  if (await attempt(() => patch(hp(), { name: f.name, threshold_cents, avg_records: f.avg_records, rhythm_days: f.rhythm_days, menu_days: f.menu_days, menu_start_dow: f.menu_start_dow }))) {
+  if (await attempt(() => patch(hp(), { name: f.name, threshold_cents, avg_records: f.avg_records, rhythm_days: f.rhythm_days, menu_days: f.menu_days, menu_start_dow: f.menu_start_dow, menu_gap_days: f.menu_gap_days }))) {
     toast('Réglages enregistrés'); await refresh();
   }
 });

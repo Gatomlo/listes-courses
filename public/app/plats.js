@@ -11,6 +11,9 @@ const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const today = () => new Date().toISOString().slice(0, 10);
 const daysAgo = (d) => Math.round((Date.parse(today()) - Date.parse(d)) / 864e5);
 export const SLOT = { pdj: 'P.-déj.', midi: 'Midi', soir: 'Soir', coll: 'Collation' };
+// Repas possibles d'un plat (generation du menu) ; sans choix = midi et soir.
+export const SLOT_ORDER = ['pdj', 'midi', 'coll', 'soir'];
+const slotsLabel = (v) => SLOT_ORDER.filter((k) => (v || ['midi', 'soir']).includes(k)).map((k) => SLOT[k]).join(', ');
 const num = (v) => { const n = Number(String(v ?? '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
 const fmtQ = (q) => String(Math.round(q * 10) / 10).replace('.', ',');
 // Unite d'un ingredient : NULL = emballages du produit, sinon comme lib/units.js (ING_UNITS) ;
@@ -59,7 +62,7 @@ export function platsView() {
   };
   return {
     title: 'Plats', sub: `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`, large: true,
-    right: isManager() ? `<a class="ib" href="#/plats/nouveau" aria-label="Nouveau plat">${I('plus')}</a>` : '',
+    right: isManager() ? `<button class="ib" data-a="dish-csv-open" aria-label="Importer des plats (CSV)" title="Importer des plats (CSV)">${I('upload')}</button><a class="ib" href="#/plats/nouveau" aria-label="Nouveau plat">${I('plus')}</a>` : '',
     body: `<div class="search">${I('search')}<input class="txt" id="dish-q" placeholder="Plat, ingrédient, recette…" value="${esc(q)}" data-in="dish-q"></div>
       <div class="opt">${[['all', 'Tous'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'Suggestions']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
       ${tagChips('dish-tag', tg)}
@@ -72,6 +75,56 @@ on('click', 'dish-filter', (el) => { S.q.dishFilter = el.dataset.f; render(); })
 on('click', 'dish-tag', (el) => { S.q.dishTag = S.q.dishTag === el.dataset.t ? '' : el.dataset.t; render(); });
 on('click', 'dish-new-named', () => { pendingName = S.q.dish; go('#/plats/nouveau'); });
 
+// ---------- Import CSV de plats (gestionnaire) : apercu puis import ----------
+const DCSV_HEAD = 'nom;portions;temps;repas;tags;lien;ingrédients;étapes;notes';
+let dcsvText = '';
+on('click', 'dish-csv-open', () => {
+  dcsvText = '';
+  sheet(`<h3>${I('upload', 's')} Importer des plats</h3>
+    <p class="muted small">Fichier CSV (séparateur « ; » ou « , »), une ligne d'en-tête puis un plat par ligne :<br><code style="word-break:break-all">${DCSV_HEAD}</code></p>
+    <p class="muted small">Seul <b>nom</b> est obligatoire. <b>repas</b> : petit-déjeuner, midi, soir, collation (plusieurs séparés par « , » ; vide = midi et soir). <b>tags</b> séparés par « , » ou « | ».
+      <b>ingrédients</b> séparés par « | », chacun « Produit » ou « Produit : quantité unité » (ex. <code>Spaghetti : 500 g | Œufs : 3 pièces | Sel</code>) ; produit inconnu : créé. <b>étapes</b> séparées par « | ».
+      Plat déjà connu : seuls ses repas et ses tags sont complétés. Réimporter le même fichier ne double rien.</p>
+    <button class="btn sec2 sm" data-a="dish-csv-model">Télécharger un modèle</button>
+    <label class="muted" style="display:block;margin-top:10px">Fichier</label><input class="txt" type="file" accept=".csv,text/csv,text/plain" data-ch="dish-csv-file">
+    <div id="dcsv-res"></div>`);
+});
+on('click', 'dish-csv-model', () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF' + DCSV_HEAD + '\r\n'
+    + 'Spaghetti bolognaise;4;45 min;midi, soir;rapide, pâtes;;Spaghetti : 500 g | Haché : 400 g | Tomates pelées : 2 | Oignon : 1 pièce | Ail : 2 gousses;Faire revenir l\'oignon | Ajouter le haché puis les tomates | Cuire les pâtes;\r\n'
+    + 'Pancakes;4;20 min;petit-déjeuner, collation;sucré;;Farine : 250 g | Lait : 50 cl | Œufs : 2 pièces;;\r\n'
+    + 'Soupe de légumes;6;1 h;soir;hiver, végé;https://exemple.be/soupe;;;Se congèle bien\r\n'], { type: 'text/csv' }));
+  a.download = 'modele-plats.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
+const dcsvSummary = (r) => `<div class="card" style="margin-top:10px">
+  <p><b>${r.created.length}</b> plat${r.created.length > 1 ? 's' : ''} ${r.dry ? 'à créer' : 'créé' + (r.created.length > 1 ? 's' : '')} · <b>${r.updated.length}</b> déjà connu${r.updated.length > 1 ? 's' : ''} (repas et tags complétés)${r.products.length ? ` · ${plural(r.products.length, 'produit')} ${r.dry ? 'à créer' : 'créé' + (r.products.length > 1 ? 's' : '')}` : ''}</p>
+  ${r.created.length ? `<p class="muted small">${r.created.map(esc).join(' · ')}</p>` : ''}
+  ${r.products.length ? `<p class="small">Nouveaux produits (rayon Épicerie, à compléter) : ${r.products.map(esc).join(', ')}</p>` : ''}
+  ${r.errors.length ? `<p class="small" style="color:var(--danger)">${plural(r.errors.length, 'ligne')} ignorée${r.errors.length > 1 ? 's' : ''} :<br>${r.errors.map((e) => `ligne ${e.line} : ${esc(e.msg)}`).join('<br>')}</p>` : ''}</div>`;
+on('change', 'dish-csv-file', async (el) => {
+  const file = el.files && el.files[0];
+  if (!file) return;
+  dcsvText = await file.text();
+  const r = await attempt(() => post(hp('/dishes/import'), { csv: dcsvText, dry: true }));
+  if (!r) return;
+  document.getElementById('dcsv-res').innerHTML = dcsvSummary(r) + (r.created.length || r.updated.length
+    ? '<div class="row end" style="margin-top:10px"><button class="btn" data-a="dish-csv-go">Importer</button></div>'
+    : '<p class="muted small">Rien à importer.</p>');
+});
+on('click', 'dish-csv-go', async () => {
+  const r = await attempt(() => post(hp('/dishes/import'), { csv: dcsvText }));
+  if (!r) return;
+  S.products = null;
+  await Promise.all([loadDishes(), loadHouse(), loadProducts()]);
+  render();
+  document.getElementById('dcsv-res').innerHTML = dcsvSummary(r);
+  toast(`${plural(r.created.length, 'plat')} importé${r.created.length > 1 ? 's' : ''}${r.updated.length ? `, ${r.updated.length} complété${r.updated.length > 1 ? 's' : ''}` : ''}`);
+});
+
 // ---------- Fiche plat ----------
 let ed = null;          // plat en cours d'edition
 let pendingName = '';
@@ -80,7 +133,7 @@ export function newDishFrom(name, ret) { pendingName = name || ''; S.dishReturn 
 export async function loadDish(id) {
   if (!S.products) await loadProducts();
   if (id === 'nouveau') {
-    ed = { id: null, name: pendingName || '', portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], groups: [], parts: [], used_in: [], tags: [], upcoming: [], past: [], times: 0 };
+    ed = { id: null, name: pendingName || '', slots: ['midi', 'soir'], portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], groups: [], parts: [], used_in: [], tags: [], upcoming: [], past: [], times: 0 };
     pendingName = '';
   } else {
     S.dishReturn = null;
@@ -131,10 +184,12 @@ export function dishView() {
   const cur = tabs.some(([k]) => k === S.q.dtab) ? S.q.dtab : ed.parts.length ? 'parts' : 'ing';
   const pills = `${ed.parts.length ? `<span class="pill">${I('puzzle', 's')} plat composé</span>` : ''}${ed.tags.map((t) => `<span class="pill">#${esc(t)}</span>`).join('')}`;
   const info = ro ? `<h1 class="mid" style="font-size:26px;margin:14px 2px 4px">${esc(ed.name)}</h1>
-      <p class="row small muted" style="margin:0 2px;flex-wrap:wrap">${I('users', 's')} ${ed.portions} pers.${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''}</p>`
+      <p class="row small muted" style="margin:0 2px;flex-wrap:wrap">${I('users', 's')} ${ed.portions} pers.${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''} · ${slotsLabel(ed.slots)}</p>`
     : `<div class="card form" style="margin-top:12px"><label class="muted small">Nom</label><input class="txt" value="${esc(ed.name)}" data-ch="ed" data-f="name">
       <div class="row gap"><label class="grow"><span class="muted small">Portions de référence</span><input class="txt" type="number" min="1" value="${ed.portions}" data-ch="ed" data-f="portions"></label>
       <label class="grow"><span class="muted small">Temps</span><input class="txt" value="${esc(ed.time_text)}" placeholder="ex. 45 min" data-ch="ed" data-f="time_text"></label></div>
+      <label class="muted small">Repas possibles <span class="fw4">(génération du menu)</span></label>
+      <div class="opt" style="margin:4px 0 8px;padding:2px 0;flex-wrap:wrap">${SLOT_ORDER.map((k) => `<button class="${ed.slots.includes(k) ? 'on' : ''}" data-a="ed-slot" data-s="${k}">${SLOT[k]}</button>`).join('')}</div>
       <label class="muted small">Tags</label>
       <div class="pills">${ed.tags.map((t, k) => `<span class="pill p-grey">#${esc(t)} <button class="x" data-a="tag-rm" data-i="${k}" aria-label="Retirer">✕</button></span>`).join('')}</div>
       <div class="row gap" style="margin-top:6px"><input class="txt grow" id="tag-in" list="tag-dl" placeholder="ex. rapide, végé, hiver…" data-enter="tag-add"><button class="btn sm sec2" data-a="tag-add">＋</button></div>
@@ -153,6 +208,12 @@ export function dishView() {
     dock: ed.id ? `<div class="btn-row grow">${btnI('book', 'Cuisiner', `href="#/plats/${ed.id}/cuisine"`, 'sec2', 'a')}${btnI('calendar', mgr ? 'Ajouter au menu' : 'Suggérer au menu', `data-a="plan-dish" data-id="${ed.id}"`, '')}</div>` : null,
   };
 }
+on('click', 'ed-slot', (el) => {
+  const k = el.dataset.s, v = ed.slots || ['midi', 'soir'];
+  if (v.includes(k) && v.length === 1) { toast('Au moins un repas'); return; }
+  ed.slots = v.includes(k) ? v.filter((x) => x !== k) : [...v, k];
+  render();
+});
 on('click', 'dtab', (el) => { S.q.dtab = el.dataset.k; render(); });
 // Photo : choisie sur l'appareil (redimensionnee a 1280 px, jpeg) ou reprise de la recette
 // importee ; envoyee avec l'enregistrement du plat.

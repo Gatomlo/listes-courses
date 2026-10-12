@@ -26,6 +26,7 @@ export function plusView() {
       </div>
       <div class="group tiles">
         ${act('csv-open', 'upload', 'Importer des produits', 'Fichier CSV, avec relevés de prix')}
+        ${act('dish-csv-open', 'upload', 'Importer des plats', 'Fichier CSV : repas, tags, ingrédients')}
         ${row('#/menu/export', 'link', 'Export et lien d’affichage du menu', 'A4 à imprimer, page publique en lecture seule')}
       </div>` : ''}
       <div class="group tiles">
