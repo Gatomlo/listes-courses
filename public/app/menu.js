@@ -78,7 +78,7 @@ function wishCard(w) {
   const mgr = isManager(), mine = w.created_by === S.me.id;
   const acts = [];
   if (mgr && w.status === 'pending' && !w.draft) acts.push(btnI('check', 'Valider l’envie', `data-a="wish-ok" data-id="${w.id}"`));
-  if (w.draft && (mgr || w.draft_by === S.me.id)) acts.push(btnI('edit', mgr ? 'Créer la fiche (valide l’envie)' : 'Compléter la fiche', `href="#/plats/${w.dish_id}"`, 'sec2', 'a'));
+  if (w.draft && (mgr || w.draft_by === S.me.id)) acts.push(btnI('edit', mgr ? 'Créer la fiche (valide l’envie)' : 'Compléter la fiche', `href="#/plats/${w.dish_id}" data-a="dish-open-edit" data-id="${w.dish_id}"`, 'sec2', 'a'));
   acts.push(btnI('calendar', mgr ? 'Mettre au menu' : 'Suggérer au menu', `data-a="plan-dish" data-id="${w.dish_id}"`, ''));
   if (mgr || (mine && w.status === 'pending')) acts.push(btnI('x', mgr && w.status === 'pending' ? 'Refuser l’envie' : 'Retirer l’envie', `data-a="wish-del" data-id="${w.id}"`, 'sec2 danger-t'));
   return `<div class="card wish">${tile(w.name, w.status === 'pending' ? '<span class="pill">à valider</span>' : '')}
@@ -472,7 +472,7 @@ async function mealSheet(m) {
     <div class="btn-row" style="margin-top:12px">${btnI('book', m.parts.length ? 'Voir les recettes' : m.has_recipe ? 'Voir la recette' : 'Ingrédients', `data-a="meal-recipe" data-dish="${m.dish_id}" data-p="${m.persons}" data-o="${m.options.join(',')}" data-ps="${m.part_skip.join(',')}"`, '')}${btnI('flame', 'Mode cuisine', `href="#/plats/${m.dish_id}/cuisine/${m.persons}" data-a="close-nav"`, 'sec2', 'a')}</div>
     <div class="btn-row" style="margin-top:8px">
       ${m.suggestion && mgr ? btnI('check', 'Accepter', `data-a="meal-accept" data-id="${m.id}"`, '') : ''}
-      ${mgr && !m.suggestion ? `${btnI('sliders', m.variant || m.parts.length ? (m.parts.length ? 'Recettes, personnes…' : 'Variantes, personnes…') : 'Personnes et réserve', `data-a="meal-edit" data-id="${m.id}" data-date="${m.date}"`)}${btnI('repeat', 'Changer de plat', `data-a="meal-change" data-id="${m.id}" data-date="${m.date}" data-slot="${m.slot}"`)}${btnI('edit', 'Modifier le plat', `href="#/plats/${m.dish_id}" data-a="close-nav"`, 'sec2', 'a')}` : ''}
+      ${mgr && !m.suggestion ? `${btnI('sliders', m.variant || m.parts.length ? (m.parts.length ? 'Recettes, personnes…' : 'Variantes, personnes…') : 'Personnes et réserve', `data-a="meal-edit" data-id="${m.id}" data-date="${m.date}"`)}${btnI('repeat', 'Changer de plat', `data-a="meal-change" data-id="${m.id}" data-date="${m.date}" data-slot="${m.slot}"`)}${btnI('edit', 'Modifier le plat', `href="#/plats/${m.dish_id}" data-a="dish-open-edit" data-id="${m.dish_id}"`, 'sec2', 'a')}` : ''}
       ${mgr || (m.suggestion && m.suggested_by === S.me.id) ? btnI('trash', m.suggestion ? 'Refuser / retirer' : 'Retirer du menu', `data-a="meal-del" data-id="${m.id}"`, 'sec2 danger-t') : ''}
     </div>`);
 }

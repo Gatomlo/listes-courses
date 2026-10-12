@@ -67,3 +67,19 @@ test('envies : refus d un brouillon = fiche supprimee ; planifier = valider', as
   assert.equal((await lea.del(`${h}/wishes/${w.find((x) => x.name === 'Gaufres').id}`)).status, 200);
   assert.equal(await dishByName('Gaufres'), undefined);
 });
+
+test('envies : plat déjà placé au menu = plus une envie', async () => {
+  const d = (await thomas.post(`${h}/dishes`, { name: 'Moules' })).data.id;
+  const e = (await thomas.post(`${h}/dishes`, { name: 'Frites' })).data.id;
+  const day = new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10);
+  // Déjà au menu : refus.
+  await thomas.post(`${h}/meals`, { date: day, slot: 'soir', dish_id: d });
+  const r = await lea.post(`${h}/wishes`, { dish_id: d });
+  assert.equal(r.status, 409);
+  assert.match(r.data.error, /déjà au menu/);
+  // « Changer de plat » vers une envie : l'envie disparaît.
+  await thomas.post(`${h}/wishes`, { dish_id: e });
+  const mid = (await thomas.get(`${h}/menu?from=${day}&days=1`)).data.meals[0].id;
+  await thomas.patch(`${h}/meals/${mid}`, { dish_id: e });
+  assert.ok(!(await thomas.get(`${h}/wishes`)).data.some((w) => w.dish_id === e));
+});

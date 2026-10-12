@@ -131,11 +131,11 @@ test('import CSV de plats : colonne variantes', async () => {
 
 test('génération : envie déjà servie dans le délai, raison donnée', async () => {
   const f = await dish({ name: 'Fondue' });
-  const from = addDays(40), to = addDays(42);
-  await thomas.post(`${h}/meals`, { date: addDays(38), slot: 'soir', dish_id: f.id });
-  await thomas.post(`${h}/wishes`, { dish_id: f.id });
+  const from = addDays(1), to = addDays(3);
+  await thomas.post(`${h}/meals`, { date: addDays(-3), slot: 'soir', dish_id: f.id }); // servi il y a 3 jours
+  assert.equal((await thomas.post(`${h}/wishes`, { dish_id: f.id })).status, 201);
   const g = (await thomas.post(`${h}/menu/generate`, { from, to, slots: ['midi', 'soir'], gap_days: 30 })).data;
   const s = g.wishes_skipped.find((w) => w.dish === 'Fondue');
   assert.match(s.reason, /délai de 30 j/);
-  assert.match(s.reason, new RegExp(addDays(38).split('-').reverse().join('/')));
+  assert.match(s.reason, new RegExp(addDays(-3).split('-').reverse().join('/')));
 });
