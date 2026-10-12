@@ -91,3 +91,17 @@ test('liste des plats : indicateur « envie »', async () => {
   assert.equal(all.find((d) => d.id === id).wish, true);
   assert.equal(all.find((d) => d.name === 'Moules').wish, false);
 });
+
+test('envies : repas du menu remis en envie', async () => {
+  const did = (await thomas.post(`${h}/dishes`, { name: 'Lasagnes', portions: 4, ingredients: [] })).data.id;
+  const m1 = (await thomas.post(`${h}/meals`, { date: '2030-04-01', slot: 'soir', dish_id: did })).data.id;
+  const m2 = (await thomas.post(`${h}/meals`, { date: '2030-04-03', slot: 'midi', dish_id: did })).data.id;
+  assert.equal((await lea.post(`${h}/meals/${m1}/wish`)).status, 403);
+  // Encore prevu un autre jour : refuse, le repas reste.
+  assert.equal((await thomas.post(`${h}/meals/${m1}/wish`)).status, 409);
+  assert.equal((await thomas.get(`${h}/menu?from=2030-04-01&days=1`)).data.meals.length, 1);
+  await thomas.del(`${h}/meals/${m2}`);
+  const w = (await thomas.post(`${h}/meals/${m1}/wish`)).data;
+  assert.deepEqual(w.filter((x) => x.name === 'Lasagnes').map((x) => x.status), ['ok']);
+  assert.equal((await thomas.get(`${h}/menu?from=2030-04-01&days=1`)).data.meals.length, 0);
+});

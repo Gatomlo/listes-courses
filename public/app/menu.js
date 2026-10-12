@@ -3,7 +3,7 @@
 import { esc, fmtDate, on, sheet, closeSheet, confirmSheet, toast, isPc } from './ui.js';
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
-import { SLOT, tagChips, allTags, loadDishes, recipeSheet, newDishFrom, chosenOf, dishIngredients, tile } from './plats.js';
+import { SLOT, tagChips, allTags, loadDishes, newDishFrom, chosenOf, dishIngredients, tile } from './plats.js';
 import { I, btnI } from './icons.js';
 import { ruleText, copyRules } from './modeles.js';
 
@@ -79,6 +79,7 @@ function wishCard(w) {
   const acts = [];
   if (mgr && w.status === 'pending' && !w.draft) acts.push(btnI('check', 'Valider l’envie', `data-a="wish-ok" data-id="${w.id}"`));
   if (w.draft && (mgr || w.draft_by === S.me.id)) acts.push(btnI('edit', mgr ? 'Créer la fiche (valide l’envie)' : 'Compléter la fiche', `href="#/plats/${w.dish_id}" data-a="dish-open-edit" data-id="${w.dish_id}"`, 'sec2', 'a'));
+  else acts.push(btnI('book', 'Fiche du plat', `href="#/plats/${w.dish_id}"`, 'sec2', 'a'));
   acts.push(btnI('calendar', mgr ? 'Mettre au menu' : 'Suggérer au menu', `data-a="plan-dish" data-id="${w.dish_id}"`, ''));
   if (mgr || (mine && w.status === 'pending')) acts.push(btnI('x', mgr && w.status === 'pending' ? 'Refuser l’envie' : 'Retirer l’envie', `data-a="wish-del" data-id="${w.id}"`, 'sec2 danger-t'));
   return `<div class="card wish">${tile(w.name, w.status === 'pending' ? '<span class="pill">à valider</span>' : '')}
@@ -223,7 +224,7 @@ on('click', 'md-del', async () => {
   if (await attempt(() => del(hp(`/menus/${menu.period.id}`)))) { toast('Menu supprimé'); await loadMenu(); render(); }
 });
 
-// Glisser-deposer d'un repas (PC, gestionnaire) ; sur telephone : « Déplacer » dans la fiche repas.
+// Glisser-deposer d'un repas (gestionnaire) : souris sur PC, appui long sur telephone.
 let dragId = null;
 const dropCell = (e) => dragId && e.target.closest && e.target.closest('[data-drop]');
 const clearDrop = () => document.querySelectorAll('.drop-on').forEach((x) => x.classList.remove('drop-on'));
@@ -467,25 +468,20 @@ async function mealSheet(m) {
     ${m.skip.length ? `<p class="muted small">${I('box', 's')} ${m.skip.length} ingrédient${m.skip.length > 1 ? 's' : ''} en réserve (non acheté${m.skip.length > 1 ? 's' : ''})</p>` : ''}
     ${mgr && !m.suggestion ? `<label class="row line"><span>Liste</span><select class="txt grow" data-ch="meal-list" data-id="${m.id}">
       <option value="">Automatique (période)</option>${lists.map((l) => `<option value="${l.id}" ${m.list_id === l.id ? 'selected' : ''}>Liste du ${esc(fmtDate(l.date))}</option>`).join('')}</select></label>` : ''}
-    ${mgr && !m.suggestion ? `<div class="mv"><input class="txt" type="date" id="mv-date" value="${m.date}"><select class="txt" id="mv-slot">${SLOTS.map((s) => `<option value="${s}" ${s === m.slot ? 'selected' : ''}>${SLOT[s]}</option>`).join('')}</select>
-      ${btnI('move', 'Déplacer', `data-a="meal-move" data-id="${m.id}"`)}</div>` : ''}
-    <div class="btn-row" style="margin-top:12px">${btnI('book', m.parts.length ? 'Voir les recettes' : m.has_recipe ? 'Voir la recette' : 'Ingrédients', `data-a="meal-recipe" data-dish="${m.dish_id}" data-p="${m.persons}" data-o="${m.options.join(',')}" data-ps="${m.part_skip.join(',')}"`, '')}${btnI('flame', 'Mode cuisine', `href="#/plats/${m.dish_id}/cuisine/${m.persons}" data-a="close-nav"`, 'sec2', 'a')}</div>
+    <a class="btn full" style="margin-top:12px" href="#/plats/${m.dish_id}" data-a="close-nav">${I('book', 's')} Fiche du plat</a>
     <div class="btn-row" style="margin-top:8px">
       ${m.suggestion && mgr ? btnI('check', 'Accepter', `data-a="meal-accept" data-id="${m.id}"`, '') : ''}
-      ${mgr && !m.suggestion ? `${btnI('sliders', m.variant || m.parts.length ? (m.parts.length ? 'Recettes, personnes…' : 'Variantes, personnes…') : 'Personnes et réserve', `data-a="meal-edit" data-id="${m.id}" data-date="${m.date}"`)}${btnI('repeat', 'Changer de plat', `data-a="meal-change" data-id="${m.id}" data-date="${m.date}" data-slot="${m.slot}"`)}${btnI('edit', 'Modifier le plat', `href="#/plats/${m.dish_id}" data-a="dish-open-edit" data-id="${m.dish_id}"`, 'sec2', 'a')}` : ''}
+      ${mgr && !m.suggestion ? `${btnI('sliders', m.variant || m.parts.length ? (m.parts.length ? 'Recettes, personnes…' : 'Variantes, personnes…') : 'Personnes et réserve', `data-a="meal-edit" data-id="${m.id}" data-date="${m.date}"`)}${btnI('repeat', 'Changer de plat', `data-a="meal-change" data-id="${m.id}" data-date="${m.date}" data-slot="${m.slot}"`)}${btnI('bulb', 'Remettre en envie', `data-a="meal-wish" data-id="${m.id}"`, 'sec2')}` : ''}
       ${mgr || (m.suggestion && m.suggested_by === S.me.id) ? btnI('trash', m.suggestion ? 'Refuser / retirer' : 'Retirer du menu', `data-a="meal-del" data-id="${m.id}"`, 'sec2 danger-t') : ''}
     </div>`);
 }
-on('click', 'meal-move', async (el) => {
-  const date = document.getElementById('mv-date').value, slot = document.getElementById('mv-slot').value;
-  if (!date) return;
-  closeSheet();
-  await moveMeal(el.dataset.id, date, slot);
-});
-const idList = (v) => (v || '').split(',').filter(Boolean).map(Number);
-on('click', 'meal-recipe', (el) => recipeSheet(Number(el.dataset.dish), Number(el.dataset.p), idList(el.dataset.o), idList(el.dataset.ps)));
 on('change', 'meal-list', async (el) => {
   if (await attempt(() => patch(hp(`/meals/${el.dataset.id}`), { list_id: el.value }))) { toast('Repas rattaché · ingrédients déplacés'); closeSheet(); afterChange(); }
+});
+on('click', 'meal-wish', async (el) => {
+  const w = await attempt(() => post(hp(`/meals/${el.dataset.id}/wish`)));
+  if (!w) return;
+  S.wishes = w; closeSheet(); toast('Repas retiré · plat remis en envie'); afterChange();
 });
 on('click', 'meal-accept', async (el) => { if (await attempt(() => post(hp(`/meals/${el.dataset.id}/accept`)))) { closeSheet(); toast('Plat ajouté au menu'); afterChange(); } });
 on('click', 'meal-del', async (el) => {

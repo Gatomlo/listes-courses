@@ -425,7 +425,6 @@ button.meal[data-drag]{-webkit-touch-callout:none;-webkit-user-select:none;user-
 .sheet::before{content:"";position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:9px;background:var(--line)}
 .sheet .txt{min-width:0}
 .sheet .x{position:absolute;right:10px;top:10px}
-.mv{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,110px) auto;gap:8px;align-items:center;margin-top:8px}
 .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .acts .btn{text-align:center}
 .sheet h3{font:800 22px/1.15 var(--display);margin:4px 40px 10px 0}
