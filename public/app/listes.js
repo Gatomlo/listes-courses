@@ -115,7 +115,7 @@ export function listesView() {
         <span class="muted block">Sans date : à importer dans une prochaine liste${b.estimate != null && b.items ? ` · ≈ ${eur(b.estimate)}` : ''}.</span></span>${I('chev', 's chev')}</a>`)}
       </div>${isPc() ? `<div>${nextPreview()}${weekPreview()}</div>` : ''}<div>
       ${box('Listes à venir', mgr ? '<button data-a="list-new">＋ Nouvelle liste</button>' : '', later.map(listRow).join('') || empty(next ? 'Pas d’autre liste prévue.' : 'Aucune.'))}
-      ${box('Promos en cours', '<a href="#/promos">Toutes</a>', promoCards)}
+      ${box('Promos en cours', mgr ? '<a href="#/promos">Toutes</a>' : '', promoCards)}
       <div id="history">${box('Historique', isPc() ? '' : `<button data-a="hist-toggle">${histOpen ? 'Masquer' : `Voir (${s.closed.length})`}</button>`, histOpen ? s.closed.map(listRow).join('') || empty('Aucune liste clôturée.') : '')}</div>
       </div></div>`,
   };

@@ -176,7 +176,7 @@ export function productView() {
   const p = current, mgr = isManager(), dis = mgr ? '' : 'disabled';
   const stores = activeStores();
   return {
-    cols: true, title: p.name, sub: `${catName(p.category_id)} · prix par ${p.unit}`, back: '#/catalogue',
+    cols: true, title: p.name, sub: `${catName(p.category_id)} · prix par ${p.unit}`, back: isManager() ? '#/catalogue' : '#/listes',
     body: `${acc('p_prix', { icon: `${I('tag', 's')} `, title: 'Prix moyen', sum: ` · par ${esc(p.unit)}, ${S.house.household.avg_records} derniers relevés`, def: true,
         body: `<div class="pad">${stores.map((s) => {
           const pr = p.prices[s.id];

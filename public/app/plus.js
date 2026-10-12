@@ -31,6 +31,7 @@ export function plusView() {
       <div class="group tiles">
         ${isInstalled() ? '' : act('install', 'phone', 'Installer l’app', 'Sur l’écran d’accueil, utilisable sans réseau', 'leaf')}
         ${act('me-password', 'lock', S.me.hasPassword ? 'Changer mon mot de passe' : 'Choisir un mot de passe', '')}
+        ${isManager() || !me.id ? '' : `<button class="item click danger-t" data-a="member-del" data-id="${me.id}"><span class="ico">${I('x')}</span><span class="grow"><b>Quitter le foyer</b><span class="muted block">${esc(H.household.name)}</span></span>${I('chev', 's chev')}</button>`}
         ${act('logout', 'logout', 'Se déconnecter', '', 'danger-t')}
       </div>`,
   };

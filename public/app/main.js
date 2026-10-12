@@ -20,6 +20,7 @@ const app = document.getElementById('app');
 // Onglets : Courses, Menu, ＋ (ajout rapide), Plats, Plus ; sur PC, barre laterale avec
 // en plus les acces directs de l'onglet Plus.
 const NAV = [['listes', 'Courses', 'basket'], ['menu', 'Menu', 'calendar'], ['+'], ['plats', 'Plats', 'bowl'], ['plus', 'Plus', 'grid']];
+const MANAGER_ONLY = ['catalogue', 'magasins', 'foyer', 'promos'];
 const PC_EXTRA = [['catalogue', 'Produits', 'tag'], ['magasins', 'Magasins', 'store'], ['foyer', 'Foyer', 'users']];
 
 const ROUTES = {
@@ -108,10 +109,14 @@ async function route() {
   if (name === 'menu' && arg === 'export') name = 'menuexport';
   if (name === 'raccourci') return shortcut(arg);
   if (!ROUTES[name]) { go('#/listes'); return; }
+  // Ecrans de gestion (onglet Plus) : gestionnaires seulement ; un membre est renvoye vers
+  // son profil. Le serveur refuse de toute facon les modifications (garde `manager`).
+  if (S.house && S.house.role !== 'manager' && MANAGER_ONLY.includes(name)) { go('#/plus'); return; }
   S.route = [name, arg, parts[3]];
   connectEvents();
   try {
     if (!S.house) await loadHouse();
+    if (S.house.role !== 'manager' && MANAGER_ONLY.includes(name)) { go('#/plus'); return; }
     if (name === 'catalogue' && !S.products) await loadProducts();
     if (name === 'produit') await loadProduct(arg);
     if (name === 'listes') await Promise.all([loadSummary(), loadSuggestions()]);
