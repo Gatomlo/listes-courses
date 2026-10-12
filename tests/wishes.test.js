@@ -83,3 +83,11 @@ test('envies : plat déjà placé au menu = plus une envie', async () => {
   await thomas.patch(`${h}/meals/${mid}`, { dish_id: e });
   assert.ok(!(await thomas.get(`${h}/wishes`)).data.some((w) => w.dish_id === e));
 });
+
+test('liste des plats : indicateur « envie »', async () => {
+  const id = (await thomas.post(`${h}/dishes`, { name: 'Waterzooi' })).data.id;
+  await lea.post(`${h}/wishes`, { dish_id: id });
+  const all = (await thomas.get(`${h}/dishes`)).data;
+  assert.equal(all.find((d) => d.id === id).wish, true);
+  assert.equal(all.find((d) => d.name === 'Moules').wish, false);
+});

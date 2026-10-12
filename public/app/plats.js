@@ -50,14 +50,14 @@ const hue = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 
 // Avec photo (adresse de l'API, ou image en attente d'enregistrement) : la photo remplace l'initiale.
 const photoSrc = (p) => (!p ? '' : /^(data:|https?:)/.test(p) ? p : `api/${p}`);
 export const tile = (name, pills = '', cls = '', photo = null) => `<div class="tile ${cls}${photo ? ' ph' : ''}" style="--h:${hue(name)}${photo ? `;background-image:url('${esc(photoSrc(photo)).replace(/'/g, '%27')}')` : ''}"><span class="mono-l">${esc(String(name || '?')[0].toUpperCase())}</span><div class="tb">${pills}</div></div>`;
-const FILTERS = [['all', 'Tous'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'Suggestions']];
+const FILTERS = [['all', 'Tous'], ['wish', 'Envies'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'Suggestions']];
 // Plats retenus par la recherche et les filtres (S.q : dish, dishFilter, dishSlot, dishType, dishTag).
 function filteredDishes() {
   const f = S.q.dishFilter || 'all', tg = S.q.dishTag || '', ty = S.q.dishType || '', sl = S.q.dishSlot || '';
   const n = norm(S.q.dish || '').trim();
   return S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || (d.types || []).some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)) || (d.part_names || []).some((x) => norm(x).includes(n)))
     && (!tg || d.tags.includes(tg)) && (!ty || (d.types || []).includes(ty)) && (!sl || (d.slots || []).includes(sl))
-    && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients && !d.parts) || (f === 'planned' && d.next_date) || (f === 'draft' && d.draft) || (f === 'parts' && d.parts)));
+    && (f === 'all' || (f === 'wish' && d.wish) || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients && !d.parts) || (f === 'planned' && d.next_date) || (f === 'draft' && d.draft) || (f === 'parts' && d.parts)));
 }
 // Filtres actifs : [cle de S.q, libelle].
 const activeFilters = () => [
@@ -72,7 +72,7 @@ export function platsView() {
   const list = filteredDishes(), act = activeFilters();
   const card = (d) => {
     const hits = n && !norm(d.name).includes(n) ? [...(d.part_names || []), ...d.ingredient_names].filter((x) => norm(x).includes(n)) : [];
-    const pills = `${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts}</span>` : ''}${d.has_recipe ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`;
+    const pills = `${d.wish ? `<span class="pill" title="Envie">${I('bulb', 's')}</span>` : ''}${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts}</span>` : ''}${d.has_recipe ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`;
     return `<a class="dcard" href="#/plats/${d.id}">${tile(d.name, pills, '', d.photo)}<div><h4>${esc(d.name)}</h4>
       <div class="muted small">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.next_date ? `<span style="color:var(--leaf);font-weight:600">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric' }))}</span>` : d.last_date ? `il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</div></div></a>`;
   };
