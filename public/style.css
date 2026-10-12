@@ -152,6 +152,8 @@ input.cb{width:22px;height:22px;flex:none;accent-color:var(--leaf)}
 .opt button.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 .opt button .n{font-weight:500;opacity:.65}
 .opt.tags button{height:30px;font-size:12.5px}
+.opt .flbl{flex:none;align-self:center;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);min-width:3.6em}
+.opt.tags+.opt.tags{margin-top:-4px}
 .opt.sticky{position:sticky;top:calc(54px + env(safe-area-inset-top));z-index:3;background:var(--bg);margin-top:0;padding-block:6px}
 .pill .x{border:0;background:none;color:inherit;padding:0 0 0 2px;font-size:11px;cursor:pointer}
 .seg{display:flex;background:var(--sunk);border-radius:13px;padding:3px;gap:2px;margin-bottom:10px;overflow-x:auto;scrollbar-width:none}

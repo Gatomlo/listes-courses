@@ -51,10 +51,10 @@ const hue = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 
 const photoSrc = (p) => (!p ? '' : /^(data:|https?:)/.test(p) ? p : `api/${p}`);
 export const tile = (name, pills = '', cls = '', photo = null) => `<div class="tile ${cls}${photo ? ' ph' : ''}" style="--h:${hue(name)}${photo ? `;background-image:url('${esc(photoSrc(photo)).replace(/'/g, '%27')}')` : ''}"><span class="mono-l">${esc(String(name || '?')[0].toUpperCase())}</span><div class="tb">${pills}</div></div>`;
 export function platsView() {
-  const q = S.q.dish || '', f = S.q.dishFilter || 'all', tg = S.q.dishTag || '';
+  const q = S.q.dish || '', f = S.q.dishFilter || 'all', tg = S.q.dishTag || '', ty = S.q.dishType || '', sl = S.q.dishSlot || '';
   const n = norm(q).trim();
   const list = S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || (d.types || []).some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)) || (d.part_names || []).some((x) => norm(x).includes(n)))
-    && (!tg || d.tags.includes(tg))
+    && (!tg || d.tags.includes(tg)) && (!ty || (d.types || []).includes(ty)) && (!sl || (d.slots || []).includes(sl))
     && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients && !d.parts) || (f === 'planned' && d.next_date) || (f === 'draft' && d.draft) || (f === 'parts' && d.parts)));
   const card = (d) => {
     const hits = n && !norm(d.name).includes(n) ? [...(d.part_names || []), ...d.ingredient_names].filter((x) => norm(x).includes(n)) : [];
@@ -67,7 +67,10 @@ export function platsView() {
     right: isManager() ? `<button class="ib" data-a="dish-csv-open" aria-label="Importer des plats (CSV)" title="Importer des plats (CSV)">${I('upload')}</button><a class="ib" href="#/plats/nouveau" aria-label="Nouveau plat">${I('plus')}</a>` : '',
     body: `<div class="search">${I('search')}<input class="txt" id="dish-q" placeholder="Plat, ingrédient, recette…" value="${esc(q)}" data-in="dish-q"></div>
       <div class="opt">${[['all', 'Tous'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'Suggestions']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
-      ${tagChips('dish-tag', tg)}
+      ${filterRow('Repas', SLOT_ORDER.map((k) => [k, SLOT[k]]), sl, 'dish-slot')}
+      ${filterRow('Type', (S.house.types || []).map((t) => [t.name, t.name]), ty, 'dish-type')}
+      ${filterRow('Tag', allTags().map((t) => [t, `#${t}`]), tg, 'dish-tag')}
+      ${tg || ty || sl ? `<div class="row" style="margin:6px 2px 0"><span class="muted small grow">${list.length} plat${list.length > 1 ? 's' : ''} sur ${S.dishes.length}</span><button class="btn sm sec2" data-a="dish-unfilter">${I('x', 's')} Effacer les filtres</button></div>` : ''}
       <div class="dgrid" style="margin-top:8px">${list.map(card).join('')}</div>
       ${list.length ? '' : `<div class="empty">Aucun plat trouvé.${isManager() && q ? `<br><button class="btn" style="margin-top:10px" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}</div>`}`,
   };
@@ -75,6 +78,11 @@ export function platsView() {
 on('input', 'dish-q', (el) => { S.q.dish = el.value; render(); const i = document.getElementById('dish-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('click', 'dish-filter', (el) => { S.q.dishFilter = el.dataset.f; render(); });
 on('click', 'dish-tag', (el) => { S.q.dishTag = S.q.dishTag === el.dataset.t ? '' : el.dataset.t; render(); });
+on('click', 'dish-type', (el) => { S.q.dishType = S.q.dishType === el.dataset.t ? '' : el.dataset.t; render(); });
+on('click', 'dish-slot', (el) => { S.q.dishSlot = S.q.dishSlot === el.dataset.t ? '' : el.dataset.t; render(); });
+on('click', 'dish-unfilter', () => { S.q.dishTag = ''; S.q.dishType = ''; S.q.dishSlot = ''; render(); });
+// Rangee de filtres (un choix par rangee, cliquer a nouveau = retirer) : [valeur, libelle].
+const filterRow = (label, items, cur, act) => (items.length ? `<div class="opt tags"><span class="flbl">${label}</span>${items.map(([v, t]) => `<button class="${cur === v ? 'on' : ''}" data-a="${act}" data-t="${esc(v)}">${esc(t)}</button>`).join('')}</div>` : '');
 on('click', 'dish-new-named', () => { pendingName = S.q.dish; go('#/plats/nouveau'); });
 
 // ---------- Import CSV de plats (gestionnaire) : apercu puis import ----------
