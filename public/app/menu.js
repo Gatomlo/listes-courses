@@ -5,7 +5,7 @@ import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
 import { SLOT, tagChips, allTags, loadDishes, recipeSheet, newDishFrom, chosenOf, dishIngredients, tile } from './plats.js';
 import { I, btnI } from './icons.js';
-import { rulesHtml, editRules, copyRules } from './modeles.js';
+import { ruleText, copyRules } from './modeles.js';
 
 const SLOTS = ['pdj', 'midi', 'soir', 'coll'];
 const today = () => new Date().toISOString().slice(0, 10);
@@ -126,21 +126,20 @@ on('click', 'menu-nav', async (el) => { S.menuAt = el.dataset.d || null; await l
 // Remplit les creneaux libres de la periode affichee (a partir d'aujourd'hui) : repas
 // demandes, delai depuis la derniere fois (reglage du foyer, modifiable ici), tags
 // (tous, sinon au moins un, sinon aucun), envies d'abord. Apercu avant d'enregistrer.
-const gen = { slots: null, gap: null, tags: [], persons: 4, res: null, model: '', rules: [] };
+const gen = { slots: null, gap: null, tags: [], persons: 4, res: null, model: 'none', rules: [] };
 const genFrom = () => (menu.from < today() ? today() : menu.from);
 on('click', 'menu-gen', () => {
   if (!gen.slots) gen.slots = slotsShown();
   if (gen.gap == null) gen.gap = S.house.household.menu_gap_days;
   gen.tags = gen.tags.filter((t) => allTags().includes(t));
-  // Modele retenu la fois precedente (s'il existe encore), sinon le premier ; regles a jour.
   const ms = S.house.models || [];
-  if (!ms.some((m) => String(m.id) === gen.model)) gen.model = ms.length && gen.model !== 'none' ? String(ms[0].id) : 'none';
+  // Modele choisi la fois precedente s'il existe encore, sinon aucun.
+  if (!ms.some((m) => String(m.id) === gen.model)) gen.model = 'none';
   gen.rules = copyRules((ms.find((m) => String(m.id) === gen.model) || {}).rules);
   gen.res = null;
   genSheet();
 });
 function genSheet() {
-  editRules(gen.rules, genSheet);
   const tags = allTags();
   sheet(`<h3>${I('spark', 's')} Générer le menu</h3>
     <p class="muted small">Du ${esc(fmtDate(genFrom(), { weekday: 'short', day: 'numeric', month: 'short' }))} au ${esc(fmtDate(menu.to, { weekday: 'short', day: 'numeric', month: 'short' }))} (menu affiché) : seuls les créneaux libres sont remplis. Aperçu avant d’enregistrer.</p>
@@ -151,8 +150,8 @@ function genSheet() {
     ${tags.length ? `<div class="opt tags">${tags.map((t) => `<button class="${gen.tags.includes(t) ? 'on' : ''}" data-a="gen-tag" data-t="${esc(t)}">#${esc(t)}</button>`).join('')}</div>
       <p class="muted small">D’abord les plats qui ont tous les tags choisis, puis ceux qui en ont au moins un, sinon les autres (le délai est toujours respecté).</p>` : '<p class="muted small">Aucun tag : ajoutez-en sur les fiches des plats.</p>'}
     <div class="sec">Modèle de semaine</div>
-    <select class="txt" data-ch="gen-model"><option value="none" ${gen.model === 'none' ? 'selected' : ''}>Aucun (repas libres)</option>${(S.house.models || []).map((m) => `<option value="${m.id}" ${String(m.id) === gen.model ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>
-    ${gen.model !== 'none' || gen.rules.length ? `<p class="muted small">Règles par semaine, modifiables pour cette fois (le modèle se gère dans Foyer → Modèles de semaine) :</p>${rulesHtml()}` : `<p class="muted small">Créez des modèles (ex. 1 poisson, 2 pâtes par semaine) dans Foyer → Modèles de semaine.${(S.house.types || []).length ? ' <button class="btn sec2 sm" data-a="rule-add">＋ Règle pour cette fois</button>' : ''}</p>`}
+    <select class="txt" data-ch="gen-model"><option value="none" ${gen.model === 'none' ? 'selected' : ''}>Aucun modèle (repas libres)</option>${(S.house.models || []).map((m) => `<option value="${m.id}" ${String(m.id) === gen.model ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>
+    <p class="muted small">${gen.model !== 'none' ? (gen.rules.length ? `Par semaine : ${gen.rules.map(ruleText).join(' · ')}.` : 'Ce modèle n’a pas de règle.') : 'Seuls le délai et les tags guident le choix.'} Les modèles se créent et se modifient dans Foyer → Modèles de semaine.</p>
     <p class="muted small">${I('bulb', 's')} Les envies passent en premier. Un plat n’est proposé que pour ses repas possibles (fiche du plat ; par défaut midi et soir).</p>
     <div class="row end"><button class="btn" data-a="gen-go">${I('spark', 's')} Proposer</button></div>`);
 }
