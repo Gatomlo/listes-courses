@@ -81,8 +81,7 @@ export function platsView() {
   const filters = isPc() ? `${search}
       <div class="opt">${FILTERS.map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
       ${filterRow('Repas', SLOT_ORDER.map((k) => [k, SLOT[k]]), sl, 'dish-slot')}
-      ${filterRow('Type', (S.house.types || []).map((t) => [t.name, t.name]), ty, 'dish-type')}
-      ${filterRow('Tag', allTags().map((t) => [t, `#${t}`]), tg, 'dish-tag')}`
+      <div class="row gap" style="margin:2px 0 4px">${ddBtn('type', 'Type', ty, 'Tous')}${ddBtn('tag', 'Tag', tg && `#${tg}`, 'Tous')}</div>`
     : `<div class="row gap">${search}<button class="btn sec2 fbtn" data-a="dish-filters" aria-label="Filtres">${I('sliders')}${act.length ? `<span class="badge">${act.length}</span>` : ''}</button></div>
       ${act.length ? `<div class="pills" style="margin:8px 2px 0">${act.map(([k, t]) => `<button class="pill p-grey" data-a="dish-unset" data-k="${k}">${esc(t)} ✕</button>`).join('')}</div>` : ''}`;
   return {
@@ -100,10 +99,48 @@ on('click', 'dish-unset', (el) => { S.q[el.dataset.k] = ''; render(); });
 // Vue principale : affichage, repas, puis Type et Tag comme lignes qui ouvrent une liste
 // avec recherche (trop nombreux pour des pastilles). Applique en direct.
 let fview = 'main', fq = '';
+// Liste de choix d'un type ou d'un tag (panneau telephone, menu deroulant PC) : « Tous »,
+// puis les valeurs filtrees par la recherche, avec leur nombre de plats.
+const pickAll = (kind) => (kind === 'type' ? (S.house.types || []).map((t) => t.name) : allTags());
+function pickRows(kind, search, act) {
+  const key = kind === 'type' ? 'dishType' : 'dishTag', all = pickAll(kind), q = norm(search).trim();
+  const count = (v) => S.dishes.filter((d) => (kind === 'type' ? d.types || [] : d.tags).includes(v)).length;
+  const row = (v, label, c) => `<button class="item click" data-a="${act}" data-k="${key}" data-v="${esc(v)}"><span class="grow">${label}</span>${c != null ? `<span class="muted small">${c}</span>` : ''}${(S.q[key] || '') === v ? I('check', 's') : ''}</button>`;
+  const items = all.filter((v) => !q || norm(v).includes(q));
+  return `${q ? '' : row('', `<b>${kind === 'type' ? 'Tous les types' : 'Tous les tags'}</b>`)}
+    ${items.map((v) => row(v, esc(kind === 'tag' ? `#${v}` : v), count(v))).join('') || `<p class="muted" style="padding:12px 14px;margin:0">${all.length ? 'Aucun résultat.' : kind === 'type' ? 'Aucun type : à créer dans Foyer.' : 'Aucun tag.'}</p>`}`;
+}
+
+// ---------- Menus deroulants Type / Tag (PC) ----------
+const ddBtn = (kind, label, cur, empty) => `<button class="btn sm sec2 dd-btn${cur ? ' on' : ''}" data-a="dd-open" data-kind="${kind}"><span class="muted">${label} :</span> ${esc(cur || empty)} ${I('down', 's')}</button>`;
+let dd = null; // { kind, q, anchor }
+function ddClose() { document.querySelectorAll('.dd-pop').forEach((x) => x.remove()); dd = null; }
+function ddRender(keepFocus) {
+  let pop = document.querySelector('.dd-pop');
+  if (!pop) { pop = document.createElement('div'); pop.className = 'dd-pop'; document.body.appendChild(pop); }
+  const r = dd.anchor.getBoundingClientRect();
+  Object.assign(pop.style, { left: `${Math.min(r.left, window.innerWidth - 300)}px`, top: `${r.bottom + 6}px` });
+  pop.innerHTML = `${pickAll(dd.kind).length > 6 ? `<div class="search">${I('search')}<input class="txt" id="dd-q" placeholder="Rechercher…" value="${esc(dd.q)}" data-in="dd-q" autocomplete="off"></div>` : ''}
+    <div class="group fs-list">${pickRows(dd.kind, dd.q, 'dd-pick')}</div>`;
+  const i = pop.querySelector('#dd-q');
+  if (i && keepFocus !== false) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+}
+on('click', 'dd-open', (el) => {
+  const same = dd && dd.kind === el.dataset.kind;
+  ddClose();
+  if (same) return;
+  dd = { kind: el.dataset.kind, q: '', anchor: el };
+  ddRender();
+});
+on('input', 'dd-q', (el) => { dd.q = el.value; ddRender(); });
+on('click', 'dd-pick', (el) => { S.q[el.dataset.k] = el.dataset.v; ddClose(); render(); });
+document.addEventListener('mousedown', (e) => { if (dd && !e.target.closest('.dd-pop, [data-a="dd-open"]')) ddClose(); });
+document.addEventListener('keydown', (e) => { if (dd && e.key === 'Escape') ddClose(); });
+window.addEventListener('hashchange', ddClose);
+window.addEventListener('scroll', (e) => { if (dd && !(e.target.closest && e.target.closest('.dd-pop'))) ddClose(); }, true);
 const CLOSE = '<button class="ib x" data-a="close" aria-label="Fermer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
 function filterSheet() {
   const n = filteredDishes().length;
-  const count = (key, v) => S.dishes.filter((d) => (key === 'type' ? d.types || [] : d.tags).includes(v)).length;
   let html;
   if (fview === 'main') {
     const pick = (label, k, cur, empty) => `<button class="item click" data-a="fs-view" data-v="${k}"><span class="grow"><b>${label}</b><span class="muted block">${cur ? esc(cur) : empty}</span></span>${I('chev', 's chev')}</button>`;
@@ -113,13 +150,9 @@ function filterSheet() {
       <div class="group" style="margin-top:14px">${pick('Type', 'type', S.q.dishType, 'Tous les types')}${pick('Tag', 'tag', S.q.dishTag && `#${S.q.dishTag}`, 'Tous les tags')}</div>
       <div class="row gap" style="margin-top:14px">${activeFilters().length ? `<button class="btn sec2" data-a="fs-clear">Effacer</button>` : ''}<button class="btn grow" data-a="close">Voir ${n} plat${n > 1 ? 's' : ''}</button></div>`;
   } else {
-    const key = fview === 'type' ? 'dishType' : 'dishTag', all = fview === 'type' ? (S.house.types || []).map((t) => t.name) : allTags();
-    const q = norm(fq).trim(), items = all.filter((v) => !q || norm(v).includes(q));
-    const row = (v, label, c) => `<button class="item click" data-a="fs-pick" data-k="${key}" data-v="${esc(v)}"><span class="grow">${label}</span>${c != null ? `<span class="muted small">${c}</span>` : ''}${(S.q[key] || '') === v ? I('check', 's') : ''}</button>`;
     html = `<div class="row"><button class="ib" data-a="fs-view" data-v="main" aria-label="Retour">${I('back')}</button><h3 style="margin:0">${fview === 'type' ? 'Type' : 'Tag'}</h3></div>
-      ${all.length > 6 ? `<div class="search" style="margin:10px 0">${I('search')}<input class="txt" id="fs-q" placeholder="Rechercher…" value="${esc(fq)}" data-in="fs-q"></div>` : ''}
-      <div class="group fs-list">${q ? '' : row('', `<b>${fview === 'type' ? 'Tous les types' : 'Tous les tags'}</b>`)}
-        ${items.map((v) => row(v, esc(fview === 'tag' ? `#${v}` : v), count(fview, v))).join('') || `<p class="muted" style="padding:12px 14px;margin:0">${all.length ? 'Aucun résultat.' : fview === 'type' ? 'Aucun type : à créer dans Foyer.' : 'Aucun tag.'}</p>`}</div>`;
+      ${pickAll(fview).length > 6 ? `<div class="search" style="margin:10px 0">${I('search')}<input class="txt" id="fs-q" placeholder="Rechercher…" value="${esc(fq)}" data-in="fs-q"></div>` : ''}
+      <div class="group fs-list">${pickRows(fview, fq, 'fs-pick')}</div>`;
   }
   const el = document.querySelector('.sheet.dfs');
   if (el) el.innerHTML = CLOSE + html; else sheet(html).classList.add('dfs');
@@ -132,8 +165,6 @@ on('click', 'fs-clear', () => { S.q.dishFilter = ''; S.q.dishSlot = ''; S.q.dish
 on('input', 'fs-q', (el) => { fq = el.value; filterSheet(); const i = document.getElementById('fs-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('input', 'dish-q', (el) => { S.q.dish = el.value; render(); const i = document.getElementById('dish-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('click', 'dish-filter', (el) => { S.q.dishFilter = el.dataset.f; render(); });
-on('click', 'dish-tag', (el) => { S.q.dishTag = S.q.dishTag === el.dataset.t ? '' : el.dataset.t; render(); });
-on('click', 'dish-type', (el) => { S.q.dishType = S.q.dishType === el.dataset.t ? '' : el.dataset.t; render(); });
 on('click', 'dish-slot', (el) => { S.q.dishSlot = S.q.dishSlot === el.dataset.t ? '' : el.dataset.t; render(); });
 on('click', 'dish-unfilter', () => { S.q.dishFilter = ''; S.q.dishTag = ''; S.q.dishType = ''; S.q.dishSlot = ''; render(); });
 // Rangee de filtres (un choix par rangee, cliquer a nouveau = retirer) : [valeur, libelle].

@@ -534,3 +534,8 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 .fbtn .badge{position:absolute;top:-5px;right:-5px}
 .opt.wrap{flex-wrap:wrap;overflow:visible;margin:10px 0}
 .fs-list{max-height:55vh;overflow-y:auto}
+.dd-btn{gap:6px}
+.dd-btn.on{background:var(--ink);color:var(--bg)}.dd-btn.on .muted{color:inherit;opacity:.7}
+.dd-pop{position:fixed;z-index:9;width:290px;background:var(--surface);border-radius:16px;box-shadow:0 12px 40px rgb(0 0 0 / .18);padding:8px;animation:pop .15s}
+.dd-pop .search{margin:2px 2px 8px}
+.dd-pop .fs-list{max-height:320px;margin:0}
