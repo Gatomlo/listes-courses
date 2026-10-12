@@ -530,3 +530,7 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 .ck-bar span.on{background:var(--leaf)}
 .ck-label{font:700 12px/1.2 var(--body);text-transform:uppercase;letter-spacing:.06em;color:var(--leaf);margin:0 2px 10px}
 .ck-step{font-size:22px;line-height:1.5;font-weight:500;padding:22px 18px;background:var(--surface);border-radius:var(--r, 18px);min-height:40vh;white-space:pre-wrap}
+.fbtn{position:relative;width:48px;padding:0;flex:none}
+.fbtn .badge{position:absolute;top:-5px;right:-5px}
+.opt.wrap{flex-wrap:wrap;overflow:visible;margin:10px 0}
+.fs-list{max-height:55vh;overflow-y:auto}

@@ -50,37 +50,92 @@ const hue = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 
 // Avec photo (adresse de l'API, ou image en attente d'enregistrement) : la photo remplace l'initiale.
 const photoSrc = (p) => (!p ? '' : /^(data:|https?:)/.test(p) ? p : `api/${p}`);
 export const tile = (name, pills = '', cls = '', photo = null) => `<div class="tile ${cls}${photo ? ' ph' : ''}" style="--h:${hue(name)}${photo ? `;background-image:url('${esc(photoSrc(photo)).replace(/'/g, '%27')}')` : ''}"><span class="mono-l">${esc(String(name || '?')[0].toUpperCase())}</span><div class="tb">${pills}</div></div>`;
+const FILTERS = [['all', 'Tous'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'Suggestions']];
+// Plats retenus par la recherche et les filtres (S.q : dish, dishFilter, dishSlot, dishType, dishTag).
+function filteredDishes() {
+  const f = S.q.dishFilter || 'all', tg = S.q.dishTag || '', ty = S.q.dishType || '', sl = S.q.dishSlot || '';
+  const n = norm(S.q.dish || '').trim();
+  return S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || (d.types || []).some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)) || (d.part_names || []).some((x) => norm(x).includes(n)))
+    && (!tg || d.tags.includes(tg)) && (!ty || (d.types || []).includes(ty)) && (!sl || (d.slots || []).includes(sl))
+    && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients && !d.parts) || (f === 'planned' && d.next_date) || (f === 'draft' && d.draft) || (f === 'parts' && d.parts)));
+}
+// Filtres actifs : [cle de S.q, libelle].
+const activeFilters = () => [
+  ...(S.q.dishFilter && S.q.dishFilter !== 'all' ? [['dishFilter', FILTERS.find(([k]) => k === S.q.dishFilter)[1]]] : []),
+  ...(S.q.dishSlot ? [['dishSlot', SLOT[S.q.dishSlot]]] : []),
+  ...(S.q.dishType ? [['dishType', S.q.dishType]] : []),
+  ...(S.q.dishTag ? [['dishTag', `#${S.q.dishTag}`]] : []),
+];
 export function platsView() {
   const q = S.q.dish || '', f = S.q.dishFilter || 'all', tg = S.q.dishTag || '', ty = S.q.dishType || '', sl = S.q.dishSlot || '';
   const n = norm(q).trim();
-  const list = S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || (d.types || []).some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)) || (d.part_names || []).some((x) => norm(x).includes(n)))
-    && (!tg || d.tags.includes(tg)) && (!ty || (d.types || []).includes(ty)) && (!sl || (d.slots || []).includes(sl))
-    && (f === 'all' || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients && !d.parts) || (f === 'planned' && d.next_date) || (f === 'draft' && d.draft) || (f === 'parts' && d.parts)));
+  const list = filteredDishes(), act = activeFilters();
   const card = (d) => {
     const hits = n && !norm(d.name).includes(n) ? [...(d.part_names || []), ...d.ingredient_names].filter((x) => norm(x).includes(n)) : [];
     const pills = `${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts}</span>` : ''}${d.has_recipe ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`;
     return `<a class="dcard" href="#/plats/${d.id}">${tile(d.name, pills, '', d.photo)}<div><h4>${esc(d.name)}</h4>
       <div class="muted small">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.next_date ? `<span style="color:var(--leaf);font-weight:600">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric' }))}</span>` : d.last_date ? `il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</div></div></a>`;
   };
+  const search = `<div class="search grow">${I('search')}<input class="txt" id="dish-q" placeholder="Plat, ingrédient, recette…" value="${esc(q)}" data-in="dish-q"></div>`;
+  // Telephone : filtres dans un panneau (bouton a cote de la recherche), filtres actifs en pastilles.
+  const filters = isPc() ? `${search}
+      <div class="opt">${FILTERS.map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
+      ${filterRow('Repas', SLOT_ORDER.map((k) => [k, SLOT[k]]), sl, 'dish-slot')}
+      ${filterRow('Type', (S.house.types || []).map((t) => [t.name, t.name]), ty, 'dish-type')}
+      ${filterRow('Tag', allTags().map((t) => [t, `#${t}`]), tg, 'dish-tag')}`
+    : `<div class="row gap">${search}<button class="btn sec2 fbtn" data-a="dish-filters" aria-label="Filtres">${I('sliders')}${act.length ? `<span class="badge">${act.length}</span>` : ''}</button></div>
+      ${act.length ? `<div class="pills" style="margin:8px 2px 0">${act.map(([k, t]) => `<button class="pill p-grey" data-a="dish-unset" data-k="${k}">${esc(t)} ✕</button>`).join('')}</div>` : ''}`;
   return {
     title: 'Plats', sub: `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`, large: true,
     right: isManager() ? `<button class="ib" data-a="dish-csv-open" aria-label="Importer des plats (CSV)" title="Importer des plats (CSV)">${I('upload')}</button><a class="ib" href="#/plats/nouveau" aria-label="Nouveau plat">${I('plus')}</a>` : '',
-    body: `<div class="search">${I('search')}<input class="txt" id="dish-q" placeholder="Plat, ingrédient, recette…" value="${esc(q)}" data-in="dish-q"></div>
-      <div class="opt">${[['all', 'Tous'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'Suggestions']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
-      ${filterRow('Repas', SLOT_ORDER.map((k) => [k, SLOT[k]]), sl, 'dish-slot')}
-      ${filterRow('Type', (S.house.types || []).map((t) => [t.name, t.name]), ty, 'dish-type')}
-      ${filterRow('Tag', allTags().map((t) => [t, `#${t}`]), tg, 'dish-tag')}
-      ${tg || ty || sl ? `<div class="row" style="margin:6px 2px 0"><span class="muted small grow">${list.length} plat${list.length > 1 ? 's' : ''} sur ${S.dishes.length}</span><button class="btn sm sec2" data-a="dish-unfilter">${I('x', 's')} Effacer les filtres</button></div>` : ''}
+    body: `${filters}
+      ${act.length ? `<div class="row" style="margin:6px 2px 0"><span class="muted small grow">${list.length} plat${list.length > 1 ? 's' : ''} sur ${S.dishes.length}</span>${isPc() ? `<button class="btn sm sec2" data-a="dish-unfilter">${I('x', 's')} Effacer les filtres</button>` : ''}</div>` : ''}
       <div class="dgrid" style="margin-top:8px">${list.map(card).join('')}</div>
       ${list.length ? '' : `<div class="empty">Aucun plat trouvé.${isManager() && q ? `<br><button class="btn" style="margin-top:10px" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}</div>`}`,
   };
 }
+on('click', 'dish-unset', (el) => { S.q[el.dataset.k] = ''; render(); });
+
+// ---------- Panneau des filtres (telephone) ----------
+// Vue principale : affichage, repas, puis Type et Tag comme lignes qui ouvrent une liste
+// avec recherche (trop nombreux pour des pastilles). Applique en direct.
+let fview = 'main', fq = '';
+const CLOSE = '<button class="ib x" data-a="close" aria-label="Fermer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+function filterSheet() {
+  const n = filteredDishes().length;
+  const count = (key, v) => S.dishes.filter((d) => (key === 'type' ? d.types || [] : d.tags).includes(v)).length;
+  let html;
+  if (fview === 'main') {
+    const pick = (label, k, cur, empty) => `<button class="item click" data-a="fs-view" data-v="${k}"><span class="grow"><b>${label}</b><span class="muted block">${cur ? esc(cur) : empty}</span></span>${I('chev', 's chev')}</button>`;
+    html = `<h3>${I('sliders', 's')} Filtres</h3>
+      <div class="sec">Afficher</div><div class="opt wrap">${FILTERS.map(([k, t]) => `<button class="${(S.q.dishFilter || 'all') === k ? 'on' : ''}" data-a="fs-set" data-k="dishFilter" data-v="${k}">${t}</button>`).join('')}</div>
+      <div class="sec">Repas</div><div class="seg">${SLOT_ORDER.map((k) => `<button class="${S.q.dishSlot === k ? 'on' : ''}" data-a="fs-set" data-k="dishSlot" data-v="${k}">${SLOT[k]}</button>`).join('')}</div>
+      <div class="group" style="margin-top:14px">${pick('Type', 'type', S.q.dishType, 'Tous les types')}${pick('Tag', 'tag', S.q.dishTag && `#${S.q.dishTag}`, 'Tous les tags')}</div>
+      <div class="row gap" style="margin-top:14px">${activeFilters().length ? `<button class="btn sec2" data-a="fs-clear">Effacer</button>` : ''}<button class="btn grow" data-a="close">Voir ${n} plat${n > 1 ? 's' : ''}</button></div>`;
+  } else {
+    const key = fview === 'type' ? 'dishType' : 'dishTag', all = fview === 'type' ? (S.house.types || []).map((t) => t.name) : allTags();
+    const q = norm(fq).trim(), items = all.filter((v) => !q || norm(v).includes(q));
+    const row = (v, label, c) => `<button class="item click" data-a="fs-pick" data-k="${key}" data-v="${esc(v)}"><span class="grow">${label}</span>${c != null ? `<span class="muted small">${c}</span>` : ''}${(S.q[key] || '') === v ? I('check', 's') : ''}</button>`;
+    html = `<div class="row"><button class="ib" data-a="fs-view" data-v="main" aria-label="Retour">${I('back')}</button><h3 style="margin:0">${fview === 'type' ? 'Type' : 'Tag'}</h3></div>
+      ${all.length > 6 ? `<div class="search" style="margin:10px 0">${I('search')}<input class="txt" id="fs-q" placeholder="Rechercher…" value="${esc(fq)}" data-in="fs-q"></div>` : ''}
+      <div class="group fs-list">${q ? '' : row('', `<b>${fview === 'type' ? 'Tous les types' : 'Tous les tags'}</b>`)}
+        ${items.map((v) => row(v, esc(fview === 'tag' ? `#${v}` : v), count(fview, v))).join('') || `<p class="muted" style="padding:12px 14px;margin:0">${all.length ? 'Aucun résultat.' : fview === 'type' ? 'Aucun type : à créer dans Foyer.' : 'Aucun tag.'}</p>`}</div>`;
+  }
+  const el = document.querySelector('.sheet.dfs');
+  if (el) el.innerHTML = CLOSE + html; else sheet(html).classList.add('dfs');
+}
+on('click', 'dish-filters', () => { fview = 'main'; fq = ''; filterSheet(); });
+on('click', 'fs-view', (el) => { fview = el.dataset.v; fq = ''; filterSheet(); });
+on('click', 'fs-set', (el) => { const k = el.dataset.k; S.q[k] = S.q[k] === el.dataset.v ? '' : el.dataset.v; render(); filterSheet(); });
+on('click', 'fs-pick', (el) => { S.q[el.dataset.k] = el.dataset.v; fview = 'main'; fq = ''; render(); filterSheet(); });
+on('click', 'fs-clear', () => { S.q.dishFilter = ''; S.q.dishSlot = ''; S.q.dishType = ''; S.q.dishTag = ''; render(); filterSheet(); });
+on('input', 'fs-q', (el) => { fq = el.value; filterSheet(); const i = document.getElementById('fs-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('input', 'dish-q', (el) => { S.q.dish = el.value; render(); const i = document.getElementById('dish-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('click', 'dish-filter', (el) => { S.q.dishFilter = el.dataset.f; render(); });
 on('click', 'dish-tag', (el) => { S.q.dishTag = S.q.dishTag === el.dataset.t ? '' : el.dataset.t; render(); });
 on('click', 'dish-type', (el) => { S.q.dishType = S.q.dishType === el.dataset.t ? '' : el.dataset.t; render(); });
 on('click', 'dish-slot', (el) => { S.q.dishSlot = S.q.dishSlot === el.dataset.t ? '' : el.dataset.t; render(); });
-on('click', 'dish-unfilter', () => { S.q.dishTag = ''; S.q.dishType = ''; S.q.dishSlot = ''; render(); });
+on('click', 'dish-unfilter', () => { S.q.dishFilter = ''; S.q.dishTag = ''; S.q.dishType = ''; S.q.dishSlot = ''; render(); });
 // Rangee de filtres (un choix par rangee, cliquer a nouveau = retirer) : [valeur, libelle].
 const filterRow = (label, items, cur, act) => (items.length ? `<div class="opt tags"><span class="flbl">${label}</span>${items.map(([v, t]) => `<button class="${cur === v ? 'on' : ''}" data-a="${act}" data-t="${esc(v)}">${esc(t)}</button>`).join('')}</div>` : '');
 on('click', 'dish-new-named', () => { pendingName = S.q.dish; go('#/plats/nouveau'); });
