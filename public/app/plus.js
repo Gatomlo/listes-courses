@@ -11,12 +11,13 @@ const row = (href, ic, title, sub, cls = '') => `<a class="item click ${cls}" hr
 const act = (a, ic, title, sub, cls = '') => `<button class="item click ${cls}" data-a="${a}"><span class="ico ${cls.includes('leaf') ? 'leaf' : ''}">${I(ic)}</span><span class="grow"><b>${title}</b>${sub ? `<span class="muted block">${sub}</span>` : ''}</span>${I('chev', 's chev')}</button>`;
 
 // ---------- Onglet Plus ----------
+// Gestionnaire : outils du foyer + profil ; membre : son profil seulement.
 export function plusView() {
   const H = S.house, me = H.members.find((m) => m.me) || { name: S.me.name };
   return {
     title: 'Plus', sub: H.household.name, large: true,
     body: `<a class="card click row" href="#/foyers"><span class="avatar">${esc((me.name || '?')[0])}</span><span class="grow"><b>${esc(S.me.name)}</b><span class="muted block">${isManager() ? 'Gestionnaire' : 'Membre'} · ${esc(H.household.name)} · changer de foyer</span></span>${I('chev', 's chev')}</a>
-      <div class="group tiles">
+      ${isManager() ? `<div class="group tiles">
         ${row('#/catalogue', 'tag', 'Produits', 'Prix moyens, relevés, magasin conseillé')}
         ${row('#/magasins', 'store', 'Magasins', 'Couleurs, magasins actifs, parcours des rayons')}
         ${row('#/promos', 'flame', 'Promos', 'Promos signalées en cours')}
@@ -26,6 +27,8 @@ export function plusView() {
       <div class="group tiles">
         ${act('csv-open', 'upload', 'Importer des produits', 'Fichier CSV, avec relevés de prix')}
         ${row('#/menu/export', 'link', 'Export et lien d’affichage du menu', 'A4 à imprimer, page publique en lecture seule')}
+      </div>` : ''}
+      <div class="group tiles">
         ${isInstalled() ? '' : act('install', 'phone', 'Installer l’app', 'Sur l’écran d’accueil, utilisable sans réseau', 'leaf')}
         ${act('me-password', 'lock', S.me.hasPassword ? 'Changer mon mot de passe' : 'Choisir un mot de passe', '')}
         ${act('logout', 'logout', 'Se déconnecter', '', 'danger-t')}

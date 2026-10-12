@@ -130,6 +130,10 @@ test('cloture : report vers la suivante, A prevoir, ou abandon', async () => {
 });
 
 test('statut, date, suppression d\'une liste (articles manuels -> A prevoir)', async () => {
+  assert.equal((await lea.patch(`${h}/lists/${l2.id}`, { status: 'prep' })).status, 403);
+  assert.equal((await lea.patch(`${h}/lists/${l2.id}`, { status: 'shopping', date: '2030-01-21' })).status, 403);
+  assert.equal((await lea.patch(`${h}/lists/${l2.id}`, { status: 'shopping' })).data.status, 'shopping', 'un membre part faire les courses');
+  assert.equal(typeof (await thomas.get(`${h}/lists`)).data.upcoming[0].unknown, 'number');
   let r = await thomas.patch(`${h}/lists/${l2.id}`, { status: 'shopping', date: '2030-01-20' });
   assert.equal(r.data.status, 'shopping');
   assert.equal(r.data.date, '2030-01-20');

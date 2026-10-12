@@ -52,7 +52,7 @@ function shell(v) {
   const nav = v.noNav || !S.house ? '' : `<nav class="tabs"><div class="brand"><span class="logo">${I('basket')}</span>Le Cabas</div>
     <a class="hh" href="#/foyers">${I('users', 's')}<span class="grow">${esc(S.house.household.name)}</span>${I('down', 's')}</a>
     ${NAV.map((n) => (n[0] === '+' ? `<button class="plus" data-a="quick" aria-label="Ajouter">${I('plus', 'l')}<span>Ajouter</span></button>`
-      : isPc() && n[0] === 'plus' ? PC_EXTRA.map((x) => link(x, tab === x[0])).join('') : link(n, n[0] === 'plus' ? inPlus : tab === n[0]))).join('')}</nav>`;
+      : isPc() && n[0] === 'plus' && mgr ? PC_EXTRA.map((x) => link(x, tab === x[0])).join('') : link(n, n[0] === 'plus' ? inPlus : tab === n[0]))).join('')}</nav>`;
   // Ecrans de l'onglet Plus : retour vers Plus (sur telephone).
   if (!v.back && !isPc() && ['catalogue', 'magasins', 'foyer'].includes(S.route[0])) v = { ...v, back: '#/plus' };
   app.className = 'shell' + (v.noNav ? ' nonav' : '') + (v.wide ? ' wide' : '') + (v.dock ? ' has-dock' : '');
@@ -115,7 +115,7 @@ async function route() {
     if (name === 'catalogue' && !S.products) await loadProducts();
     if (name === 'produit') await loadProduct(arg);
     if (name === 'listes') await Promise.all([loadSummary(), loadSuggestions()]);
-    if (name === 'liste' || name === 'magasin') await loadList(arg);
+    if (name === 'liste' || name === 'magasin') await loadList(arg, name === 'magasin');
     if (name === 'plats') { S.dishReturn = null; await loadDishes(); }
     if (name === 'plat' || name === 'cuisine') await loadDish(arg);
     if (name === 'promos') await loadPromos();

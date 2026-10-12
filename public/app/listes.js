@@ -28,9 +28,15 @@ export async function loadSummary() {
       get(hp(`/menu?from=${new Date().toISOString().slice(0, 10)}&days=7`)).catch(() => null)]);
   }
 }
-export async function loadList(id) {
+export async function loadList(id, shop) {
   current = await get(hp(`/lists/${id}`));
   if (!S.products) await loadProducts();
+  // Entrer dans le mode courses = partir faire les courses : la liste passe « En courses »
+  // (sans reseau : tant pis, le statut n'est qu'indicatif).
+  if (shop && current.type === 'dated' && current.status === 'prep') {
+    current.status = 'shopping';
+    patch(hp(`/lists/${id}`), { status: 'shopping' }).then(() => { summary = null; }).catch(() => {});
+  }
 }
 const refreshList = async (l) => { current = l || await get(hp(`/lists/${current.id}`)); setCached(hp(`/lists/${current.id}`), current); await loadHouse(); render(); };
 export const currentList = () => current;
@@ -56,21 +62,35 @@ const itemUpdate = (i, fields) => runOps([newOp({ type: 'item.update', item_id: 
 // « À prévoir », listes a venir, promos en cours, historique.
 const statusPill = (l) => `<span class="pill ${l.status === 'shopping' ? 'p-leaf' : 'p-grey'}">${STATUS[l.status]}</span>`;
 const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
+// Carte guidee par l'etape : Preparer -> En courses -> Terminee. En preparation : ce qu'il
+// reste a regler (suggestions, articles sans prix) et le conseil de magasin ; deux boutons
+// (preparer, partir faire les courses). En courses : progression, reprendre les courses.
 function heroCard(l) {
   const a = l.advice || { stores: [] }, pct = l.items ? Math.round((l.bought / l.items) * 100) : 0;
-  const mono = storeById(a.mono);
-  const advice = !a.stores.length ? '' : `<div class="card flat" style="margin:0">
-    <div class="row wrap" style="margin:0">${a.stores.map((x) => `<span class="st" style="--c:${esc(x.color)}">${esc(x.name)} · ${x.items}</span>`).join('')}</div>
-    <div class="small" style="margin-top:6px">${a.stores.length < 2 ? `Tout est prévu chez ${esc(a.stores[0].name)}.`
-      : a.split ? `Faire les ${a.stores.length} magasins fait économiser <b>${eur(a.saving)}</b> par rapport à tout chez ${esc(mono ? mono.name : '?')}.`
-        : `L’économie d’un 2e magasin (${eur(Math.max(0, a.saving))}) reste sous le seuil de ${eur(a.threshold)}.`}</div></div>`;
- return `<section class="card box hero-c"><a href="#/listes/${l.id}" style="color:inherit;text-decoration:none;display:block">
-    <div class="box-h"><span>Prochaines courses</span>${statusPill(l)}</div>
-    <div class="mid" style="margin:4px 0 12px">${esc(shortTitle(l))}</div>
-    <div class="row small"><span class="grow muted">${l.bought} / ${l.items} dans le caddie${l.pending ? ` · ${plural(l.pending, 'suggestion')}` : ''}</span>${l.estimate != null && l.items ? `<b class="price">≈ ${eur(l.estimate)}</b>` : ''}</div>
-    <div class="prog" style="margin:6px 0 14px"><i style="width:${pct}%"></i></div></a>
-    ${advice}
-    <div class="btn-row" style="margin-top:14px">${btnI('basket', 'Ouvrir la liste', `href="#/listes/${l.id}"`, 'sec2', 'a')}${btnI('plus', isManager() ? 'Ajouter un article' : 'Suggérer un article', 'href="#/raccourci/article"', 'sec2', 'a')}${l.items ? btnI('cart', 'Mode courses', `data-a="shop-pick" data-id="${l.id}"`, '') : ''}</div></section>`;
+  const mono = storeById(a.mono), shopping = l.status === 'shopping';
+  const steps = `<div class="steps" aria-label="Étape : ${STATUS[l.status]}"><span class="${shopping ? 'past' : 'on'}"></span><span class="${shopping ? 'on' : ''}"></span><span></span></div>
+    <div class="steps-l small"><span class="${shopping ? '' : 'on'}">Préparer</span><span class="${shopping ? 'on' : ''}">En courses</span><span>Terminée</span></div>`;
+  const ok = (t) => `<div class="todo"><span class="ic ok">${I('check', 's')}</span><span class="grow">${t}</span></div>`;
+  const warn = (t, attrs = '') => `<div class="todo"${attrs}><span class="ic wa">!</span><span class="grow">${t}</span></div>`;
+  const storesTxt = a.stores.map((x) => `<span class="st" style="--c:${esc(x.color)}">${esc(x.name)} · ${x.items}</span>`).join(' ');
+  const advice = !a.stores.length ? '' : a.stores.length < 2 ? `Tout est prévu chez ${esc(a.stores[0].name)}.`
+    : a.split ? `Deux magasins font économiser <b>${eur(a.saving)}</b> par rapport à tout chez ${esc(mono ? mono.name : '?')}.`
+      : `Un seul magasin suffirait : un 2e ne fait gagner que ${eur(Math.max(0, a.saving))} (seuil ${eur(a.threshold)}).`;
+  const body = shopping
+    ? `<div class="row small" style="margin-top:12px"><b class="grow">${l.bought} / ${l.items} dans le caddie</b>${l.estimate != null && l.items ? `<span class="price muted">≈ ${eur(l.estimate)}</span>` : ''}</div>
+      <div class="prog" style="margin:8px 0 2px"><i style="width:${pct}%"></i></div>`
+    : `<div class="todos">${ok(`${plural(l.items, 'article')}${l.estimate != null && l.items ? ` · ≈ <b class="price">${eur(l.estimate)}</b>` : ''}`)}
+      ${a.stores.length ? ok(`${advice}<div class="row wrap" style="margin:6px 0 0">${storesTxt}</div>`) : ''}
+      ${l.unknown ? warn(`${plural(l.unknown, 'article')} sans prix connu`) : ''}
+      ${l.pending ? warn(`${plural(l.pending, 'suggestion')} à valider`) : ''}
+      ${!l.items ? warn('Liste vide pour l’instant') : ''}</div>`;
+  const prepBtn = btnI('basket', shopping ? 'Revoir la préparation' : 'Préparer la liste', `href="#/listes/${l.id}"`, 'sec2', 'a');
+  const shopBtn = l.items ? btnI('cart', shopping ? 'Reprendre les courses' : 'Partir faire les courses', `data-a="shop-pick" data-id="${l.id}"`, '') : '';
+  return `<section class="card box hero-c${shopping ? ' going' : ''}"><a href="#/listes/${l.id}" style="color:inherit;text-decoration:none;display:block">
+    <div class="box-h"><span>Prochaines courses</span></div>
+    <div class="mid" style="margin:4px 0 8px">${esc(shortTitle(l))}</div>${steps}</a>
+    ${body}
+    <div class="btn-row" style="margin-top:14px">${prepBtn}${shopBtn}</div></section>`;
 }
 // Bloc de l'accueil : un cadre, son titre et son lien a l'interieur (meme forme partout).
 const box = (title, action, content, cls = '') => `<section class="card box ${cls}"><div class="box-h"><span>${title}</span>${action || ''}</div>${content}</section>`;
@@ -144,8 +164,9 @@ on('click', 'list-create', async () => {
 });
 
 // ---------- Detail d'une liste ----------
-// Une ligne par article : coche, quantite × nom (· note), indicateurs courts, prix au
-// magasin retenu, plats (modale), promo, etiquette du magasin. Le detail est dans la fiche.
+// Une ligne par article : quantite × nom (· note), indicateurs courts, prix au magasin
+// retenu, promo, etiquette du magasin. Le detail est dans la fiche. Mode courses (o.shop) :
+// case a cocher, ni prix ni etiquette (magasin en indication si « Tous les magasins »).
 function itemRow(i, l, o = {}) {
   const mgr = isManager(), open = l.status !== 'closed', dated = l.type === 'dated';
   const mine = i.suggestion && i.suggested_by === S.me.id;
@@ -159,15 +180,17 @@ function itemRow(i, l, o = {}) {
     i.status === 'unavailable' ? `<span>${I('ban', 's')} indisponible</span>` : '',
     i.promos && i.promos.length && open ? `<span style="color:var(--carrot)">${I('tag', 's')} promo</span>` : '',
     i.carried_label ? `<span>→ ${i.carried_label === 'À prévoir' ? 'À prévoir' : esc(fmtDate(i.carried_label))}</span>` : '',
+    !o.shop && dated && open && i.status === 'bought' ? `<span style="color:var(--leaf)">${I('check', 's')} dans le caddie</span>` : '',
+    o.shop && o.allStores && storeById(i.at_store_id) ? `<span style="color:${esc(storeById(i.at_store_id).color)}">● ${esc(storeById(i.at_store_id).name)}</span>` : '',
   ].join('');
-  const check = dated && open && !i.suggestion
+  const check = o.shop && open && !i.suggestion
     ? `<button class="chk${i.status === 'bought' ? ' on' : ''}" data-a="item-check" data-id="${i.id}" aria-label="Acheté">${I('check')}</button>` : '';
   const priced = open && !i.deleted;
   const price = priced && !i.suggestion && dated ? (i.prices[i.at_store_id] != null ? eur(i.prices[i.at_store_id] * i.qty) : '<span class="muted">?</span>') : '';
   const right = i.suggestion && open
     ? (mgr ? `<button class="ib" data-a="sugg-no" data-id="${i.id}" aria-label="Refuser">${I('x')}</button><button class="btn sm" data-a="sugg-ok" data-id="${i.id}" aria-label="Accepter">${I('check', 's')}</button>`
       : mine ? `<button class="ib" data-a="item-del" data-id="${i.id}" aria-label="Retirer">${I('x')}</button>` : '')
-    : priced && dated && !o.noStore ? `<span class="px">${price ? `<span class="price small">${price}</span>` : ''}${storeButton(i)}</span>` : '';
+    : priced && dated && !o.shop ? `<span class="px">${price ? `<span class="price small">${price}</span>` : ''}${storeButton(i)}</span>` : '';
   const tap = open && !i.suggestion;
   return `<div class="item line1${i.suggestion ? ' pending' : ''}${i.status === 'bought' && open ? ' done' : ''}${i.deleted ? ' gone' : ''}" id="it${i.id}">${check}
     <div class="grow nm${tap ? ' click' : ''}" ${tap ? `data-a="item" data-id="${i.id}"` : ''}><span class="t">${esc(i.name)}${i.qty !== 1 ? ` <span class="faint fw4">× ${qtyText(i.qty)}</span>` : ''}</span>
@@ -231,9 +254,26 @@ function basePanel(l) {
     body: l.base.map((b) => `<div class="item"><span class="grow"><b>${esc(b.name)}</b><span class="muted block">pour ${esc(b.dishes.join(', '))}</span></span><button class="btn sm sec2" data-a="add-item" data-id="${b.product_id}">＋ À acheter</button></div>`).join('') });
 }
 
-function filterStore(l) {
-  const f = S.q.listStore;
-  return f && f.listId === l.id ? storeById(f.sid) || null : null;
+// Preparer (liste datee en cours) : suggestions a valider, puis un bloc par magasin retenu
+// (nombre d'articles, sous-total), articles dans l'ordre des rayons du magasin, sans coche.
+function prepBody(l) {
+  const sugg = l.items.filter((i) => i.suggestion);
+  const rest = l.items.filter((i) => !i.suggestion && i.status !== 'unavailable'), unav = l.items.filter((i) => !i.suggestion && i.status === 'unavailable');
+  const st = (id) => (l.pricing && l.pricing.stores.find((x) => x.id === id)) || null;
+  const stores = [...activeStores(), ...[...new Set(rest.map((i) => i.at_store_id))].filter((id) => !activeStores().some((x) => x.id === id)).map((id) => storeById(id) || { id, name: '?', color: 'var(--muted)', categoryOrder: [] })];
+  const blocks = stores.map((s) => {
+    const its = rest.filter((i) => i.at_store_id === s.id);
+    if (!its.length) return '';
+    const ord = [...(s.categoryOrder || []), ...categoryOrder()], rank = (i) => { const k = ord.indexOf(i.category_id); return k < 0 ? 1e6 : k; };
+    its.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'fr'));
+    const p = st(s.id);
+    return `<div class="rayon"><span class="dot" style="background:${esc(s.color)}"></span><b style="color:var(--ink)">${esc(s.name)}</b><span class="n">${plural(its.length, 'article')}${p ? ` · ${eur(p.itemsTotal)}` : ''}</span></div>
+      <div class="group">${its.map((i) => itemRow(i, l)).join('')}</div>`;
+  }).join('');
+  return `${sugg.length ? `<div class="rayon" style="color:var(--carrot)">${I('bulb', 's')} Suggestions à valider<span class="n">${sugg.length}</span></div><div class="group">${sugg.map((i) => itemRow(i, l)).join('')}</div>` : ''}
+    ${blocks}
+    ${!l.items.length ? `<div class="empty">${I('basket', 'l')}<p>Liste vide. ${isManager() ? 'Ajoutez un article ci-dessous.' : 'Suggérez un article ci-dessous.'}</p></div>` : ''}
+    ${unav.length ? `<div class="rayon">Indisponibles<span class="n">${unav.length}</span></div><div class="group">${unav.map((i) => itemRow(i, l)).join('')}</div>` : ''}`;
 }
 
 // Articles par rayon (ordre donne) ; coches replies dans « Dans le caddie ».
@@ -267,25 +307,24 @@ function scenCard(l) {
 }
 on('click', 'scen', () => sheet(`<h3>Scénarios comparés</h3>${scenPanel(current)}`));
 
+// Liste datee en cours = « Preparer » (decider quoi, ou, a quel prix) ; le mode courses
+// (storeListView) sert a acheter. « A prevoir » : par rayon ; liste close : lecture seule.
 export function listView() {
   const l = current, mgr = isManager(), open = l.status !== 'closed', dated = l.type === 'dated';
-  const done = l.items.filter((i) => i.status === 'bought' && !i.suggestion).length;
-  const fs = dated && open ? filterStore(l) : null;
-  const chips = dated && open && activeStores().length > 1 ? `<div class="opt sticky">${[{ id: '', name: 'Tous', n: l.items.length }, ...activeStores().map((x) => ({ ...x, n: l.items.filter((i) => i.at_store_id === x.id).length }))]
-    .map((x) => `<button class="${(fs ? fs.id : '') === x.id ? 'on' : ''}" data-a="list-store" data-sid="${x.id}">${x.color ? `<span class="dot" style="background:${esc(x.color)}"></span>` : ''}${esc(x.name)} <span class="n">${x.n}</span></button>`).join('')}</div>` : '';
-  const shown = fs ? l.items.filter((i) => i.at_store_id === fs.id) : l.items;
+  const real = l.items.filter((i) => !i.suggestion), done = real.filter((i) => i.status === 'bought').length;
   const meals = dated && l.meals && l.meals.length ? `<div class="sec">Repas couverts <a href="#/menu">Menu</a></div>
     <div class="hscroll">${l.meals.map((m) => `<button class="card click" style="width:150px;padding:12px" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted small">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric' }))} · ${SLOT[m.slot]}</span><div style="font-weight:650;line-height:1.25;margin-top:2px">${esc(m.dish)}</div></button>`).join('')}</div>` : '';
-  const body = !open ? closedBody(l) : `${presenceLine(l)}<div class="split"><div>${chips}
-      ${itemsBody(l, shown, fs ? fs.categoryOrder : categoryOrder(), fs ? { empty: `Aucun article prévu chez ${esc(fs.name)}.` } : {})}</div>
+  const body = !open ? closedBody(l) : `${presenceLine(l)}<div class="split"><div>
+      ${dated ? prepBody(l) : itemsBody(l, l.items, categoryOrder())}</div>
       <div class="side">${dated ? scenCard(l) : ''}${meals}${dated ? basePanel(l) : ''}</div></div>`;
+  const shopLbl = l.status === 'shopping' ? 'Reprendre les courses' : 'Partir faire les courses';
   return {
-    title: l.type === 'backlog' ? 'À prévoir' : shortTitle(l), back: '#/listes',
-    sub: l.type === 'backlog' ? 'Liste permanente, sans date' : `${STATUS[l.status]}${open ? ` · ${done}/${l.items.filter((i) => !i.suggestion).length} dans le caddie` : ''}`,
+    title: !dated ? 'À prévoir' : open ? 'Préparer' : shortTitle(l), back: '#/listes',
+    sub: !dated ? 'Liste permanente, sans date' : open ? `${shortTitle(l)} · ${STATUS[l.status]}${done ? ` · ${done}/${real.length} dans le caddie` : ''}` : STATUS[l.status],
     right: dated && mgr ? `<button class="ib" data-a="list-menu" aria-label="Actions de la liste">${I('more')}</button>` : '',
     body,
     dock: open ? `<button class="addbar" data-a="add-open">${I('plus')}<span class="grow">${mgr ? 'Ajouter un article' : 'Suggérer un article'}</span>${I('search', 's')}</button>
-      ${dated && l.items.length ? `<button class="btn" data-a="shop-pick" data-id="${l.id}" aria-label="Mode courses">${I('cart')}</button>` : ''}` : null,
+      ${dated && real.length ? `<button class="btn" data-a="shop-pick" data-id="${l.id}" aria-label="${shopLbl}" title="${shopLbl}">${I('cart')}</button>` : ''}` : null,
   };
 }
 
@@ -296,7 +335,7 @@ on('click', 'shop-pick', async (el) => {
   const l = current && current.id === id ? current : await attempt(() => get(hp(`/lists/${id}`)));
   if (!l) return;
   const left = (sid) => l.items.filter((i) => !i.suggestion && i.status === 'todo' && (!sid || i.at_store_id === sid)).length;
-  sheet(`<h3>Mode courses</h3><p class="muted small">Un magasin à la fois, ou toute la liste sans séparation. Fonctionne sans réseau.</p>
+  sheet(`<h3>Faire les courses</h3><p class="muted small">Un magasin à la fois, ou toute la liste sans séparation. Fonctionne sans réseau.</p>
     <div class="group"><a class="item click" href="#/listes/${l.id}/magasin/tous" data-a="close-go"><span class="ico leaf">${I('cart')}</span><span class="grow"><b>Tous les magasins</b><span class="muted block">${plural(left(), 'article')} à prendre · sans séparation</span></span>${I('arrowR')}</a>
     ${activeStores().map((x) => `<a class="item click" href="#/listes/${l.id}/magasin/${x.id}" data-a="close-go"><span class="dot" style="background:${esc(x.color)}"></span><span class="grow"><b>${esc(x.name)}</b><span class="muted block">${plural(left(x.id), 'article')} à prendre</span></span>${I('arrowR')}</a>`).join('')}</div>`);
 });
@@ -310,16 +349,18 @@ export function storeListView(sid) {
   const st = all ? { itemsTotal: l.pricing ? l.pricing.split : 0, itemsUnknown: 0 } : (l.pricing && l.pricing.stores.find((x) => x.id === s.id)) || { itemsTotal: 0, itemsUnknown: 0 };
   const open = l.status !== 'closed';
   const pct = items.length ? Math.round((done.length / items.length) * 100) : 0;
-  const tabs = activeStores().length > 1 ? `<div class="seg">${[{ id: 'tous', name: 'Tous' }, ...activeStores()].map((x) => `<a class="${String(x.id) === String(s.id) ? 'on' : ''}" href="#/listes/${l.id}/magasin/${x.id}">${esc(x.name)}</a>`).join('')}</div>` : '';
+  const left = (id) => l.items.filter((i) => !i.suggestion && i.status === 'todo' && (id === 'tous' || i.at_store_id === id)).length;
+  const tabs = activeStores().length > 1 ? `<div class="seg sticky">${[{ id: 'tous', name: 'Tous' }, ...activeStores()].map((x) => `<a class="${String(x.id) === String(s.id) ? 'on' : ''}" href="#/listes/${l.id}/magasin/${x.id}">${x.color ? `<span class="dot" style="background:${esc(x.color)}"></span>` : ''}${esc(x.name)} <span class="faint">${left(x.id)}</span></a>`).join('')}</div>` : '';
+  const endLbl = all ? 'Terminer les courses' : `Terminer chez ${s.name}`;
   return {
-    title: s.name, back: `#/listes/${l.id}`, noNav: true, sub: shortTitle(l),
+    title: s.name, back: `#/listes/${l.id}`, noNav: true, sub: `Courses du ${shortTitle(l)}`,
     body: `<div class="shop">${tabs}
       <div class="card" style="--c:${esc(s.color)};padding:0;overflow:hidden"><div class="shopbar"></div><div style="padding:14px 16px">
-        <div class="row"><span class="mid grow">${done.length} / ${items.length}</span><span class="price muted">≈ ${eur(st.itemsTotal)}${st.itemsUnknown ? ` (${st.itemsUnknown} sans prix)` : ''}</span></div>
+        <div class="row"><span class="mid grow">${done.length} / ${items.length}</span><span class="price muted">≈ ${eur(st.itemsTotal)}</span></div>
         <div class="prog" style="margin-top:10px"><i style="width:${pct}%;background:${esc(s.color)}"></i></div>
         ${others(l).length ? `<p class="row small muted" style="margin:10px 0 0">${I('users', 's')} ${esc(others(l).join(', '))} ${others(l).length > 1 ? 'sont' : 'est'} aussi sur cette liste · en direct</p>` : ''}</div></div>
-      ${itemsBody(l, items, s.categoryOrder, { noStore: !all, empty: all ? 'Aucun article à prendre.' : `Aucun article prévu chez ${esc(s.name)}.` })}</div>`,
-    dock: open && items.length ? `<button class="btn full" style="background:${esc(s.color)}" data-a="shop-end" data-sid="${all ? '' : s.id}">${all ? 'Terminer les courses' : `Terminer chez ${esc(s.name)}`}</button>` : null,
+      ${itemsBody(l, items, s.categoryOrder, { shop: true, allStores: all, empty: all ? 'Aucun article à prendre.' : `Aucun article prévu chez ${esc(s.name)}.` })}</div>`,
+    dock: open ? `<div class="btn-row">${btnI('plus', isManager() ? 'Ajouter un oubli' : 'Suggérer un article', 'data-a="add-open"')}${items.length ? btnI('check', esc(endLbl), `data-a="shop-end" data-sid="${all ? '' : s.id}" style="flex-grow:3;background:${esc(s.color)}"`, '') : ''}</div>` : null,
   };
 }
 on('click', 'shop-end', (el) => {
@@ -340,12 +381,6 @@ on('click', 'shop-end-unav', async (el) => {
 });
 on('click', 'shop-end-ok', () => { closeSheet(); go(`#/listes/${current.id}`); });
 
-// Filtre memorise par liste ; retoucher le magasin filtre le retire.
-on('click', 'list-store', (el) => {
-  const sid = Number(el.dataset.sid) || null, f = S.q.listStore;
-  S.q.listStore = sid && !(f && f.listId === current.id && f.sid === sid) ? { listId: current.id, sid } : null;
-  render();
-});
 on('click', 'store-cycle', async (el) => {
   const i = current.items.find((x) => x.id === Number(el.dataset.id));
   const ids = activeStores().map((s) => s.id);

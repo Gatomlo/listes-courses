@@ -501,3 +501,21 @@ main.enter{animation:inR .26s cubic-bezier(.2,.8,.2,1)}
 .pre{white-space:pre-wrap}
 .part-rec{border-top:1px solid var(--line);margin-top:12px;padding-top:8px}.part-rec h4{margin:0 0 2px}.part-rec ol.steps{margin-top:6px}.skipped{text-decoration:line-through;opacity:.6}
 body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))}
+
+/* Accueil : carte guidee par l'etape (Preparer -> En courses -> Terminee) */
+.steps{display:flex;gap:4px;margin:2px 0 4px}
+.steps span{flex:1;height:5px;border-radius:9px;background:var(--sunk)}
+.steps span.on{background:var(--leaf)}
+.steps span.past{background:var(--leaf-soft)}
+.steps-l{display:flex;justify-content:space-between;color:var(--faint)}
+.steps-l .on{color:var(--leaf);font-weight:650}
+.todos{margin-top:10px}
+.todo{display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:14px}
+.todo .ic{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:none;font-weight:800;font-size:12px;margin-top:1px}
+.todo .ic .i{width:13px;height:13px}
+.todo .ic.ok{background:var(--leaf-soft);color:var(--leaf)}
+.todo .ic.wa{background:var(--carrot-soft);color:var(--carrot)}
+.hero-c.going{box-shadow:inset 0 0 0 2px var(--leaf),var(--shadow)}
+/* Mode courses : onglets des magasins collants */
+.seg.sticky{position:sticky;top:calc(54px + env(safe-area-inset-top));z-index:3;box-shadow:0 0 0 6px var(--bg)}
+@media (min-width:900px){.seg.sticky{top:62px}}
