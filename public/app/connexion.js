@@ -5,6 +5,7 @@ import { esc, on, toast, sheet, closeSheet, formData } from './ui.js';
 import { I } from './icons.js';
 import { get, post, patch, attempt, clearLocal } from './api.js';
 import { S, render, loadHouse, go } from './state.js';
+import { pushOff } from './rappels.js';
 
 const pending = { invite: null, invitation: null, sent: null, reset: null, mode: null, options: { mail: false, setup: false } };
 
@@ -147,6 +148,7 @@ on('click', 'foyer-create', async () => {
   if (me) { S.me = me; await loadHouse(); S.products = null; toast('Foyer créé'); go('#/foyer'); }
 });
 on('click', 'logout', async () => {
+  await pushOff(); // cet appareil ne recoit plus les rappels de ce compte
   await attempt(() => post('auth/logout'));
   clearLocal();
   location.href = './';

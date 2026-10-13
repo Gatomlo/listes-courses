@@ -51,6 +51,9 @@ app.get('/', (req, res) => {
   res.set('Cache-Control', 'no-cache').type('html').send(INDEX.replace(/\{\{ROOT\}\}/g, root));
 });
 
+// Rappels de la veille (notifications) : verification chaque minute (CABAS_PUSH=off : aucun).
+require('./lib/push').start();
+
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => console.log(`Le Cabas : http://localhost:${PORT}/`));

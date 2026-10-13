@@ -234,12 +234,12 @@ export async function loadDish(id) {
   S.q.openEdit = null;
   if (!S.products) await loadProducts();
   if (id === 'nouveau') {
-    ed = { id: null, name: pendingName || '', slots: ['midi', 'soir'], types: [], portions: 4, time_text: '', url: '', steps: '', notes: '', ingredients: [], groups: [], parts: [], used_in: [], tags: [], upcoming: [], past: [], times: 0 };
+    ed = { id: null, name: pendingName || '', slots: ['midi', 'soir'], types: [], portions: 4, time_text: '', url: '', steps: '', notes: '', ahead: '', ingredients: [], groups: [], parts: [], used_in: [], tags: [], upcoming: [], past: [], times: 0 };
     pendingName = '';
   } else {
     S.dishReturn = null;
     const d = await get(hp(`/dishes/${id}`));
-    ed = { parts: [], used_in: [], ...d, steps: d.steps || '', notes: d.notes || '', url: d.url || '', time_text: d.time_text || '' };
+    ed = { parts: [], used_in: [], ...d, steps: d.steps || '', notes: d.notes || '', ahead: d.ahead || '', url: d.url || '', time_text: d.time_text || '' };
   }
 }
 export const currentDish = () => ed;
@@ -269,12 +269,14 @@ export function dishView() {
   const tabIng = `${ro ? `<p class="muted small" style="margin:0 4px 8px">${I('users', 's')} Pour ${ed.portions} personne${ed.portions > 1 ? 's' : ''}${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''}</p>` : ''}<div class="card">${ingRows('c', ed.parts.length ? '<p class="muted">Rien en plus des recettes (ex. pain pita, olives…).</p>' : '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient (produit)…')}</div>
     ${ro ? '' : '<p class="muted small" style="margin:0 4px">Quantités facultatives, ajustées au nombre de personnes : en emballages, ou en g, ml, pièces (convertis grâce à la contenance du produit).</p>'}${variants}`;
   const steps = String(ed.steps || '').split('\n').map((x) => x.trim()).filter(Boolean);
-  const tabRec = ro ? `${ed.url ? `<a class="card click row" href="${esc(ed.url)}" target="_blank" rel="noopener">${I('link')}<span class="grow small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(ed.url)}</span>${I('arrowR', 's')}</a>` : ''}
+  const aheadRo = ed.ahead ? `<div class="card ahead"><div class="row small" style="margin-bottom:4px">${I('bell', 's')}<b>À faire à l’avance</b><span class="muted">· la veille</span></div><div class="pre">${esc(ed.ahead)}</div></div>` : '';
+  const tabRec = ro ? `${aheadRo}${ed.url ? `<a class="card click row" href="${esc(ed.url)}" target="_blank" rel="noopener">${I('link')}<span class="grow small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(ed.url)}</span>${I('arrowR', 's')}</a>` : ''}
       ${steps.length ? `<div class="card"><ol class="steps">${steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></div>` : '<div class="empty">Pas d’étapes renseignées.</div>'}${ed.notes ? `<div class="sec">Notes</div><div class="card pre">${esc(ed.notes)}</div>` : ''}`
     : `<div class="card form"><label class="muted small">Lien vers une recette en ligne</label><div class="row gap"><input class="txt grow" value="${esc(ed.url)}" placeholder="https://…" data-ch="ed" data-f="url">${mgr ? `<button class="btn sm" data-a="rec-import">${I('upload', 's')} Importer</button><button class="btn sm sec2" data-a="rec-paste" title="Coller la liste des ingrédients">Coller</button>` : ''}</div>
       ${mgr ? '<p class="muted small">Importer lit nom, portions, temps, ingrédients et étapes quand le site les publie. Si le site refuse, « Coller » reprend la liste des ingrédients copiée depuis la page.</p>' : ''}
       <label class="muted small">Étapes (une par ligne)</label><textarea class="txt" rows="7" data-ch="ed" data-f="steps">${esc(ed.steps)}</textarea>
-      <label class="muted small">Notes</label><textarea class="txt" rows="2" data-ch="ed" data-f="notes">${esc(ed.notes)}</textarea></div>`;
+      <label class="muted small">Notes</label><textarea class="txt" rows="2" data-ch="ed" data-f="notes">${esc(ed.notes)}</textarea>
+      <label class="muted small">${I('bell', 's')} À faire à l’avance <span class="fw4">(rappel la veille au soir)</span></label><textarea class="txt" rows="2" maxlength="1000" placeholder="ex. sortir la viande du congélateur, faire tremper les pois chiches" data-ch="ed" data-f="ahead">${esc(ed.ahead)}</textarea></div>`;
   // Plat compose : recettes (autres plats) a preparer ensemble ; un seul niveau.
   const tabParts = `<p class="muted small" style="margin:0 4px 10px">Pour un plat fait de plusieurs recettes (ex. Mezze : houmous, taboulé, falafels). Chaque recette reste un plat à part ; ses ingrédients s'ajoutent aux courses du repas.</p>
       <div class="group">${ed.parts.map((p, k) => `<div class="item"><span class="ico plum">${I('puzzle')}</span><a class="grow" style="color:inherit;text-decoration:none" href="#/plats/${p.dish_id}"><b>${esc(p.name)}</b><span class="muted block">${fmtQ(p.portions)} portions sur ${p.dish_portions} · pour les ${ed.portions} du plat</span></a>
@@ -500,7 +502,7 @@ on('click', 'dish-save', async () => {
   const d = await attempt(() => (ed.id ? put(hp(`/dishes/${ed.id}`), body) : post(hp('/dishes'), body)));
   if (!d) return;
   const isNew = !ed.id, wasDraft = ed.draft;
-  ed = { ...d, steps: d.steps || '', notes: d.notes || '', url: d.url || '', time_text: d.time_text || '' };
+  ed = { ...d, steps: d.steps || '', notes: d.notes || '', ahead: d.ahead || '', url: d.url || '', time_text: d.time_text || '' };
   S.q.deditId = null;
   S.dishes = null;
   loadHouse().catch(() => {}); // tags du foyer (ecran Foyer)

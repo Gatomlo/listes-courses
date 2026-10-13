@@ -5,6 +5,7 @@ import { get, post, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadProducts, activeStores, storeById } from './state.js';
 import { I } from './icons.js';
 import { isInstalled } from './install.js';
+import { rappelsSub } from './rappels.js';
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const row = (href, ic, title, sub, cls = '') => `<a class="item click ${cls}" href="${href}"><span class="ico">${I(ic)}</span><span class="grow"><b>${title}</b>${sub ? `<span class="muted block">${sub}</span>` : ''}</span>${I('chev', 's chev')}</a>`;
@@ -30,6 +31,7 @@ export function plusView() {
         ${row('#/menu/export', 'link', 'Export et lien d’affichage du menu', 'A4 à imprimer, page publique en lecture seule')}
       </div>` : ''}
       <div class="group tiles">
+        ${act('push-open', 'bell', 'Rappels de la veille', rappelsSub())}
         ${isInstalled() ? '' : act('install', 'phone', 'Installer l’app', 'Sur l’écran d’accueil, utilisable sans réseau', 'leaf')}
         ${act('me-password', 'lock', S.me.hasPassword ? 'Changer mon mot de passe' : 'Choisir un mot de passe', '')}
         ${isManager() || !me.id ? '' : `<button class="item click danger-t" data-a="member-del" data-id="${me.id}"><span class="ico">${I('x')}</span><span class="grow"><b>Quitter le foyer</b><span class="muted block">${esc(H.household.name)}</span></span>${I('chev', 's chev')}</button>`}

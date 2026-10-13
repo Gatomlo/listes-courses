@@ -2,11 +2,11 @@
 // Portee = dossier de l'app (/cabas/ dans la passerelle). L'API n'est jamais mise en
 // cache ici : les donnees hors-ligne sont gerees par l'app (public/app/api.js).
 // Changer VERSION quand la liste des fichiers change.
-const VERSION = 'cabas-v61';
+const VERSION = 'cabas-v62';
 const FILES = [
   './', 'style.css', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png',
   'app/main.js', 'app/ui.js', 'app/api.js', 'app/state.js', 'app/connexion.js',
-  'app/foyer.js', 'app/magasins.js', 'app/install.js', 'app/catalogue.js', 'app/listes.js', 'app/scan.js', 'app/ticket.mjs', 'app/plats.js', 'app/menu.js', 'app/icons.js', 'app/plus.js', 'app/modeles.js',
+  'app/foyer.js', 'app/magasins.js', 'app/install.js', 'app/catalogue.js', 'app/listes.js', 'app/scan.js', 'app/ticket.mjs', 'app/plats.js', 'app/menu.js', 'app/icons.js', 'app/plus.js', 'app/modeles.js', 'app/rappels.js',
 ];
 // Le lecteur de tickets (vendor/, ~ 6 Mo) est garde a sa premiere utilisation.
 
@@ -41,5 +41,25 @@ self.addEventListener('fetch', (e) => {
       if (hit) return hit;
       return fetch(req);
     }
+  })());
+});
+
+// Rappels de la veille (notifications push) : { title, body, url (#/...), tag }.
+self.addEventListener('push', (e) => {
+  let m = {};
+  try { m = e.data ? e.data.json() : {}; } catch { m = { body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(m.title || 'Le Cabas', {
+    body: m.body || '', tag: m.tag, icon: 'icon-192.png', badge: 'icon-192.png', data: { url: m.url || '#/menu' }, lang: 'fr',
+  }));
+});
+// Appui sur la notification : l'app deja ouverte passe a l'ecran indique, sinon elle s'ouvre.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = new URL(self.registration.scope + (e.notification.data && e.notification.data.url || '')).href;
+  e.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const w = wins.find((c) => c.url.startsWith(self.registration.scope));
+    if (w) { await w.focus(); return w.navigate(url).catch(() => w.postMessage({ go: e.notification.data.url })); }
+    return self.clients.openWindow(url);
   })());
 });

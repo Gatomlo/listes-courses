@@ -218,7 +218,11 @@ async function prefetch() {
 }
 
 // Application installable et utilisable sans reseau (voir sw.js).
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Appui sur un rappel quand l'app est deja ouverte : ecran indique par la notification.
+  navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && typeof e.data.go === 'string' && e.data.go.startsWith('#/')) go(e.data.go); });
+}
 on('click', 'go', (el) => go(el.dataset.to));
 
 // ---------- Demarrage ----------

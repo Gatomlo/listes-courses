@@ -43,6 +43,7 @@ export const PATHS = {
   arrowR: 'M5 12h14M13 6l6 6-6 6',
   lock: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',
   mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
+  bell: 'M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2.2 2.2 0 0 0 4 0',
   flame: 'M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z',
 };
 export const I = (n, c = '') => `<svg class="i ${c}" viewBox="0 0 24 24" aria-hidden="true"><path d="${PATHS[n]}"${n === 'more' || n === 'grip' ? ' stroke-width="3"' : ''}/></svg>`;
