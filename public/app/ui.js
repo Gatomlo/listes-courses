@@ -7,6 +7,9 @@ export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 export const eur = (cents) => (cents == null ? '—' : (cents / 100).toFixed(2).replace('.', ',') + ' €');
 export const fmtDate = (iso, o = { day: 'numeric', month: 'short' }) => new Date(iso + 'T12:00').toLocaleDateString('fr-BE', o);
 
+// Date du jour (heure de l'appareil, pas UTC : apres minuit c'est bien le lendemain), decalee de n jours.
+export const localDay = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
 export const isPc = () => window.matchMedia('(min-width: 900px)').matches;
 
 // ---------- Actions par delegation ----------

@@ -1,7 +1,7 @@
 // Scan du ticket de caisse : photo -> preparation de l'image -> lecture sur le telephone
 // (Tesseract.js, rien n'est envoye a un service tiers) -> lignes rapprochees du
 // catalogue -> validation -> operation receipt.save (fonctionne aussi hors-ligne).
-import { esc, eur, on, acc, sheet, closeSheet, toast, formData } from './ui.js';
+import { esc, eur, on, acc, sheet, closeSheet, toast, formData, localDay } from './ui.js';
 import { I } from './icons.js';
 import { get, sync, newOp, attempt } from './api.js';
 import { S, hp, render, go, loadProducts, activeStores, storeById, catName, categoryOrder } from './state.js';
@@ -21,7 +21,7 @@ on('click', 'scan-start', (el) => {
   input.addEventListener('change', () => {
     if (!input.files[0]) return;
     closeSheet();
-    scan = { listId: Number(el.dataset.lid) || null, storeId: Number(el.dataset.sid) || null, date: new Date().toISOString().slice(0, 10), status: 'reading', progress: 0, lines: [] };
+    scan = { listId: Number(el.dataset.lid) || null, storeId: Number(el.dataset.sid) || null, date: localDay(), status: 'reading', progress: 0, lines: [] };
     go('#/scan');
     read(input.files[0]);
   });

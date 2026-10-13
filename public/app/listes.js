@@ -1,10 +1,10 @@
 // Listes : accueil (A prevoir, prochaines courses, historique), detail d'une liste
 // (articles par rayon, ajout, suggestions, fiche article, actions), creation, cloture.
-import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc } from './ui.js';
+import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
 import { get, post, patch, del, attempt, sync, newOp, setCached } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
 import { unitOptions, catOptions, contField } from './catalogue.js';
-import { SLOT } from './plats.js';
+import { SLOT, tile } from './plats.js';
 import { I, btnI } from './icons.js';
 
 const STATUS = { prep: 'En préparation', shopping: 'En courses', closed: 'Clôturée' };
@@ -16,17 +16,15 @@ const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 
 let summary = null;   // GET /lists
 let promos = [];      // GET /promos (accueil)
-let nextList = null, week = null; // PC : apercu de la prochaine liste, repas des 7 jours
+let nextList = null, week = null; // PC : apercu de la prochaine liste ; repas des jours a venir (7 sur PC, 2 sur telephone)
 let current = null;   // liste affichee (GET /lists/:id)
 
 export async function loadSummary() {
   [summary, promos] = await Promise.all([get(hp('/lists')), get(hp('/promos')).catch(() => promos)]);
   // PC : la place permet d'afficher le contenu de la prochaine liste et le menu de la semaine.
   const n = summary.upcoming[0];
-  if (isPc()) {
-    [nextList, week] = await Promise.all([n ? get(hp(`/lists/${n.id}`)).catch(() => null) : null,
-      get(hp(`/menu?from=${new Date().toISOString().slice(0, 10)}&days=7`)).catch(() => null)]);
-  }
+  [nextList, week] = await Promise.all([n && isPc() ? get(hp(`/lists/${n.id}`)).catch(() => null) : null,
+    get(hp(`/menu?from=${localDay()}&days=${isPc() ? 7 : 2}`)).catch(() => null)]);
 }
 export async function loadList(id, shop) {
   current = await get(hp(`/lists/${id}`));
@@ -92,6 +90,27 @@ function heroCard(l) {
     ${body}
     <div class="btn-row" style="margin-top:14px">${prepBtn}${shopBtn}</div></section>`;
 }
+// Repas du jour : midi et soir (creneaux vides masques ; a partir de 21 h, ceux de
+// demain). Appui = fiche du repas ; bouton = mode cuisine pour le bon nombre de personnes.
+export function todayMeals(w = week) {
+  if (!w) return null;
+  const late = new Date().getHours() >= 21, day = localDay(late ? 1 : 0);
+  const rows = ['midi', 'soir'].map((s) => {
+    const o = (w.outings || []).find((x) => x.date === day && x.slot === s);
+    const m = w.meals.find((x) => x.date === day && x.slot === s && !x.suggestion);
+    return o ? { slot: s, out: o } : m ? { slot: s, meal: m } : null;
+  }).filter(Boolean);
+  return { late, day, rows };
+}
+function todayCard() {
+  const t = todayMeals();
+  if (!t || !t.rows.length) return '';
+  const row = (r) => (r.out
+    ? `<a class="item click" href="#/menu"><span class="ico">${I('pin')}</span><span class="grow"><span class="faint small block">${SLOT[r.slot]}</span><b>À l’extérieur</b>${r.out.note ? `<span class="muted small block">${esc(r.out.note)}</span>` : ''}</span></a>`
+    : `<div class="item"><button class="tm-o" data-a="meal-open" data-id="${r.meal.id}" data-date="${r.meal.date}">${tile(r.meal.dish_name, '', 'tm', r.meal.photo)}<span class="grow"><span class="faint small block">${SLOT[r.slot]} · ${r.meal.persons} pers.</span><b>${esc(r.meal.dish)}</b></span></button>
+      ${r.meal.dish_deleted ? '' : `<a class="ib" href="#/plats/${r.meal.dish_id}/cuisine/${r.meal.persons}" aria-label="Cuisiner ${esc(r.meal.dish_name)}" title="Cuisiner">${I('flame')}</a>`}</div>`);
+  return box(t.late ? 'Demain au menu' : 'Aujourd’hui au menu', '<a href="#/menu">Menu</a>', t.rows.map(row).join(''), 'today-c');
+}
 // Bloc de l'accueil : un cadre, son titre et son lien a l'interieur (meme forme partout).
 const box = (title, action, content, cls = '') => `<section class="card box ${cls}"><div class="box-h"><span>${title}</span>${action || ''}</div>${content}</section>`;
 export function listesView() {
@@ -110,6 +129,7 @@ export function listesView() {
     title: 'Courses', sub: S.house.household.name, large: true,
     body: `${sug && mgr ? `<button class="banner" data-a="sugg-sheet">${I('bulb')}<span class="grow">${plural(S.house.pending, 'suggestion')} à valider</span>${I('chev', 's')}</button>` : ''}
       <div class="home-grid${isPc() ? ' three' : ''}"><div>
+      ${todayCard()}
       ${next ? heroCard(next) : box('Prochaines courses', '', `<p class="muted">Aucune liste de courses prévue.</p>${mgr ? '<button class="btn" data-a="list-new">＋ Nouvelle liste</button>' : ''}`, 'hero-c')}
       ${box('À prévoir', `<a href="#/listes/${b.id}">Voir</a>`, `<a class="item click" href="#/listes/${b.id}"><span class="grow"><b>${plural(b.items, 'article')}</b>${b.pending ? ` <span class="pill p-carrot">${plural(b.pending, 'suggestion')}</span>` : ''}
         <span class="muted block">Sans date : à importer dans une prochaine liste${b.estimate != null && b.items ? ` · ≈ ${eur(b.estimate)}` : ''}.</span></span>${I('chev', 's chev')}</a>`)}
@@ -134,7 +154,7 @@ function nextPreview() {
 // PC : repas des 7 prochains jours.
 function weekPreview() {
   if (!week) return '';
-  const days = [...Array(7)].map((_, k) => new Date(Date.now() + k * 864e5).toISOString().slice(0, 10));
+  const days = [...Array(7)].map((_, k) => localDay(k));
   const meals = week.meals.filter((m) => !m.suggestion);
   return box('Cette semaine au menu', '<a href="#/menu">Menu</a>', days.map((d) => { const ms = meals.filter((m) => m.date === d);
     return `<div class="item"><span class="muted small" style="width:78px;flex:none">${esc(fmtDate(d, { weekday: 'short', day: 'numeric' }))}</span><span class="grow small">${ms.map((m) => `<span class="faint">${SLOT[m.slot]}</span> ${esc(m.dish)}`).join(' · ') || '<span class="faint">—</span>'}</span></div>`; }).join(''));
@@ -404,7 +424,7 @@ on('click', 'promo', (el) => {
 function promoSheet(i) {
   const f = promoForm, ex = i.promos.find((p) => p.store_id === f.sid);
   const dated = current.type === 'dated';
-  const until = ex && ex.valid_until ? ex.valid_until : new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+  const until = ex && ex.valid_until ? ex.valid_until : localDay(7);
   const scope = ex ? (ex.list_id ? 'list' : 'until') : (dated ? 'list' : 'until');
   sheet(`<h3>Promo · ${esc(i.name)}</h3><p class="muted small">Rappel que ce produit devrait être moins cher. Le prix promo remplace la moyenne pour le conseil de magasin, sans entrer dans la moyenne.</p>
     <div class="seg">${activeStores().map((s) => `<button class="${f.sid === s.id ? 'on' : ''}" data-a="promo-store" data-sid="${s.id}">${esc(s.name)}</button>`).join('')}</div>

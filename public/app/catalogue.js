@@ -1,6 +1,6 @@
 // Catalogue commun du foyer : liste par rayon (recherche, filtres), fiche produit
 // (caracteristiques, prix moyens par magasin, releves), creation, fusion, suppression.
-import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc } from './ui.js';
+import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
 import { I, btnI } from './icons.js';
 import { get, post, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadProducts, loadHouse, activeStores, storeById, catName, categoryOrder } from './state.js';
@@ -216,7 +216,7 @@ on('click', 'rec-add', () => {
   sheet(`<h3>Nouveau relevé</h3><p class="muted">${esc(current.name)} · prix par ${esc(current.unit)}</p>
     <label class="muted">Magasin</label><select class="txt" name="store_id">${activeStores().map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
     <div class="row gap"><label class="grow"><span class="muted">Prix (€)</span><input class="txt" name="price" inputmode="decimal" placeholder="0,00"></label>
-    <label class="grow"><span class="muted">Date</span><input class="txt" type="date" name="date" value="${new Date().toISOString().slice(0, 10)}"></label></div>
+    <label class="grow"><span class="muted">Date</span><input class="txt" type="date" name="date" value="${localDay()}"></label></div>
     <label class="row" style="margin-top:8px"><input type="checkbox" class="cb" name="promo"><span class="grow">Prix en promo (exclu de la moyenne)</span></label>
     <div class="row end"><button class="btn" data-a="rec-add-ok">Enregistrer</button></div>`);
 });

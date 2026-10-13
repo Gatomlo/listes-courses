@@ -1,6 +1,6 @@
 // Menu : planning des repas (jours x creneaux ; grille semaine sur PC), ajout d'un plat
 // avec ingredients en reserve, fiche repas, export / impression, lien d'affichage.
-import { esc, fmtDate, on, sheet, closeSheet, confirmSheet, toast, isPc } from './ui.js';
+import { esc, fmtDate, on, sheet, closeSheet, confirmSheet, toast, isPc, localDay } from './ui.js';
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
 import { SLOT, tagChips, allTags, loadDishes, newDishFrom, chosenOf, dishIngredients, tile } from './plats.js';
@@ -8,7 +8,7 @@ import { I, btnI } from './icons.js';
 import { ruleText, copyRules } from './modeles.js';
 
 const SLOTS = ['pdj', 'midi', 'soir', 'coll'];
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDay();
 const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 // Repas affiches (choix de l'appareil) ; ancien reglage « p.-dej. / collation » repris.

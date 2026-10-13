@@ -9,6 +9,7 @@
   "theme_color": "#2f7d4f",
   "lang": "fr",
   "shortcuts": [
+    { "name": "Cuisiner le repas du jour", "short_name": "Repas du jour", "url": "./#/raccourci/repas", "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] },
     { "name": "Ajouter un article à la prochaine liste", "short_name": "Nouvel article", "url": "./#/raccourci/article", "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] },
     { "name": "Proposer une envie de plat", "short_name": "Envie de plat", "url": "./#/raccourci/envie", "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] },
     { "name": "Créer un plat", "short_name": "Nouveau plat", "url": "./#/raccourci/plat", "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] }

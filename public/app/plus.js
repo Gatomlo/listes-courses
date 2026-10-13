@@ -1,6 +1,6 @@
 // Onglet Plus (produits, magasins, promos, foyer, compte, outils), écran Promos et
 // bouton ＋ d'ajout rapide (article, repas, envie, plat, promo, ticket).
-import { esc, eur, fmtDate, on, sheet, closeSheet, toast, formData } from './ui.js';
+import { esc, eur, fmtDate, on, sheet, closeSheet, toast, formData, localDay } from './ui.js';
 import { get, post, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadProducts, activeStores, storeById } from './state.js';
 import { I } from './icons.js';
@@ -70,7 +70,7 @@ function promoForm() {
         ${ms.length ? `<div class="ac">${ms.map((x) => `<button data-a="pf-pick" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>` : ''}`}
     <div class="sec">Magasin</div><div class="seg">${activeStores().map((s) => `<button class="${pf.sid === s.id ? 'on' : ''}" data-a="pf-store" data-sid="${s.id}">${esc(s.name)}</button>`).join('')}</div>
     <div class="row gap"><label class="grow"><span class="muted small">Prix promo (facultatif)</span><input class="txt" name="price" inputmode="decimal" placeholder="ex. 1,99"></label>
-    <label class="grow"><span class="muted small">Jusqu’au</span><input class="txt" type="date" name="until" value="${new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)}"></label></div>
+    <label class="grow"><span class="muted small">Jusqu’au</span><input class="txt" type="date" name="until" value="${localDay(7)}"></label></div>
     <label class="muted small" style="display:block;margin-top:8px">Note</label><input class="txt" name="note" placeholder="ex. 2e à -50 %, dépliant">
     <div class="row end"><button class="btn" data-a="pf-save" ${p ? '' : 'disabled'}>Enregistrer</button></div>`);
   if (!p) { const i = document.getElementById('pf-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }

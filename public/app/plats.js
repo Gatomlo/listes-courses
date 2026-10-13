@@ -1,6 +1,6 @@
 // Plats : liste (recherche par nom ou ingredient, filtres), fiche (informations,
 // ingredients, recette facultative avec import depuis un lien, menu et historique).
-import { esc, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc } from './ui.js';
+import { esc, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder } from './state.js';
 import { matchLines } from './ticket.mjs';
@@ -8,7 +8,7 @@ import { unitOptions, catOptions, contField } from './catalogue.js';
 import { I, btnI } from './icons.js';
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDay();
 const daysAgo = (d) => Math.round((Date.parse(today()) - Date.parse(d)) / 864e5);
 export const SLOT = { pdj: 'P.-déj.', midi: 'Midi', soir: 'Soir', coll: 'Collation' };
 // Repas possibles d'un plat (generation du menu) ; sans choix = midi et soir.

@@ -1,6 +1,6 @@
 // Point d'entree : connexion (lien e-mail, invitation), navigation par #, cadre de
 // l'ecran (en-tete, navigation en bas sur mobile / barre laterale sur PC).
-import { esc, on, toggleAcc, isPc, toast, closeSheet } from './ui.js';
+import { esc, on, toggleAcc, isPc, toast, closeSheet, localDay } from './ui.js';
 import { I } from './icons.js';
 import { plusView, promosView, loadPromos } from './plus.js';
 import { get, post, ApiError, net, outbox, onNetChange, onFlushed, flush } from './api.js';
@@ -13,7 +13,7 @@ import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
 import { platsView, dishView, cookView, loadDishes, loadDish } from './plats.js';
 import { menuView, exportView, publicView, loadMenu, loadExport, loadPublic } from './menu.js';
-import { listesView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList } from './listes.js';
+import { listesView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList, todayMeals } from './listes.js';
 
 const app = document.getElementById('app');
 
@@ -86,6 +86,15 @@ async function shortcut(kind) {
       if (l) { to = `#/listes/${l.id}`; pendingClick = 'add-open'; } else toast('Aucune liste en cours');
     } else if (kind === 'plat' && isManager()) to = '#/plats/nouveau';
     else if (kind === 'envie' || kind === 'plat') { to = '#/menu'; pendingClick = 'wish-add'; }
+    else if (kind === 'repas') {
+      // Repas du jour : mode cuisine du soir (a partir de 14 h), sinon du midi, sinon du
+      // repas restant ; rien de prevu = menu.
+      const t = todayMeals(await get(hp(`/menu?from=${localDay()}&days=2`)));
+      const ms = t.rows.filter((r) => r.meal && !r.meal.dish_deleted);
+      const m = (new Date().getHours() >= 14 && ms.find((r) => r.slot === 'soir')) || ms[0];
+      if (m) to = `#/plats/${m.meal.dish_id}/cuisine/${m.meal.persons}`;
+      else { to = '#/menu'; toast(t.late ? 'Rien de prévu demain' : 'Rien de prévu aujourd’hui'); }
+    }
   } catch { /* hors-ligne : ecran des listes */ }
   history.replaceState(null, '', location.pathname + location.search + to); // le raccourci ne reste pas dans l'historique
   return route();
@@ -154,7 +163,12 @@ setRenderer(() => {
 });
 
 // Changement d'ecran : un panneau ouvert se ferme (retour du navigateur compris).
-window.addEventListener('hashchange', () => { closeSheet(); route().then(() => window.scrollTo(0, 0)); });
+// Nouvel ecran : en haut ; menu sur telephone : sur aujourd'hui (sous l'en-tete).
+function scrollStart() {
+  const d = S.route?.[0] === 'menu' && !isPc() && document.querySelector('.agenda .day.today');
+  window.scrollTo(0, d ? d.getBoundingClientRect().top + window.scrollY - 70 : 0);
+}
+window.addEventListener('hashchange', () => { closeSheet(); route().then(scrollStart); });
 // Passage mobile <-> PC : la mise en page et l'etat des accordeons changent.
 window.matchMedia('(min-width: 900px)').addEventListener('change', () => render());
 
@@ -222,6 +236,7 @@ async function boot() {
   if (!S.me) S.me = await get('me').catch(() => null);
   await loadInvitation();
   await route();
+  scrollStart();
   if (loginError && !S.me) toast(loginError, true);
   if (S.me) await acceptPending();
   flush();
