@@ -35,11 +35,15 @@ export async function loadMenu() {
 }
 const mealAt = (d, s) => menu.meals.find((m) => m.date === d && m.slot === s && !m.suggestion) || menu.meals.find((m) => m.date === d && m.slot === s);
 const shopDay = (d) => menu.lists.some((l) => l.date === d);
+const outAt = (d, s) => (menu.outings || []).find((o) => o.date === d && o.slot === s);
 
 function mealBtn(m, label) {
   const drag = isManager() && !m.suggestion ? `${isPc() ? ' draggable="true"' : ''} data-drag="${m.id}"` : '';
   return `<button class="meal${m.suggestion ? ' pending' : ''}"${drag} data-a="meal-open" data-id="${m.id}" data-date="${m.date}">${label ? `<span class="sl">${SLOT[m.slot]}</span>` : ''}<span class="nm">${m.parts?.length ? I('puzzle', 's') + ' ' : ''}${esc(m.dish)}</span>${m.suggestion ? '<span class="pill p-carrot">suggéré</span>' : m.persons !== 4 ? `<span class="pill">${m.persons} p.</span>` : ''}</button>`;
 }
+// Repas a l'exterieur : mention a la place d'un plat (fiche : note, retirer).
+const outBtn = (o, label) => `<button class="meal out" data-a="out-open" data-date="${o.date}" data-slot="${o.slot}">${label ? `<span class="sl">${SLOT[o.slot]}</span>` : ''}<span class="nm">${I('pin', 's')} À l’extérieur${o.note ? `<span class="muted small block">${esc(o.note)}</span>` : ''}</span></button>`;
+const cell = (d, s, label) => { const o = outAt(d, s), m = mealAt(d, s); return o ? outBtn(o, label) : m ? mealBtn(m, label) : addBtn(d, s, label); };
 const addBtn = (d, s, label) => `<button class="add" data-a="meal-add" data-date="${d}" data-slot="${s}" aria-label="Ajouter un plat">${I('plus', 's')}${label ? ` ${SLOT[s]}` : ''}</button>`;
 
 export function menuView() {
@@ -51,11 +55,11 @@ export function menuView() {
     const weeks = []; for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
     const pad = (w, tag) => `<${tag} class="off"></${tag}>`.repeat(7 - w.length);
     body = weeks.map((w) => `<table class="wk"><tr><th></th>${w.map((d) => `<th class="${d === today() ? 'today' : ''}">${esc(fmtDate(d, { weekday: 'short', day: 'numeric', month: 'short' }))}${shopDay(d) ? ` <span class="shopday">${I('cart', 's')}</span>` : ''}</th>`).join('')}${pad(w, 'th')}</tr>
-      ${slots.map((s) => `<tr><td class="sl">${SLOT[s]}</td>${w.map((d) => { const m = mealAt(d, s); return `<td data-drop="${d}" data-slot="${s}">${m ? mealBtn(m) : addBtn(d, s)}</td>`; }).join('')}${pad(w, 'td')}</tr>`).join('')}</table>`).join('')
+      ${slots.map((s) => `<tr><td class="sl">${SLOT[s]}</td>${w.map((d) => `<td data-drop="${d}" data-slot="${s}">${cell(d, s)}</td>`).join('')}${pad(w, 'td')}</tr>`).join('')}</table>`).join('')
       + (mgr ? '<p class="muted small">Glissez un repas vers un autre jour ou créneau pour le déplacer (si la case est occupée, les deux repas s’échangent).</p>' : '');
   } else {
     body = `<div class="agenda">${days.map((d) => `<div class="day${d === today() ? ' today' : ''}${d < today() ? ' past' : ''}"><div class="d"><span>${esc(fmtDate(d, { weekday: 'short' }).replace('.', ''))}</span><b>${new Date(d + 'T12:00').getDate()}</b></div>
-      <div class="slots">${shopDay(d) ? `<span class="shopday">${I('cart', 's')} Courses</span>` : ''}${slots.map((s) => { const m = mealAt(d, s); return `<div class="slot" data-drop="${d}" data-slot="${s}">${m ? mealBtn(m, true) : addBtn(d, s, true)}</div>`; }).join('')}</div></div>`).join('')}</div>`;
+      <div class="slots">${shopDay(d) ? `<span class="shopday">${I('cart', 's')} Courses</span>` : ''}${slots.map((s) => `<div class="slot" data-drop="${d}" data-slot="${s}">${cell(d, s, true)}</div>`).join('')}</div></div>`).join('')}</div>`;
     if (mgr) body += '<p class="muted small">Appui long sur un repas, puis glissez-le vers un autre créneau (si la case est occupée, les deux repas s’échangent).</p>';
   }
   const range = `${esc(fmtDate(menu.from, { weekday: 'short', day: 'numeric', month: 'short' }))} → ${esc(fmtDate(menu.to, { weekday: 'short', day: 'numeric', month: 'short' }))}`;
@@ -314,9 +318,11 @@ document.addEventListener('click', (e) => { if (touch.swallow) { touch.swallow =
 document.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('[data-drag]') && !isPc()) e.preventDefault(); });
 
 async function moveMeal(id, date, slot) {
-  const other = menu && date >= menu.from && date <= menu.to ? menu.meals.find((x) => x.date === date && x.slot === slot && !x.suggestion && x.id !== Number(id)) : null;
+  const inMenu = menu && date >= menu.from && date <= menu.to;
+  const other = inMenu ? menu.meals.find((x) => x.date === date && x.slot === slot && !x.suggestion && x.id !== Number(id)) : null;
+  const out = inMenu && outAt(date, slot);
   if (await attempt(() => patch(hp(`/meals/${id}`), { date, slot }))) {
-    toast(other ? `Échangé avec « ${other.dish} »` : 'Repas déplacé');
+    toast(other ? `Échangé avec « ${other.dish} »` : out ? 'Échangé avec « À l’extérieur »' : 'Repas déplacé');
     afterChange();
   }
 }
@@ -354,7 +360,8 @@ function pickSheet() {
     <input class="txt" id="pick-q" placeholder="Rechercher un plat…" value="${esc(pm.q || '')}" data-in="pick-q">
     ${tagChips('pick-tag', pm.tag)}
     <div class="pick">${list.map((d) => `<button class="card click" data-a="pick-dish" data-id="${d.id}"><b>${wished.has(d.id) ? `${I('bulb', 's')} ` : ''}${d.draft ? `${I('edit', 's')} ` : ''}${esc(d.name)}</b><span class="muted block">${d.parts ? `${I('puzzle', 's')} ${esc((d.part_names || []).join(', '))}` : d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}` : 'rappel seulement'}${d.last_date ? ` · dernière fois le ${esc(fmtDate(d.last_date))}` : ''}</span></button>`).join('') || '<p class="muted">Aucun plat.</p>'}</div>
-    ${isManager() ? `<button class="btn sec2 full" data-a="pick-new">＋ Nouveau plat${pm.q ? ` « ${esc(pm.q)} »` : ''}</button>` : ''}`);
+    ${isManager() ? `<button class="btn sec2 full" data-a="pick-new">＋ Nouveau plat${pm.q ? ` « ${esc(pm.q)} »` : ''}</button>
+      <button class="btn sec2 full" style="margin-top:8px" data-a="out-set">${I('pin', 's')} Repas à l’extérieur</button>` : ''}`);
 }
 on('click', 'meal-add', (el) => { pm = { date: el.dataset.date, slot: el.dataset.slot, persons: 4, skip: [], q: '' }; pickSheet(); });
 on('input', 'pick-q', (el) => { pm.q = el.value; pickSheet(); const i = document.getElementById('pick-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
@@ -452,6 +459,28 @@ async function afterChange() {
   render();
 }
 
+// ---------- Repas a l'exterieur (gestionnaire) ----------
+function outSheet(date, slot) {
+  const o = outAt(date, slot), m = !o && mealAt(date, slot), mgr = isManager();
+  sheet(`<h3>${I('pin', 's')} Repas à l’extérieur</h3><p class="muted">${esc(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[slot]}</p>
+    ${mgr ? `<input class="txt" id="out-note" maxlength="200" placeholder="Où ? (restaurant, chez…) — facultatif" value="${esc(o?.note || '')}" data-enter="out-save" data-date="${date}" data-slot="${slot}">
+      ${m && !m.suggestion ? `<p class="muted small">« ${esc(m.dish)} » sera retiré du menu (ingrédients retirés de la liste).</p>` : ''}
+      <div class="row end" style="margin-top:12px">${o ? `<button class="btn sec2 danger-t" data-a="out-del" data-id="${o.id}">Retirer la mention</button><button class="btn sec2" data-a="meal-add" data-date="${date}" data-slot="${slot}">Mettre un plat</button>` : ''}
+      <button class="btn" data-a="out-save" data-date="${date}" data-slot="${slot}">Enregistrer</button></div>`
+      : o?.note ? `<p>${esc(o.note)}</p>` : '<p class="muted">Pas de repas à préparer pour ce créneau.</p>'}`);
+}
+on('click', 'out-open', (el) => outSheet(el.dataset.date, el.dataset.slot));
+on('click', 'out-set', () => outSheet(pm.date, pm.slot));
+const saveOuting = async (date, slot) => {
+  const note = document.getElementById('out-note')?.value || '';
+  if (!(await attempt(() => put(hp('/outings'), { date, slot, note })))) return;
+  closeSheet(); toast('Repas à l’extérieur noté'); afterChange();
+};
+on('click', 'out-save', (el) => saveOuting(el.dataset.date, el.dataset.slot));
+on('click', 'out-del', async (el) => {
+  if (await attempt(() => del(hp(`/outings/${el.dataset.id}`)))) { closeSheet(); toast('Mention retirée'); afterChange(); }
+});
+
 // ---------- Fiche repas ----------
 on('click', 'meal-open', async (el) => {
   const r = await attempt(() => get(hp(`/menu?from=${el.dataset.date}&days=1`)));
@@ -518,14 +547,17 @@ function sheetHtml(d, household) {
   const days = []; for (let x = d.from; x <= d.to; x = addDays(x, 1)) days.push(x);
   const slots = SLOTS.filter((s) => ex.slots[s]);
   const shop = new Set((d.lists || []).map((l) => l.date).concat(d.shoppingDays || []));
-  const meals = d.meals.filter((m) => !m.suggestion);
+  const meals = d.meals.filter((m) => !m.suggestion), outs = d.outings || [];
   const weeks = []; for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
   // Toujours 7 colonnes de meme largeur : la derniere semaine incomplete est completee de cases vides.
   const pad = (w, tag) => `<${tag} class="off"></${tag}>`.repeat(7 - w.length);
   return `<div class="pm"><h1>Menu du ${esc(fmtDate(d.from, { day: 'numeric', month: 'long' }))} au ${esc(fmtDate(d.to, { day: 'numeric', month: 'long' }))}</h1>
     <div class="meta">${esc(household)}${ex.shop ? ` · ${I('cart', 's')} = jour de courses` : ''}</div>
     ${weeks.map((w) => `<table><colgroup><col class="c-sl">${'<col>'.repeat(7)}</colgroup><tr><th class="sl"></th>${w.map((x) => `<th>${esc(fmtDate(x, { weekday: 'short', day: 'numeric', month: 'short' }))}${ex.shop && shop.has(x) ? ` ${I('cart', 's')}` : ''}</th>`).join('')}${pad(w, 'th')}</tr>
-      ${slots.map((s) => `<tr><td class="sl"><span>${SLOT[s]}</span></td>${w.map((x) => { const m = meals.find((y) => y.date === x && y.slot === s); return `<td>${m ? esc(m.dish) + (ex.persons ? ` <span class="np">(${m.persons} p.)</span>` : '') : ''}</td>`; }).join('')}${pad(w, 'td')}</tr>`).join('')}</table>`).join('')}
+      ${slots.map((s) => `<tr><td class="sl"><span>${SLOT[s]}</span></td>${w.map((x) => {
+        const o = outs.find((y) => y.date === x && y.slot === s), m = meals.find((y) => y.date === x && y.slot === s);
+        return `<td>${o ? `<i class="out">À l’extérieur${o.note ? ` <span class="np">(${esc(o.note)})</span>` : ''}</i>` : m ? esc(m.dish) + (ex.persons ? ` <span class="np">(${m.persons} p.)</span>` : '') : ''}</td>`;
+      }).join('')}${pad(w, 'td')}</tr>`).join('')}</table>`).join('')}
     ${ex.notes ? noteBox(d.note) : ''}
     <div class="foot"><span>Le Cabas</span><span>Imprimé le ${new Date().toLocaleDateString('fr-BE')}</span></div></div>`;
 }
