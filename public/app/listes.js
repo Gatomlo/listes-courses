@@ -466,24 +466,31 @@ function matches(q) {
   return S.products.filter((p) => norm(p.name).includes(n)).sort((a, b) => norm(a.name).indexOf(n) - norm(b.name).indexOf(n)).slice(0, 6);
 }
 on('click', 'add-open', () => sheet(`<h3>${isManager() ? 'Ajouter un article' : 'Suggérer un article'}</h3>
-  <div class="addbox"><input class="txt" id="add-q" autocomplete="off" autofocus placeholder="Rechercher ou créer un produit…" data-in="add-q" data-enter="add-first"><div id="add-ac"></div></div>`));
+  <div class="addbox"><input class="txt" id="add-q" autocomplete="off" autofocus placeholder="Rechercher ou créer un produit…" data-in="add-q" data-enter="add-first"><div id="add-ac"></div></div>
+  <div class="row" style="margin-top:10px"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1" aria-label="Moins">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="1"><button class="btn sm sec2" data-a="qty" data-d="1" aria-label="Plus">＋</button></div>`));
 on('input', 'add-q', (el) => {
   const q = el.value.trim(), ms = matches(q);
   document.getElementById('add-ac').innerHTML = q ? `<div class="ac">${ms.map((p) => `<button data-a="add-item" data-id="${p.id}"><span class="grow">${esc(p.name)}</span><span class="muted">${esc(catName(p.category_id))}</span></button>`).join('')}
     ${ms.some((p) => norm(p.name) === norm(q)) ? '' : `<button data-a="add-new"><b>＋ Créer « ${esc(q)} » dans les produits</b></button>`}</div>` : '';
 });
-async function addItem(product_id) {
+let newQty = 1;
+const wantedQty = () => {
+  const el = document.querySelector('.sheet [name=qty]');
+  const v = el ? Number(String(el.value).replace(',', '.')) : newQty;
+  return v > 0 ? v : 1;
+};
+async function addItem(product_id, qty = wantedQty()) {
   const p = S.products.find((x) => x.id === product_id) || { name: '?' };
-  await runOps([newOp({ type: 'item.add', list_id: current.id, product_id, qty: 1 })], (l) => {
+  await runOps([newOp({ type: 'item.add', list_id: current.id, product_id, qty })], (l) => {
     const ex = isManager() && l.items.find((i) => i.product_id === product_id && !i.suggestion);
-    if (ex) { ex.qty += 1; return; }
+    if (ex) { ex.qty += qty; return; }
     const sid = p.best_store_id || (activeStores()[0] || {}).id;
-    l.items.push({ id: `tmp-${Date.now()}`, product_id, name: p.name, category_id: p.category_id, unit: p.unit, qty: 1, origin: 'manual', status: 'todo',
+    l.items.push({ id: `tmp-${Date.now()}`, product_id, name: p.name, category_id: p.category_id, unit: p.unit, qty, origin: 'manual', status: 'todo',
       suggestion: isManager() ? null : 'pending', suggested_by: S.me.id, suggested_by_name: S.me.name, prices: {}, promos: [], at_store_id: sid, best_store_id: sid });
   });
   toast(isManager() ? `${p.name} ajouté` : 'Suggestion envoyée au gestionnaire');
   const q = document.getElementById('add-q');
-  if (q) { q.value = ''; document.getElementById('add-ac').innerHTML = ''; q.focus(); }
+  if (q) { q.value = ''; document.getElementById('add-ac').innerHTML = ''; document.querySelector('.sheet [name=qty]').value = '1'; q.focus(); }
 }
 on('click', 'add-item', (el) => addItem(Number(el.dataset.id)));
 on('click', 'add-first', () => {
@@ -492,6 +499,7 @@ on('click', 'add-first', () => {
   if (ms.length) addItem(ms[0].id); else if (q) document.querySelector('[data-a=add-new]')?.click();
 });
 on('click', 'add-new', () => {
+  newQty = wantedQty();
   const q = document.getElementById('add-q').value.trim();
   sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté aux produits du foyer, puis à la liste.</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(q)}">
@@ -505,7 +513,7 @@ on('click', 'add-new-ok', async () => {
   if (!p) return;
   closeSheet();
   await loadProducts();
-  await addItem(p.id);
+  await addItem(p.id, newQty);
 });
 
 // ---------- Coche, suggestions ----------
