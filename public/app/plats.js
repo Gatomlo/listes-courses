@@ -594,13 +594,15 @@ on('click', 'rec-import', async () => {
     else { closeSheet(); toast(e.status === 0 ? 'Pas de réseau : action possible seulement en ligne.' : e.message, true); }
     return;
   }
+  // Legende Instagram sans liste d'ingredients reconnue : texte propose au collage.
+  if (r.source === 'instagram' && !r.ingredients.length) { pasteSheet('Aucune liste d’ingrédients reconnue dans la description : vérifiez le texte ci-dessous.', r.caption); return; }
   await showImport(r);
 });
 // Repli : ingredients copies depuis la page, une ligne chacun.
-function pasteSheet(why) {
+function pasteSheet(why, text = '') {
   sheet(`<h3>Coller les ingrédients</h3>${why ? `<p class="muted small">${esc(why)}</p>` : ''}
     <p class="muted small">Copiez la liste des ingrédients depuis la page de la recette, une ligne par ingrédient (ex. « 300 g de farine »).</p>
-    <textarea class="txt" id="rec-text" rows="8" placeholder="300 g de farine&#10;3 oeufs&#10;60 cl de lait"></textarea>
+    <textarea class="txt" id="rec-text" rows="8" placeholder="300 g de farine&#10;3 oeufs&#10;60 cl de lait">${esc(text)}</textarea>
     <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="rec-paste-ok">Lire les ingrédients</button></div>`);
   setTimeout(() => document.getElementById('rec-text')?.focus());
 }
