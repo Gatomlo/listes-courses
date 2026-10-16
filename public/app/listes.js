@@ -156,8 +156,11 @@ function weekPreview() {
   if (!week) return '';
   const days = [...Array(7)].map((_, k) => localDay(k));
   const meals = week.meals.filter((m) => !m.suggestion);
-  return box('Cette semaine au menu', '<a href="#/menu">Menu</a>', days.map((d) => { const ms = meals.filter((m) => m.date === d);
-    return `<div class="item"><span class="muted small" style="width:78px;flex:none">${esc(fmtDate(d, { weekday: 'short', day: 'numeric' }))}</span><span class="grow small">${ms.map((m) => `<span class="faint">${SLOT[m.slot]}</span> ${esc(m.dish)}`).join(' · ') || '<span class="faint">—</span>'}</span></div>`; }).join(''));
+  const order = ['pdj', 'midi', 'coll', 'soir'], rank = (x) => { const i = order.indexOf(x); return i < 0 ? 9 : i; };
+  return box('Cette semaine au menu', '<a href="#/menu">Menu</a>', days.map((d) => {
+    const ms = [...meals.filter((m) => m.date === d).map((m) => ({ slot: m.slot, html: esc(m.dish) })),
+      ...(week.outings || []).filter((o) => o.date === d).map((o) => ({ slot: o.slot, html: `${I('pin', 's')} À l’extérieur${o.note ? ` · ${esc(o.note)}` : ''}` }))].sort((a, b) => rank(a.slot) - rank(b.slot));
+    return `<div class="item"><span class="muted small" style="width:78px;flex:none">${esc(fmtDate(d, { weekday: 'short', day: 'numeric' }))}</span><span class="grow small">${ms.map((m) => `<span class="faint">${SLOT[m.slot]}</span> ${m.html}`).join(' · ') || '<span class="faint">—</span>'}</span></div>`; }).join(''));
 }
 on('click', 'hist-toggle', () => { S.q.histOpen = !S.q.histOpen; render(); });
 on('click', 'sugg-sheet', () => sheet(`<h3>Suggestions à valider</h3><p class="muted small">Proposées par les membres du foyer.</p>${suggestionsHtml()}`));
