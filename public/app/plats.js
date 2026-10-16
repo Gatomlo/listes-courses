@@ -274,7 +274,7 @@ export function dishView() {
         <button class="btn sec2 sm" data-a="opt-add" data-g="${gk}">＋ Option</button></div>`).join('')}
       <button class="btn ghost" data-a="grp-add">${I('plus', 's')} Groupe de variantes</button>
       ${!ed.groups.length ? '<p class="muted small">Ex. Légume : carottes / épinards ; Viande : saucisse / haché. Les ingrédients ci-dessus sont communs à toutes les variantes.</p>' : ''}`;
-  const tabIng = `${ro ? `<p class="muted small" style="margin:0 4px 8px">${I('users', 's')} Pour ${ed.portions} personne${ed.portions > 1 ? 's' : ''}${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''}</p>` : ''}<div class="card">${ingRows('c', ed.parts.length ? '<p class="muted">Rien en plus des recettes (ex. pain pita, olives…).</p>' : '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient (produit)…')}</div>
+  const tabIng = `${ro ? `<p class="muted small" style="margin:0 4px 8px">${I('users', 's')} Pour ${ed.portions} personne${ed.portions > 1 ? 's' : ''}${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''}</p>` : ''}<div class="card">${ingRows('c', ed.parts.length ? '<p class="muted">Rien en plus des recettes (ex. pain pita, olives…).</p>' : '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient (produit)…')}${ro || !mgr ? '' : `<button class="btn sec2 full" data-a="rec-paste">${I('upload', 's')} Coller une liste d’ingrédients</button>`}</div>
     ${ro ? '' : '<p class="muted small" style="margin:0 4px">Quantités facultatives, ajustées au nombre de personnes : en emballages, ou en g, ml, pièces (convertis grâce à la contenance du produit).</p>'}${variants}`;
   const steps = String(ed.steps || '').split('\n').map((x) => x.trim()).filter(Boolean);
   const aheadRo = ed.ahead ? `<div class="card ahead"><div class="row small" style="margin-bottom:4px">${I('bell', 's')}<b>À faire à l’avance</b><span class="muted">· la veille</span></div><div class="pre">${esc(ed.ahead)}</div></div>` : '';
@@ -314,8 +314,8 @@ export function dishView() {
       <div class="row gap" style="margin-bottom:8px"><input class="txt grow" id="type-new" placeholder="Autre type (ex. poisson, pâtes…)" data-enter="type-new"><button class="btn sm sec2" data-a="type-new">＋</button></div>
       <label class="muted small">Tags</label>
       <div class="pills">${ed.tags.map((t, k) => `<span class="pill p-grey">#${esc(t)} <button class="x" data-a="tag-rm" data-i="${k}" aria-label="Retirer">✕</button></span>`).join('')}</div>
-      <div class="row gap" style="margin-top:6px"><input class="txt grow" id="tag-in" list="tag-dl" placeholder="ex. rapide, végé, hiver…" data-enter="tag-add"><button class="btn sm sec2" data-a="tag-add">＋</button></div>
-      <datalist id="tag-dl">${allTags().filter((t) => !ed.tags.includes(t)).map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>`;
+      <div class="row gap" style="margin-top:6px"><input class="txt grow" id="tag-in" autocomplete="off" placeholder="Chercher ou créer un tag…" data-in="tag-q" data-enter="tag-add"><button class="btn sm sec2" data-a="tag-add">＋</button></div>
+      <div class="pills" id="tag-sug" style="margin-top:6px">${tagSug('')}</div></div>`;
   const banner = ed.draft ? `<div class="banner">${I('edit')}<span>Proposé par un membre : ${mgr ? 'enregistrer valide la fiche' : 'à valider par un gestionnaire'}.</span></div>` : '';
   const hero = tile(ed.name || '?', pills, 'hero-t', curPhoto());
   const usedIn = ed.used_in.length ? `<p class="small" style="margin:8px 2px">${I('puzzle', 's')} Recette de ${ed.used_in.map((d) => `<a href="#/plats/${d.id}" style="color:var(--plum);font-weight:650">${esc(d.name)}</a>`).join(', ')}</p>` : '';
@@ -491,6 +491,14 @@ on('click', 'ing-cont-ok', async () => {
   render();
 });
 
+// Tags existants proposes sous le champ, filtres pendant la frappe (tous au depart).
+function tagSug(q) {
+  const n = norm(q.replace(/^#/, '')).trim();
+  return allTags().filter((t) => !ed.tags.some((x) => norm(x) === norm(t)) && (!n || norm(t).includes(n)))
+    .map((t) => `<button class="pill" data-a="tag-pick" data-t="${esc(t)}">#${esc(t)}</button>`).join('');
+}
+on('input', 'tag-q', (el) => { document.getElementById('tag-sug').innerHTML = tagSug(el.value); });
+on('click', 'tag-pick', (el) => { if (!ed.tags.some((x) => norm(x) === norm(el.dataset.t))) ed.tags.push(el.dataset.t); document.getElementById('tag-in').value = ''; render(); });
 // Tags : ajout (Entree, virgules acceptees), retrait ; enregistres avec le plat.
 function takeTagInput() {
   const i = document.getElementById('tag-in');
@@ -629,14 +637,14 @@ function importSheet() {
     ${[['name', 'Nom', m.name], ['portions', 'Portions', m.portions && `${m.portions} personnes`], ['time', 'Temps', m.time], ['steps', 'Étapes', m.steps.length && `${m.steps.length} étapes`]]
       .filter(([, , v]) => v).map(([k, t, v]) => `<label class="row line"><input type="checkbox" class="cb" data-ch="imp-f" data-k="${k}" ${m.f[k] ? 'checked' : ''}><span class="grow"><b>${t}</b> · ${esc(v)}</span></label>`).join('')}
     <div class="sec">Ingrédients (${m.ing.length})</div>
-    <p class="muted small" style="margin:-4px 0 8px">Nom modifiable : choisissez un produit existant dans la liste pour le relier, ou gardez un nouveau nom pour le créer.</p>
+    <p class="muted small" style="margin:-4px 0 8px">Tapez pour chercher un produit existant et le relier (touchez-le dans la liste), ou gardez un nouveau nom pour le créer.</p>
     ${m.ing.map((g, i) => `<div class="imp-line"><input type="checkbox" class="cb" data-ch="imp-ing" data-i="${i}" ${g.on ? 'checked' : ''} aria-label="Reprendre">
       <div class="grow"><div class="muted small">« ${esc(g.raw)} »</div>
-        <div class="row" style="margin-top:4px"><input class="txt sm grow" list="imp-dl" value="${esc(g.label)}" data-ch="imp-name" data-i="${i}" aria-label="Produit">
+        <div class="row" style="margin-top:4px"><input class="txt sm grow" autocomplete="off" value="${esc(g.label)}" data-ch="imp-name" data-in="imp-search" data-i="${i}" aria-label="Produit">
         <span class="pill ${g.product_id ? 'p-leaf' : 'p-carrot'}" id="imp-st-${i}">${g.product_id ? 'existant' : 'nouveau'}</span></div>
+        <div id="imp-ac-${i}"></div>
         <select class="txt sm" id="imp-cat-${i}" data-ch="imp-cat" data-i="${i}" style="margin-top:4px" ${g.product_id ? 'hidden' : ''} aria-label="Rayon du nouveau produit">${catOptions(g.create ? g.create.category_id : categoryOrder()[0])}</select>
         <div class="row gap" style="margin-top:4px"><input class="txt w5 sm c" value="${g.q != null ? fmtQ(g.q) : ''}" placeholder="—" data-ch="imp-q" data-i="${i}" aria-label="Quantité"><select class="txt sm w6" data-ch="imp-u" data-i="${i}" aria-label="Unité">${[['', 'emballage'], ...IUNITS].map(([v, l]) => `<option value="${v}" ${(g.u || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${g.note ? `<span class="muted small">· ${esc(g.note)}</span>` : ''}</div></div></div>`).join('')}
-    <datalist id="imp-dl">${S.products.map((p) => `<option value="${esc(p.name)}">`).join('')}</datalist>
     <p class="muted small">Les quantités en g, ml, pièces, cuillères sont converties en emballages dans les listes (contenance du produit).</p>
     <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="imp-ok">Appliquer au plat</button></div>`);
 }
@@ -653,6 +661,20 @@ on('change', 'imp-name', (el) => {
   st.textContent = g.product_id ? 'existant' : 'nouveau';
   st.className = `pill ${g.product_id ? 'p-leaf' : 'p-carrot'}`;
   cat.hidden = !!g.product_id;
+});
+// Recherche pendant la frappe : produits contenant le texte ; toucher un produit le relie.
+on('input', 'imp-search', (el) => {
+  const k = Number(el.dataset.i), n = norm(el.value).trim(), box = document.getElementById(`imp-ac-${k}`);
+  const ms = n ? S.products.filter((p) => norm(p.name).includes(n) && norm(p.name) !== n).slice(0, 6) : [];
+  box.innerHTML = ms.length ? `<div class="ac">${ms.map((p) => `<button data-a="imp-pick" data-i="${k}" data-id="${p.id}"><span class="grow">${esc(p.name)}</span><span class="muted">${esc(catName(p.category_id))}</span></button>`).join('')}</div>` : '';
+});
+on('click', 'imp-pick', (el) => {
+  const k = Number(el.dataset.i), p = S.products.find((x) => x.id === Number(el.dataset.id));
+  if (!p) return;
+  const inp = document.querySelector(`[data-in="imp-search"][data-i="${k}"]`);
+  inp.value = p.name;
+  document.getElementById(`imp-ac-${k}`).innerHTML = '';
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
 });
 on('change', 'imp-cat', (el) => { const g = imp.ing[Number(el.dataset.i)]; if (g.create) g.create.category_id = Number(el.value); });
 on('click', 'imp-ok', async () => {
