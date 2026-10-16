@@ -243,6 +243,14 @@ export async function loadDish(id) {
   }
 }
 export const currentDish = () => ed;
+on('click', 'dish-wish', async () => {
+  if (!await attempt(() => post(hp('/wishes'), { dish_id: ed.id }))) return;
+  toast(isManager() ? 'Envie ajoutée' : 'Envie proposée'); S.wishes = null; S.dishes = null; await Promise.all([loadDish(ed.id), loadHouse()]); render();
+});
+on('click', 'dish-unwish', async () => {
+  if (!await attempt(() => del(hp(`/wishes/${ed.wish_id}`)))) return;
+  toast('Envie retirée'); S.wishes = null; S.dishes = null; await Promise.all([loadDish(ed.id), loadHouse()]); render();
+});
 
 // Fiche : vignette et informations, puis onglets Ingredients / Recette / Composition /
 // Historique ; « Cuisiner » et « Ajouter au menu » en bas d'ecran.
@@ -323,7 +331,7 @@ export function dishView() {
       : `${banner}<div class="split dish"><div>${hero}
       ${ro ? '' : `<div class="btn-row" style="margin-top:8px">${btnI('camera', curPhoto() ? 'Changer la photo' : 'Ajouter une photo', 'data-a="dish-photo"')}${curPhoto() ? btnI('trash', 'Retirer la photo', 'data-a="dish-photo-x"', 'sec2 danger-t') : ''}</div>`}${info}
       ${usedIn}</div><div>${tabsHtml}</div></div>`,
-    dock: ed.id ? `<div class="btn-row grow">${btnI('book', 'Cuisiner', `href="#/plats/${ed.id}/cuisine"`, 'sec2', 'a')}${btnI('calendar', mgr ? 'Ajouter au menu' : 'Suggérer au menu', `data-a="plan-dish" data-id="${ed.id}"`, '')}</div>` : null,
+    dock: ed.id ? `<div class="btn-row grow">${btnI('book', 'Cuisiner', `href="#/plats/${ed.id}/cuisine"`, 'sec2', 'a')}${ed.wish_id ? btnI('bulb', 'Retirer des envies', `data-a="dish-unwish"`, 'sec2') : btnI('bulb', 'Ajouter aux envies', `data-a="dish-wish"`, 'sec2')}${btnI('calendar', mgr ? 'Ajouter au menu' : 'Suggérer au menu', `data-a="plan-dish" data-id="${ed.id}"`, '')}</div>` : null,
   };
 }
 on('click', 'dish-open-edit', (el) => { closeSheet(); S.q.openEdit = Number(el.dataset.id); go(el.getAttribute('href')); });
