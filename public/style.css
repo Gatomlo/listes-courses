@@ -573,3 +573,13 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 @keyframes dropin{from{transform:translateY(-30px);opacity:0}to{transform:none;opacity:1}}
 .fold{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:12px 4px;color:var(--muted);font:600 14px var(--body);text-align:left;cursor:pointer}
 .fold .n{margin-left:auto;font-weight:400;font-size:12.5px}
+
+/* Mode courses : barre de progression fine collante, balayage pour retirer */
+.shopbar2{position:sticky;top:calc(54px + env(safe-area-inset-top));z-index:3;display:flex;align-items:center;gap:10px;margin:0 -2px 8px;padding:8px 4px;background:var(--bg)}
+.shopbar2 .prog{flex:1;margin:0}
+.shopbar2 .prog i{background:var(--c)}
+.avatar.sm{width:22px;height:22px;font-size:11px}
+.swipe{position:relative;overflow:hidden}
+.swipe .swipe-del{position:absolute;right:0;top:0;bottom:0;width:96px;background:var(--danger,#b3261e);color:#fff;font-weight:700;border:0;display:flex;align-items:center;justify-content:center;gap:6px}
+.swipe>.item{position:relative;background:var(--bg);touch-action:pan-y;transition:transform .18s}
+.swipe>.item.dragging{transition:none}

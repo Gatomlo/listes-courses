@@ -289,13 +289,16 @@ function itemRow(i, l, o = {}) {
   const right = i.suggestion && open
     ? (mgr ? `<button class="ib" data-a="sugg-no" data-id="${i.id}" aria-label="Refuser">${I('x')}</button><button class="btn sm" data-a="sugg-ok" data-id="${i.id}" aria-label="Accepter">${I('check', 's')}</button>`
       : mine ? `<button class="ib" data-a="item-del" data-id="${i.id}" aria-label="Retirer">${I('x')}</button>` : '')
-    : o.shop && open && mgr && i.status === 'todo' && !isTemp(i.id) ? `<button class="ib" data-a="shop-del" data-id="${i.id}" aria-label="Retirer de la liste" title="Retirer de la liste">${I('x', 's')}</button>`
+    : o.shop && open && mgr && i.status === 'todo' && !isTemp(i.id) ? ''
     : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click" data-a="item-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid != null ? esc(eur(i.paid)) : `${I('plus', 's')} prix`}</button>`
     : priced && dated && !o.shop ? `<span class="px">${price ? `<span class="price small">${price}</span>` : ''}${storeButton(i)}</span>` : '';
   const tap = open && !i.suggestion;
-  return `<div class="item line1${i.suggestion ? ' pending' : ''}${i.status === 'bought' && open ? ' done' : ''}${i.deleted ? ' gone' : ''}" id="it${i.id}">${check}
+  const swipe = o.shop && open && mgr && i.status === 'todo' && !i.suggestion && !isTemp(i.id);
+  const html = `<div class="item line1${i.suggestion ? ' pending' : ''}${i.status === 'bought' && open ? ' done' : ''}${i.deleted ? ' gone' : ''}" id="it${i.id}">${check}
     <div class="grow nm${tap ? ' click' : ''}" ${tap ? `data-a="item" data-id="${i.id}"` : ''}><span class="t">${esc(i.name)}${i.qty !== 1 ? ` <span class="faint fw4">× ${qtyText(i.qty)}</span>` : ''}</span>
       <span class="meta">${meta || `<span>${esc(i.unit)}</span>`}</span></div>${right}</div>`;
+  // Gestionnaire en courses : balayer vers la gauche pour retirer (swipe.js).
+  return swipe ? `<div class="swipe"><button class="swipe-del" data-a="shop-del" data-id="${i.id}" tabindex="-1">${I('trash', 's')} Retirer</button>${html.replace('class="item line1', 'data-swipe="1" class="item line1')}</div>` : html;
 }
 on('click', 'meals-menu', () => { closeSheet(); go('#/menu'); });
 on('click', 'item-meals', (el) => {
@@ -432,8 +435,14 @@ export function listView() {
 // Mode courses : « Où fais-tu les courses ? ». Un magasin : toute la liste dans l'ordre de ses
 // rayons (les articles conseilles ailleurs portent une mention, filtrables) ; « plusieurs
 // magasins » : chaque article chez son magasin retenu, sans separation.
+// Dernier magasin utilise (memorise sur l'appareil) : « Partir faire les courses » y va directement ;
+// le changement se fait par l'icone magasin de l'en-tete.
+const lastShop = () => { try { return localStorage.getItem('cabas-last-shop') || ''; } catch { return ''; } };
+export function rememberShop(sid) { try { localStorage.setItem('cabas-last-shop', String(sid)); } catch { /* stockage indisponible */ } }
 on('click', 'shop-pick', async (el) => {
   const id = Number(el.dataset.id);
+  const last = lastShop();
+  if (last && (last === 'tous' || (storeById(Number(last)) || {}).active)) { go(`#/listes/${id}/magasin/${last}`); return; }
   const l = current && current.id === id ? current : await attempt(() => get(hp(`/lists/${id}`)));
   if (l) shopPickSheet(l);
 });
@@ -498,11 +507,8 @@ export function storeListView(sid) {
     title: s.name, back: `#/listes/${l.id}`, noNav: true, sub: `Courses du ${shortTitle(l)}`,
     right: stores.length > 1 ? `<button class="ib" data-a="shop-switch" aria-label="Changer de magasin" title="Changer de magasin">${I('store')}</button>` : '',
     body: `<div class="shop">
-      <div class="card" style="--c:${esc(s.color)};padding:0;overflow:hidden"><div class="shopbar"></div><div style="padding:14px 16px">
-        <div class="row"><span class="mid grow">${done.length} / ${items.length}</span><span class="price muted">≈ ${eur(total)}</span></div>
-        <div class="row small" style="margin-top:6px"><span class="grow muted">Dans le caddie${cartUnknown ? ` · ${cartUnknown} sans prix` : ''}</span><b class="price" style="color:var(--leaf)">≈ ${eur(cartTotal)}</b></div>
-        <div class="prog" style="margin-top:10px"><i style="width:${pct}%;background:${esc(s.color)}"></i></div>
-        ${others(l).length ? `<p class="row small muted" style="margin:10px 0 0">${I('users', 's')} ${esc(others(l).join(', '))} ${others(l).length > 1 ? 'sont' : 'est'} aussi sur cette liste · en direct</p>` : ''}</div></div>
+      <div class="shopbar2" style="--c:${esc(s.color)}"><b>${done.length}/${items.length}</b><div class="prog"><i style="width:${pct}%"></i></div><span class="price muted small">≈ ${eur(total)}</span>
+        ${others(l).length ? `<span class="avatar sm" style="--c:var(--plum)" title="${esc(others(l).join(', '))} ${others(l).length > 1 ? 'sont' : 'est'} aussi sur cette liste">${esc(others(l)[0][0])}</span>` : ''}</div>
       ${filt}
       ${itemsBody(l, items, s.categoryOrder, { shop: true, allStores: all, here: all ? null : s.id, empty: 'Aucun article à prendre.' })}</div>`,
     dock: open ? `<div class="btn-row">${btnI('plus', isManager() ? 'Ajouter un oubli' : 'Suggérer un article', 'data-a="add-open"')}${real.length ? btnI('check', esc(endLbl), `data-a="shop-end" data-sid="${all ? '' : s.id}" style="flex-grow:3;background:${esc(s.color)}"`, '') : ''}</div>` : null,
@@ -520,6 +526,8 @@ on('click', 'shop-end', (el) => {
   const elsewhere = sid ? activeStores().filter((x) => x.id !== sid) : [];
   const awayLeft = left.some((i) => i.at_store_id !== sid);
   const mgr = isManager();
+  // Tout est pris : pas de fenetre, le passage se termine ; le ticket se scanne depuis la notification.
+  if (!left.length && bought.length) { finishDirect(sid); return; }
   const def = !left.length ? '' : elsewhere.length && (awayLeft || !mgr) ? 'continue' : mgr ? 'report' : 'continue';
   const opt = (v, t, d) => `<label class="row line"><input type="radio" class="cb" name="fate" value="${v}" ${def === v ? 'checked' : ''}><span class="grow">${t}<span class="muted block small">${d}</span></span></label>`;
   sheet(`<h3>${sid ? `Terminer chez ${esc(storeName(sid))}` : 'Terminer les courses'}</h3>
@@ -531,6 +539,21 @@ on('click', 'shop-end', (el) => {
       ${opt('unav', 'Marquer indisponibles', 'Ils seront reportés à la clôture de la liste.')}` : ''}
     <div class="row end wide">${bought.length ? `<button class="btn sec2" data-a="shop-end-go" data-sid="${sid || ''}" data-scan="1">${I('camera', 's')} Scanner le ticket</button>` : ''}<button class="btn" data-a="shop-end-go" data-sid="${sid || ''}">${bought.length ? 'Ticket plus tard' : 'Terminer'}</button></div>`);
 });
+function finishDirect(sid) {
+  const l = current, real = l.items.filter((i) => !i.suggestion);
+  const stores = [...new Set(real.filter((i) => i.status === 'bought' && (!sid || i.bought_at === sid)).map((i) => i.bought_at).filter(Boolean))];
+  runOps(stores.map((x) => newOp({ type: 'trip.finish', list_id: l.id, store_id: x })), () => {
+    l.tickets = l.tickets || [];
+    for (const x of stores) if (!l.tickets.some((t) => t.store_id === x)) {
+      const st = storeById(x) || {};
+      l.tickets.push({ store_id: x, name: st.name, color: st.color, items: real.filter((i) => i.status === 'bought' && i.bought_at === x).length });
+    }
+  }).then(() => {
+    go(`#/listes/${l.id}`);
+    toast('Courses terminées', false, { label: 'Scanner le ticket', a: 'scan-start', id: '' });
+    const t = document.querySelector('.toast'); if (t) { t.dataset.lid = l.id; t.dataset.sid = stores[0] || ''; }
+  });
+}
 on('click', 'shop-end-go', (el) => {
   const sid = Number(el.dataset.sid) || null, scanNow = !!el.dataset.scan;
   const fate = (document.querySelector('.sheet [name=fate]:checked') || {}).value || '';

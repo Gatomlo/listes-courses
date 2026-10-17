@@ -9,12 +9,13 @@ import { S, setRenderer, render, loadHouse, loadProducts, go, hp, isManager } fr
 import { loginView, foyersView, setInvite, setReset, loadOptions, loadInvitation, acceptPending, resetPending } from './connexion.js';
 import { foyerView } from './foyer.js';
 import { magasinsView } from './magasins.js';
+import './swipe.js';
 import './install.js'; // tot : retient l'invite d'installation du navigateur
 import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
 import { platsView, dishView, cookView, loadDishes, loadDish } from './plats.js';
 import { menuView, exportView, publicView, loadMenu, loadExport, loadPublic } from './menu.js';
-import { listesView, accueilView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList, todayMeals, closeCount } from './listes.js';
+import { listesView, accueilView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList, todayMeals, closeCount, rememberShop } from './listes.js';
 
 const app = document.getElementById('app');
 
@@ -135,6 +136,7 @@ async function route() {
     if (name === 'produit') await loadProduct(arg);
     if (name === 'listes' || name === 'accueil') await Promise.all([loadSummary(), loadSuggestions()]);
     if (name === 'liste' || name === 'magasin') await loadList(arg, name === 'magasin');
+    if (name === 'magasin') rememberShop(parts[3]);
     if (name === 'plats') { S.dishReturn = null; await loadDishes(); }
     if (name === 'plat' || name === 'cuisine') await loadDish(arg);
     if (name === 'promos') await loadPromos();
