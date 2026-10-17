@@ -373,3 +373,22 @@ ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;
 }
 @keyframes pop{from{transform:scale(.96);opacity:0}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* ---------- Menu du haut (☰) ---------- */
+.menu-b{position:relative}
+.menu-b .bd.dot{position:absolute;top:6px;right:6px;width:9px;height:9px;min-width:0;padding:0;border-radius:50%}
+.topsheet{position:absolute;left:0;right:0;top:0;max-height:88%;overflow-y:auto;background:var(--surface);border-radius:0 0 28px 28px;padding:46px 18px 20px;pointer-events:auto;animation:down .3s cubic-bezier(.2,.9,.25,1);box-shadow:0 18px 40px rgb(0 0 0 / .18)}
+.topsheet .th{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.topsheet .th .x{margin-left:auto}
+.topsheet .sh{margin-top:16px}
+.topsheet .handle{width:40px;height:5px;border-radius:9px;background:var(--line);margin:14px auto 0}
+@keyframes down{from{transform:translateY(-100%)}}
+/* Listes : sections rares repliees */
+.rare{margin-top:22px}
+.rare>button.fold{width:100%;display:flex;align-items:center;gap:10px;padding:12px 4px;color:var(--muted);font-weight:650;font-size:14px;text-align:left}
+.rare>button.fold .n{margin-left:auto;display:flex;align-items:center;gap:6px;font-weight:500;font-size:13px;color:var(--faint)}
+@container app (min-width:760px){
+  .layer:has(.topsheet){align-items:flex-start;justify-content:flex-end}
+  .topsheet{position:relative;left:auto;right:28px;top:62px;width:440px;max-height:calc(100% - 90px);border-radius:24px;padding:20px 22px 22px;animation:pop .2s cubic-bezier(.2,.9,.25,1)}
+  .topsheet .handle{display:none}
+}

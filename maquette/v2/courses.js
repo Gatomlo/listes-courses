@@ -7,36 +7,46 @@ const nextDate = () => addDays(LISTS.filter((l) => l.type === 'dated').map((l) =
 const qtyText = (i) => `${qtyOf(i)} × ${P[i.pid].u}`;
 
 // ---------- Accueil ----------
-VIEWS.home = () => {
-  const cur = dated()[0], sc = scenarios(cur), todo = counted(cur).filter((i) => !i.done), done = counted(cur).length - todo.length;
-  const sugg = LISTS.flatMap((l) => l.items.filter((i) => i.sugg).map((i) => ({ ...i, l })));
+// Au quotidien : les repas du jour, la prochaine liste et « À prévoir ». Les autres listes
+// (2 ou 3 par an) vivent dans l'onglet Listes, repliees.
+const dayMeals = () => ['midi', 'soir'].map((s) => MEALS.find((m) => m.date === TODAY && m.slot === s && !m.sugg)).filter(Boolean);
+const heroCard = (cur) => {
+  const sc = scenarios(cur), done = counted(cur).filter((i) => i.done).length, heroStores = sc.split ? sc.used : [sc.all[0].st];
+  return `<div class="card hero tap" data-a="go" data-v="list" data-id="${cur.id}">
+      <div class="between"><span class="sub">Prochaine liste</span>${statusPill(cur)}</div>
+      <div class="mid" style="margin:4px 0 12px">${listName(cur)}</div>
+      <div class="between small"><span class="muted">${done} / ${counted(cur).length} dans le caddie</span><b class="num">≈ ${eur(sc.split ? sc.plan.total : sc.all[0].total)}</b></div>
+      <div class="prog" style="margin:6px 0 14px"><i style="width:${Math.round((done / counted(cur).length) * 100)}%"></i></div>
+      <div class="card" style="background:var(--raised);padding:12px 14px">
+        <div class="hstack">${heroStores.map((s) => sp(s, `${STORES[s].n} · ${sc.plan.by[s] || counted(cur).length}`)).join('')}</div>
+        <div class="small" style="margin-top:6px">${sc.split ? `Faire les deux magasins fait économiser <b>${eur(sc.saving)}</b> par rapport à tout chez ${STORES[sc.all[0].st].n}.` : `Tout chez ${STORES[sc.all[0].st].n} : l’économie d’un 2e magasin reste sous le seuil.`}</div>
+      </div>
+      <div class="btn-row" style="margin-top:14px">${bI('basket', 'Ouvrir la liste', `data-a="go" data-v="list" data-id="${cur.id}"`)}${bI('plus', 'Ajouter un article', `data-a="qa" data-k="item"`)}${bI('cart', 'Mode courses', `data-a="shop-pick" data-id="${cur.id}"`, '')}</div>
+    </div>`;
+};
+const noNext = () => `<div class="card"><div class="mid">Pas de prochaine liste</div><p class="sub" style="margin:4px 0 12px">Elle reprend les récurrents et « À prévoir ».</p>${isM() ? `<button class="btn" data-a="new-list">${I('plus')} Créer la prochaine liste</button>` : ''}</div>`;
+const backlogCard = () => {
   const ap = listById('ap');
+  return `<button class="card tap" style="width:100%;text-align:left" data-a="go" data-v="list" data-id="ap">
+      <div class="between"><b>${plural(ap.items.length, 'article')} en attente</b>${I('chev', 's chev')}</div>
+      <div class="hstack" style="margin-top:8px">${ap.items.map((i) => `<span class="pill">${P[i.pid].n}</span>`).join('') || '<span class="muted">Rien en attente</span>'}</div>
+      <div class="sub" style="margin-top:8px">Articles sans date : à importer dans une prochaine liste.</div></button>`;
+};
+VIEWS.home = () => {
+  const cur = dated()[0], meals = dayMeals();
+  const sugg = LISTS.flatMap((l) => l.items.filter((i) => i.sugg).map((i) => ({ ...i, l })));
   const promos = PROMOS.filter((p) => p.until >= TODAY);
-  const heroStores = sc.split ? sc.used : [sc.all[0].st];
   return {
-    title: 'Courses', sub: `${HOUSE.name} · ${fmtD(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}`, large: true,
-    actions: `<button class="ib" data-a="go" data-v="history" aria-label="Historique">${I('clock')}</button>`,
+    title: 'Accueil', sub: `${HOUSE.name} · ${fmtD(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}`, large: true,
     body: `${sugg.length && isM() ? `<button class="banner" data-a="sugg-sheet" style="width:100%">${I('bulb')}<span class="grow" style="text-align:left">${plural(sugg.length, 'suggestion')} de ${[...new Set(sugg.map((s) => s.sugg))].join(', ')} à valider</span>${I('chev', 's')}</button>` : ''}
       <div class="home-grid"><div>
-      <div class="card hero tap" data-a="go" data-v="list" data-id="${cur.id}">
-        <div class="between"><span class="sub">Prochaines courses</span>${statusPill(cur)}</div>
-        <div class="mid" style="margin:4px 0 12px">${listName(cur)}</div>
-        <div class="between small"><span class="muted">${done} / ${counted(cur).length} dans le caddie</span><b class="num">≈ ${eur(sc.split ? sc.plan.total : sc.all[0].total)}</b></div>
-        <div class="prog" style="margin:6px 0 14px"><i style="width:${Math.round((done / counted(cur).length) * 100)}%"></i></div>
-        <div class="card" style="background:var(--raised);padding:12px 14px">
-          <div class="hstack">${heroStores.map((s) => sp(s, `${STORES[s].n} · ${sc.plan.by[s] || counted(cur).length}`)).join('')}</div>
-          <div class="small" style="margin-top:6px">${sc.split ? `Faire les deux magasins fait économiser <b>${eur(sc.saving)}</b> par rapport à tout chez ${STORES[sc.all[0].st].n}.` : `Tout chez ${STORES[sc.all[0].st].n} : l’économie d’un 2e magasin reste sous ${eur(HOUSE.threshold)}.`}</div>
-        </div>
-        <div class="btn-row" style="margin-top:14px">${bI('basket', 'Ouvrir la liste', `data-a="go" data-v="list" data-id="${cur.id}"`)}${bI('plus', 'Ajouter un article', `data-a="qa" data-k="item"`)}${bI('cart', 'Mode courses', `data-a="shop-pick" data-id="${cur.id}"`, '')}</div>
-      </div>
+      ${meals.length ? `<div class="sh"><span>Aujourd’hui au menu</span><button data-a="tab" data-t="menu">Menu</button></div>
+        <div class="group">${meals.map((m) => `<button class="row tap" data-a="meal-open" data-id="${m.id}"><span class="ico">${I('bowl')}</span><span class="grow"><span class="sub" style="display:block">${SLOTS[m.slot]} · ${m.p} pers.</span><b>${DISHES[m.dish].n}</b></span>${I('chev', 's chev')}</button>`).join('')}</div>` : ''}
+      <div class="sh"><span>Prochaine liste</span></div>
+      ${cur ? heroCard(cur).replace('<span class="sub">Prochaine liste</span>', '<span class="sub">Courses</span>') : noNext()}
       <div class="sh"><span>À prévoir</span><button data-a="go" data-v="list" data-id="ap">Voir</button></div>
-      <button class="card tap" style="width:100%;text-align:left" data-a="go" data-v="list" data-id="ap">
-        <div class="hstack">${ap.items.map((i) => `<span class="pill">${P[i.pid].n}</span>`).join('') || '<span class="muted">Rien en attente</span>'}</div>
-        <div class="sub" style="margin-top:8px">Articles sans date : à importer dans une prochaine liste.</div></button>
+      ${backlogCard()}
       </div><div>
-      <div class="sh"><span>Listes à venir</span>${isM() ? '<button data-a="new-list">＋ Nouvelle liste</button>' : ''}</div>
-      <div class="group">${dated().map((l) => `<button class="row tap" data-a="go" data-v="list" data-id="${l.id}"><div class="ico ${l.status === 'cours' ? 'acc' : ''}">${I('basket')}</div>
-        <span class="grow"><b>${listName(l)}</b><span class="sub" style="display:block">${plural(counted(l).length, 'article')} · ≈ ${eur(scenarios(l).plan.total)}</span></span>${statusPill(l)}${I('chev', 's chev')}</button>`).join('')}</div>
       <div class="sh"><span>Promos en cours</span><button data-a="go" data-v="promos">Toutes</button></div>
       <div class="hscroll">${promos.map((p) => `<button class="card tap" style="width:180px;text-align:left" data-a="go" data-v="product" data-id="${p.pid}">
         ${sp(p.st)}<div class="b" style="margin:8px 0 2px">${P[p.pid].n}</div>
@@ -46,6 +56,34 @@ VIEWS.home = () => {
       </div></div>`,
   };
 };
+
+// ---------- Listes ----------
+// « À prévoir » et la prochaine liste en grand ; les autres listes a venir et l'historique
+// sont repliés (usage rare, quelques fois par an).
+VIEWS.lists = () => {
+  const [cur, ...later] = dated(), closed = LISTS.filter((l) => l.status === 'closed').sort((a, b) => b.date.localeCompare(a.date));
+  const open = S.q.otherOpen;
+  const row = (l) => `<button class="row tap" data-a="go" data-v="list" data-id="${l.id}"><div class="ico ${l.status === 'cours' ? 'acc' : ''}">${I(l.status === 'closed' ? 'check' : 'basket')}</div>
+    <span class="grow"><b>${listName(l)}</b><span class="sub" style="display:block">${plural(counted(l).length, 'article')}${l.status === 'closed' ? '' : ` · ≈ ${eur(scenarios(l).plan.total)}`}</span></span>${statusPill(l)}${I('chev', 's chev')}</button>`;
+  return {
+    title: 'Listes', sub: 'À prévoir et prochaine liste', large: true,
+    body: `<div class="home-grid"><div>
+        <div class="sh"><span>À prévoir</span><button data-a="go" data-v="list" data-id="ap">Ouvrir</button></div>
+        ${backlogCard()}
+        <div class="btn-row" style="margin-top:10px">${bI('plus', 'Ajouter à « À prévoir »', `data-a="add-sheet" data-id="ap"`)}</div>
+      </div><div>
+        <div class="sh"><span>Prochaine liste</span></div>
+        ${cur ? heroCard(cur).replace('<span class="sub">Prochaine liste</span>', '<span class="sub">Courses</span>') : noNext()}
+      </div></div>
+      <div class="rare">
+        <button class="fold" data-a="other-toggle">${I(open ? 'up' : 'down', 's')}<span>Autres listes</span><span class="n">${later.length ? `${plural(later.length, 'à venir', 'à venir')} · ` : ''}${plural(closed.length, 'clôturée')}</span></button>
+        ${open ? `${later.length ? `<div class="group">${later.map(row).join('')}</div>` : ''}
+          <div class="group" style="margin-top:10px"><button class="row tap" data-a="go" data-v="history"><span class="ico">${I('clock')}</span><span class="grow"><b>Historique</b><span class="sub" style="display:block">${plural(closed.length, 'liste clôturée', 'listes clôturées')}, en lecture seule</span></span>${I('chev', 's chev')}</button></div>
+          ${isM() ? `<button class="btn sec" style="margin-top:12px" data-a="new-list">${I('plus')} Nouvelle liste datée</button>` : ''}` : ''}
+      </div>`,
+  };
+};
+A['other-toggle'] = () => { S.q.otherOpen = !S.q.otherOpen; render(); };
 A['new-list'] = () => {
   if (!needNet()) return;
   const d = nextDate();
@@ -181,7 +219,7 @@ A['close-list'] = (el) => {
     <div class="foot"><button class="btn sec" data-a="go" data-v="scan" data-id="${l.id}" data-st="co">${I('camera')} Scanner le ticket</button><button class="btn" data-a="close-ok" data-id="${l.id}">Clôturer</button></div>`);
 };
 A['carry-all'] = (el) => { S.q.carryAll = el.dataset.k; refresh(); };
-A['close-ok'] = (el) => { if (!needNet()) return; listById(el.dataset.id).status = 'closed'; closeSheet(); tab('home'); toast('Liste clôturée · articles reportés'); };
+A['close-ok'] = (el) => { if (!needNet()) return; listById(el.dataset.id).status = 'closed'; closeSheet(); tab('lists'); toast('Liste clôturée · articles reportés'); };
 
 // Fiche article
 A['item-open'] = (el) => {
@@ -354,7 +392,7 @@ A['tl-prod'] = (el) => {
     <button class="row tap" data-a="noop" style="color:var(--accent)"><span class="ico acc">${I('plus')}</span><span class="grow">Créer un produit</span></button></div>`);
 };
 A['tl-set'] = (el) => { const x = S.q.lines[Number(el.dataset.k)]; x.pid = el.dataset.pid || null; x.on = !!x.pid; closeSheet(); render(); };
-A['scan-save'] = () => { const n = S.q.lines.filter((x) => x.on && x.pid).length; S.q.scanStep = null; queued(); tab('home'); toast(`${plural(n, 'relevé')} enregistré${n > 1 ? 's' : ''} · articles cochés`); };
+A['scan-save'] = () => { const n = S.q.lines.filter((x) => x.on && x.pid).length; S.q.scanStep = null; queued(); tab('lists'); toast(`${plural(n, 'relevé')} enregistré${n > 1 ? 's' : ''} · articles cochés`); };
 
 // ---------- Historique, promos ----------
 VIEWS.history = () => ({
@@ -377,20 +415,11 @@ A['promo-add'] = () => {
 };
 A['promo-ok'] = () => { closeSheet(); toast('Promo enregistrée · conseils recalculés'); };
 
-// ---------- Bouton ＋ ----------
-A.quick = () => sheet(`<h3>Ajouter</h3><p class="lead">Aussi en appui long sur l’icône de l’app.</p>
-  <div class="qa">
-    <button data-a="qa" data-k="item"><span class="ico acc">${I('basket', 'l')}</span>Article</button>
-    <button data-a="qa" data-k="meal"><span class="ico acc">${I('calendar', 'l')}</span>Repas au menu</button>
-    <button data-a="qa" data-k="wish"><span class="ico warn">${I('bulb', 'l')}</span>Envie de plat</button>
-    <button data-a="qa" data-k="dish"><span class="ico plum">${I('bowl', 'l')}</span>Nouveau plat</button>
-    <button data-a="qa" data-k="promo"><span class="ico warn">${I('tag', 'l')}</span>Promo</button>
-    <button data-a="qa" data-k="scan"><span class="ico">${I('receipt', 'l')}</span>Ticket</button>
-  </div>`);
+// ---------- Ajout rapide (tuiles du menu ☰) ----------
 A.qa = (el) => {
   closeSheet();
   const k = el.dataset.k;
-  if (k === 'item') { tab('home'); go('list', { id: 'l13' }); A['add-sheet']({ dataset: { id: 'l13' } }); }
+  if (k === 'item') { tab('lists'); go('list', { id: 'l13' }); A['add-sheet']({ dataset: { id: 'l13' } }); }
   if (k === 'meal') { tab('menu'); A['meal-add']({ dataset: { date: '2026-10-23', slot: 'soir' } }); }
   if (k === 'wish') { tab('menu'); A['wish-add'](); }
   if (k === 'dish') { tab('dishes'); A['dish-new'](); }

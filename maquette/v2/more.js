@@ -1,18 +1,31 @@
 // Le Cabas · maquette v2 : onglet Plus (produits, magasins, foyer, import, installation) et écrans d'accès.
-VIEWS.more = () => ({
-  title: 'Plus', sub: HOUSE.name, large: true,
-  body: `<button class="card tap row" style="padding:14px 16px;margin-bottom:14px" data-a="go" data-v="house">${avatar(MEMBERS[0])}<span class="grow"><b>Thomas</b><span class="sub" style="display:block">${isM() ? 'Gestionnaire' : 'Membre'} · ${HOUSE.name}</span></span>${I('chev', 's chev')}</button>
-    <div class="group">
-      ${[['products', 'tag', 'Produits', `${Object.keys(P).length} produits · prix moyens`], ['stores', 'store', 'Magasins', 'Couleurs, rayons et parcours'], ['promos', 'flame', 'Promos', `${PROMOS.filter((p) => p.until >= TODAY).length} en cours`], ['history', 'clock', 'Historique des listes', 'Listes clôturées'], ['house', 'users', 'Foyer', `${MEMBERS.length} membres · réglages · tags`]]
-        .map(([v, ic, t, s]) => `<button class="row tap" data-a="go" data-v="${v}"><span class="ico">${I(ic)}</span><span class="grow"><b>${t}</b><span class="sub" style="display:block">${s}</span></span>${I('chev', 's chev')}</button>`).join('')}
+// Menu du haut (☰) : ajouter, puis le reste. Remplace l'ancien onglet Plus et le bouton ＋ du bas.
+A.menu = () => {
+  const row = (v, ic, t, sub, attrs = '') => `<button class="row tap" ${attrs || `data-a="go" data-v="${v}"`}><span class="ico">${I(ic)}</span><span class="grow"><b>${t}</b>${sub ? `<span class="sub" style="display:block">${sub}</span>` : ''}</span>${I('chev', 's chev')}</button>`;
+  topSheet(`<div class="th"><button class="row tap" style="padding:0;background:none;gap:12px;flex:1" data-a="go" data-v="house">${avatar(MEMBERS[0])}<span class="grow" style="text-align:left"><b>Thomas</b><span class="sub" style="display:block">${isM() ? 'Gestionnaire' : 'Membre'} · ${HOUSE.name}</span></span></button>
+      <button class="ib x" data-a="close" aria-label="Fermer">${I('x')}</button></div>
+    <div class="sh" style="margin-top:0"><span>Ajouter</span></div>
+    <div class="qa">
+      <button data-a="qa" data-k="item"><span class="ico acc">${I('basket', 'l')}</span>Article</button>
+      <button data-a="qa" data-k="meal"><span class="ico acc">${I('calendar', 'l')}</span>Repas au menu</button>
+      <button data-a="qa" data-k="wish"><span class="ico warn">${I('bulb', 'l')}</span>Envie de plat</button>
+      <button data-a="qa" data-k="dish"><span class="ico plum">${I('bowl', 'l')}</span>Nouveau plat</button>
+      <button data-a="qa" data-k="promo"><span class="ico warn">${I('tag', 'l')}</span>Promo</button>
+      <button data-a="qa" data-k="scan"><span class="ico">${I('receipt', 'l')}</span>Ticket</button>
     </div>
+    ${isM() ? `<div class="sh"><span>Gérer</span></div><div class="group">
+      ${row('products', 'tag', 'Produits', `${Object.keys(P).length} produits · prix moyens`)}
+      ${row('stores', 'store', 'Magasins', 'Couleurs, rayons et parcours')}
+      ${row('promos', 'flame', 'Promos', `${PROMOS.filter((p) => p.until >= TODAY).length} en cours`)}
+      ${row('house', 'users', 'Foyer', `${MEMBERS.length} membres · réglages · tags`)}
+    </div>` : ''}
     <div class="group" style="margin-top:14px">
-      <button class="row tap" data-a="csv"><span class="ico">${I('upload')}</span><span class="grow"><b>Importer des produits (CSV)</b><span class="sub" style="display:block">Paniers transcrits, avec relevés de prix</span></span>${I('chev', 's chev')}</button>
-      <button class="row tap" data-a="menu-share"><span class="ico">${I('link')}</span><span class="grow"><b>Lien d’affichage du menu</b><span class="sub" style="display:block">Lecture seule, sans connexion</span></span>${I('chev', 's chev')}</button>
-      <button class="row tap" data-a="install"><span class="ico acc">${I('phone')}</span><span class="grow"><b>Installer l’app</b><span class="sub" style="display:block">Sur l’écran d’accueil, hors-ligne</span></span>${I('chev', 's chev')}</button>
+      ${isM() ? row('csv', 'upload', 'Importer des produits (CSV)', 'Paniers transcrits, avec relevés de prix', 'data-a="csv"') : ''}
+      ${row('menu-share', 'link', 'Lien d’affichage du menu', 'Lecture seule, sans connexion', 'data-a="menu-share"')}
+      ${row('install', 'phone', 'Installer l’app', 'Sur l’écran d’accueil, hors-ligne', 'data-a="install"')}
       <button class="row tap" data-a="go" data-v="auth" data-k="login" style="color:var(--danger)"><span class="ico">${I('logout')}</span><b class="grow">Se déconnecter</b></button>
-    </div>`,
-});
+    </div><div class="handle"></div>`);
+};
 A.install = () => sheet(`<h3>Installer Le Cabas</h3><p class="lead">L’app s’ouvre alors comme les autres, en plein écran, et marche sans réseau en magasin.</p>
   <div class="seg" style="margin-bottom:12px"><button class="on">iPhone</button><button>Android</button><button>PC</button></div>
   <ol class="steps"><li>Ouvrir le site dans Safari.</li><li>Toucher le bouton Partager.</li><li>Choisir « Sur l’écran d’accueil ».</li></ol>

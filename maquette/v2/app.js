@@ -1,5 +1,7 @@
 // Le Cabas · maquette v2 : cadre (navigation par pile, onglets, panneaux, toasts, icônes).
 const PATHS = {
+  home: 'M3 11l9-8 9 8M5 9.5V20h5v-6h4v6h5V9.5',
+  menu: 'M4 7h16M4 12h16M4 17h16',
   basket: 'M3 9h18l-1.6 9.2a2 2 0 0 1-2 1.8H6.6a2 2 0 0 1-2-1.8L3 9zM8 9l3-5M16 9l-3-5M9 13v3M15 13v3',
   calendar: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
   bowl: 'M3 11h18a9 9 0 0 1-18 0zM9 7c0-2 2-2 2-4M14 7c0-2 2-2 2-4',
@@ -58,8 +60,9 @@ const S = { role: 'manager', online: true, queue: 0, format: 'phone', stack: [{ 
 const isM = () => S.role === 'manager';
 const topV = () => S.stack[S.stack.length - 1];
 const A = {}, IN = {}, CH = {}, VIEWS = {};
-const TABS = [['home', 'Courses', 'basket'], ['menu', 'Menu', 'calendar'], ['fab'], ['dishes', 'Plats', 'bowl'], ['more', 'Plus', 'grid']];
-const badge = { home: () => LISTS.reduce((n, l) => n + l.items.filter((i) => i.sugg).length, 0), menu: () => WISHES.filter((w) => w.status === 'pending').length + MEALS.filter((m) => m.sugg).length };
+// 4 onglets ; « Ajouter » et « Plus » sont dans le menu du haut (bouton ☰ de l'en-tête).
+const TABS = [['home', 'Accueil', 'home'], ['lists', 'Listes', 'basket'], ['menu', 'Menu', 'calendar'], ['dishes', 'Plats', 'bowl']];
+const badge = { lists: () => LISTS.reduce((n, l) => n + l.items.filter((i) => i.sugg).length, 0), menu: () => WISHES.filter((w) => w.status === 'pending').length + MEALS.filter((m) => m.sugg).length };
 
 function go(v, params = {}) { S.stack.push({ v, ...params }); render('f'); }
 function back() { if (S.stack.length > 1) { S.stack.pop(); render('b'); } }
@@ -74,7 +77,7 @@ function render(dir) {
   const sub = S.stack.length > 1;
   view.innerHTML = `<header class="bar${sub ? ' sub' : ''}" id="bar">
       <div class="side">${sub ? `<button class="ib" data-a="back" aria-label="Retour">${I('back')}</button>` : ''}</div>
-      <div class="t">${v.title}</div><div class="side r">${v.actions || ''}</div></header>
+      <div class="t">${v.title}</div><div class="side r">${v.actions || ''}${sub ? '' : `<button class="ib menu-b" data-a="menu" aria-label="Menu : ajouter, produits, magasins…">${I('menu')}</button>`}</div></header>
     <div class="scroll${dir ? ' anim-' + dir : ''}${v.cls ? ' ' + v.cls : ''}" id="scroll" data-v="${t.v}">
       ${v.large ? `<h1 class="ltitle">${v.title}</h1>${v.sub ? `<p class="lsub root">${v.sub}</p>` : ''}` : v.sub ? `<p class="lsub">${v.sub}</p>` : ''}
       ${!S.online ? `<div class="banner off">${I('wifioff')}<span class="grow">Hors-ligne${S.queue ? ` · ${plural(S.queue, 'modification')} en attente` : ''}</span><span class="xs">envoi au retour du réseau</span></div>` : ''}
@@ -93,8 +96,7 @@ function render(dir) {
 function navHtml() {
   return `<div class="brand"><span class="logo">${I('basket')}</span>Le Cabas</div>
     <button class="hh" data-a="house-switch">${avatar({ n: 'F', c: 'var(--accent)' }, 's')}<span class="grow ellip">${HOUSE.name}</span>${I('down', 's')}</button>
-    ${TABS.map(([k, n, ic]) => (k === 'fab' ? `<button class="fab" data-a="quick" aria-label="Ajouter">${I('plus', 'l')}<span>Ajouter</span></button>`
-      : `<button class="tab${S.tab === k ? ' on' : ''}" data-a="tab" data-t="${k}">${I(ic, 'l')}<span>${n}</span>${badge[k] && badge[k]() ? `<span class="bd">${badge[k]()}</span>` : ''}</button>`)).join('')}`;
+    ${TABS.map(([k, n, ic]) => `<button class="tab${S.tab === k ? ' on' : ''}" data-a="tab" data-t="${k}">${I(ic, 'l')}<span>${n}</span>${badge[k] && badge[k]() ? `<span class="bd">${badge[k]()}</span>` : ''}</button>`).join('')}`;
 }
 
 // ---------- Panneaux et toasts ----------
@@ -104,6 +106,10 @@ function sheet(html, o = {}) {
   $('layer').innerHTML = `<div class="scrim" data-a="close"></div><div class="sheet${o.full ? ' full' : ''}${o.keep ? ' noanim' : ''}" role="dialog" aria-modal="true">
     <div class="grab"></div><button class="ib x" data-a="close" aria-label="Fermer">${I('x')}</button>${html}</div>`;
   document.querySelector('.sheet').scrollTop = y;
+}
+// Menu qui descend du haut de l'ecran (☰) : ajouter, puis le reste (produits, magasins, foyer…).
+function topSheet(html) {
+  $('layer').innerHTML = `<div class="scrim" data-a="close"></div><div class="topsheet" role="dialog" aria-modal="true">${html}</div>`;
 }
 // Panneau redessine a chaque changement (fn renvoie le HTML).
 function live(fn, o = {}) { sheetFn = () => sheet(fn(), { ...o, keep: true }); sheet(fn(), o); }
@@ -150,15 +156,15 @@ A.noop = () => toast('Dans l’app : action réelle');
 
 // ---------- Panneau de maquette ----------
 const JUMPS = [
-  ['Accueil courses', () => tab('home')], ['Liste en cours', () => { tab('home'); go('list', { id: 'l13' }); }],
-  ['Mode courses', () => { tab('home'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'co' }); }],
-  ['Mode courses (tout)', () => { tab('home'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'all' }); }],
-  ['Scan du ticket', () => { tab('home'); go('scan', { id: 'l13', st: 'co' }); }],
+  ['Accueil', () => tab('home')], ['Listes (À prévoir + prochaine)', () => tab('lists')], ['Menu du haut (☰)', () => A.menu()], ['Liste en cours', () => { tab('lists'); go('list', { id: 'l13' }); }],
+  ['Mode courses', () => { tab('lists'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'co' }); }],
+  ['Mode courses (tout)', () => { tab('lists'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'all' }); }],
+  ['Scan du ticket', () => { tab('lists'); go('scan', { id: 'l13', st: 'co' }); }],
   ['Menu', () => tab('menu')], ['Fiche repas (Mezze)', () => { tab('menu'); A['meal-open']({ dataset: { id: MEALS.find((m) => m.dish === 'mez').id } }); }],
   ['Plats', () => tab('dishes')], ['Plat composé', () => { tab('dishes'); go('dish', { id: 'mez' }); }], ['Plat à variantes', () => { tab('dishes'); go('dish', { id: 'sto' }); }],
   ['Mode cuisine', () => { tab('dishes'); go('cook', { id: 'mez', p: 8 }); }],
-  ['Produits', () => { tab('more'); go('products'); }], ['Fiche produit', () => { tab('more'); go('products'); go('product', { id: 'poi' }); }],
-  ['Magasins', () => { tab('more'); go('stores'); }], ['Foyer', () => { tab('more'); go('house'); }], ['Promos', () => { tab('more'); go('promos'); }],
+  ['Produits', () => { go('products'); }], ['Fiche produit', () => { go('products'); go('product', { id: 'poi' }); }],
+  ['Magasins', () => { go('stores'); }], ['Foyer', () => { go('house'); }], ['Promos', () => { go('promos'); }],
   ['Connexion', () => go('auth', { k: 'login' })], ['Premier compte', () => go('auth', { k: 'setup' })], ['Invitation', () => go('auth', { k: 'invite' })],
   ['Mot de passe oublié', () => go('auth', { k: 'reset' })], ['Affichage public', () => go('display')], ['Export A4', () => { tab('menu'); go('export'); }],
 ];
@@ -171,8 +177,8 @@ function panelHtml() {
     <h3>Thème</h3>${seg('theme', [['auto', 'Système'], ['light', 'Clair'], ['dark', 'Sombre']])}
     <h3>Aller à</h3><div class="jump">${JUMPS.map(([t], k) => `<button data-a="jump" data-k="${k}">${t}</button>`).join('')}</div>
     <h3>Ce qui change</h3><ul>
-      <li>4 onglets + bouton ＋ central : article, envie, plat, promo, ticket.</li>
-      <li>Accueil « Courses » : la liste du moment, son conseil de magasin et sa progression d’un coup d’œil.</li>
+      <li>4 onglets seulement : Accueil, Listes, Menu, Plats. Le bouton ☰ en haut à droite ouvre un menu qui descend : Ajouter (article, repas, envie, plat, promo, ticket), puis Produits, Magasins, Promos, Foyer, import, installation.</li>
+      <li>Accueil : repas du jour, prochaine liste et « À prévoir » d’un coup d’œil. Onglet Listes : « À prévoir » et la prochaine liste en grand ; les autres listes (2 ou 3 par an) et l’historique restent repliés.</li>
       <li>Liste : barre d’ajout en bas, filtre par magasin collant, caddie replié, suggestions en ligne.</li>
       <li>Panneaux qui montent du bas (dialogues sur PC), titres qui se replient au défilement.</li>
       <li>Menu en agenda (téléphone) ou grille semaine (PC), envies en carrousel.</li>
