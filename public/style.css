@@ -586,3 +586,6 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 
 .ib.rec{background:var(--danger,#b3261e);color:#fff;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.6}}
+
+.subh{display:flex;gap:8px;align-items:center;font:700 12px var(--body);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:10px 4px 2px}
+.subh .n{font-weight:400}

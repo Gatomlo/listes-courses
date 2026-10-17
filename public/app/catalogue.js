@@ -18,6 +18,13 @@ function noPrice(p) {
   return forced ? !p.prices[forced.id] : !activeStores().some((s) => p.prices[s.id]);
 }
 
+// Produits d'un rayon, par sous-rayon quand le rayon en a (« Autres » : sans sous-rayon).
+function subGroups(cid, ps, row) {
+  const subs = (S.house.categories.find((c) => c.id === cid) || {}).subs || [];
+  if (!subs.length) return ps.map(row).join('');
+  const parts = [...subs.map((sb) => [sb.name, ps.filter((p) => p.subcategory_id === sb.id)]), ['Autres', ps.filter((p) => !subs.some((sb) => sb.id === p.subcategory_id))]].filter(([, xs]) => xs.length);
+  return parts.map(([n, xs]) => `<div class="subh">${esc(n)}<span class="n">${xs.length}</span></div>${xs.map(row).join('')}`).join('');
+}
 export function catalogueView() {
   const q = S.q.cat || '', f = S.q.catFilter || 'all';
   const ok = (p) => (!q || norm(p.name).includes(norm(q)))
@@ -40,7 +47,7 @@ export function catalogueView() {
   const head = (cid, ps) => `<div class="item prow phead pc-only${mgr && pc ? ' selectable' : ''}" style="--n:${stores.length}">${box(ps.every((p) => sel.has(p.id)), 'psel-all', `data-cid="${cid}"`)}<span class="grow">Produit</span><span class="pc">Emballage</span><span class="pc">De base</span>${stores.map((s) => `<span class="pc">${esc(s.name)}</span>`).join('')}<span class="tag">Conseil</span></div>`;
   const opts = (list, ph) => `<option value="">${ph}</option>${list}`;
   const bulk = sel.size ? `<div class="card bulk"><b>${sel.size} sélectionné${sel.size > 1 ? 's' : ''}</b>
-      <select class="txt sm" data-ch="bulk" data-k="category_id" aria-label="Rayon">${opts(catOptions(), 'Rayon…')}</select>
+      <select class="txt sm" data-ch="bulk" data-k="rayon" aria-label="Rayon">${opts(catSubOptions(), 'Rayon…')}</select>
       <select class="txt sm" data-ch="bulk" data-k="is_base" aria-label="De base">${opts('<option value="1">De base : oui</option><option value="0">De base : non</option>', 'De base…')}</select>
       <select class="txt sm" data-ch="bulk" data-k="forced_store_id" aria-label="Magasin imposé">${opts(`<option value="none">Magasin : conseil (aucun imposé)</option>${stores.map((s) => `<option value="${s.id}">Toujours ${esc(s.name)}</option>`).join('')}`, 'Magasin imposé…')}</select>
       ${btnI('trash', 'Supprimer', 'data-a="bulk-del"', 'sec2 danger-t sm')}${btnI('x', 'Annuler la sélection', 'data-a="bulk-clear"', 'sec2 sm')}</div>` : '';
@@ -50,7 +57,7 @@ export function catalogueView() {
     body: `<div class="search">${I('search')}<input class="txt" id="cat-q" placeholder="Rechercher un produit…" value="${esc(q)}" data-in="cat-q"></div>
       <div class="opt">${[['all', 'Tous'], ['rec', `${I('repeat', 's')} Récurrents`], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
       ${bulk}
-      ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: head(cid, ps) + ps.map(row).join('') })).join('')
+      ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: head(cid, ps) + subGroups(cid, ps, row) })).join('')
         || `<p class="muted">Aucun produit.</p>${q ? `<button class="btn" data-a="prod-new" data-name="${esc(q)}">＋ Créer « ${esc(q)} »</button>` : ''}`}`,
     dock: `<button class="addbar" data-a="prod-new">${I('plus')}<span class="grow">Nouveau produit</span></button>`,
   };
@@ -67,7 +74,7 @@ on('click', 'psel-all', (el) => {
 on('click', 'bulk-clear', () => { S.q.psel.clear(); render(); });
 on('change', 'bulk', async (el) => {
   if (!el.value) return;
-  const k = el.dataset.k, v = el.value === 'none' ? null : k === 'is_base' ? el.value === '1' : Number(el.value);
+  const k = el.dataset.k, v = el.value === 'none' ? null : k === 'is_base' ? el.value === '1' : k === 'rayon' ? el.value : Number(el.value);
   const n = S.q.psel.size;
   const r = await attempt(() => post(hp('/products/bulk'), { ids: [...S.q.psel], set: { [k]: v } }));
   if (r) { await loadProducts(); toast(`${n} produit${n > 1 ? 's' : ''} modifié${n > 1 ? 's' : ''}`); render(); }
@@ -104,12 +111,18 @@ export function contField(cur = '', dis = '') {
     <select class="txt w6" name="cont_u" ${dis}>${CONT_UNITS.map((x) => `<option ${x === u ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
     ${!m && c ? `<input type="hidden" name="contenance" value="${esc(c)}"><p class="muted small">⚠ Ancienne valeur « ${esc(c)} » : à ressaisir en nombre + unité.</p>` : ''}`;
 }
+// Liste unique « Rayon » / « Rayon › Sous-rayon » (valeur « cid » ou « cid:sid »).
+export const catSubOptions = (cur, curSub) => categoryOrder().map((cid) => {
+  const c = S.house.categories.find((x) => x.id === cid) || { subs: [] };
+  return `<option value="${cid}" ${cid === cur && !curSub ? 'selected' : ''}>${esc(catName(cid))}</option>${(c.subs || []).map((sb) => `<option value="${cid}:${sb.id}" ${sb.id === curSub ? 'selected' : ''}>${esc(catName(cid))} › ${esc(sb.name)}</option>`).join('')}`;
+}).join('');
+export const subName = (id) => { for (const c of S.house.categories) { const x = (c.subs || []).find((y) => y.id === id); if (x) return x.name; } return ''; };
 export const catOptions = (cur) => categoryOrder().map((cid) => `<option value="${cid}" ${cid === cur ? 'selected' : ''}>${esc(catName(cid))}</option>`).join('');
 
 on('click', 'prod-new', (el) => {
   sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté aux produits communs du foyer.</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(el.dataset.name || '')}" placeholder="ex. Beurre doux 250 g">
-    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions()}</select></label>
+    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="rayon">${catSubOptions()}</select></label>
     <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
     ${contField()}
     <label class="row" style="margin-top:8px"><input type="checkbox" class="cb" name="is_base"><span class="grow">Ingrédient de base (sel, huile, épices…)</span></label>
@@ -186,7 +199,7 @@ export function productView() {
       ${acc('p_fiche', { icon: `${I('tag', 's')} `, title: 'Caractéristiques', sum: ` · ${esc(catName(p.category_id))}, ${esc(p.unit)}${p.recurrence ? `, ${I('repeat', 's')} ` + REC[p.recurrence] : ''}`,
         body: `<div class="form" id="prod-form">
           <label class="muted">Nom</label><input class="txt" name="name" value="${esc(p.name)}" ${dis}>
-          <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id" ${dis}>${catOptions(p.category_id)}</select></label>
+          <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="rayon" ${dis}>${catSubOptions(p.category_id, p.subcategory_id)}</select></label>
           <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit" ${dis}>${unitOptions(p.unit)}</select></label></div>
           ${contField(p.contenance, dis)}
           <p class="muted small">${p.size ? `1 ${esc(p.unit)} = <b>${esc(sizeText(p.size))}</b>. ` : ''}Sert à convertir les quantités des recettes (g, ml, pièces) en emballages.</p>

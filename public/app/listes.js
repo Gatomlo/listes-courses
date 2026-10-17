@@ -3,7 +3,7 @@
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
 import { get, post, put, patch, del, attempt, sync, newOp, setCached, net } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
-import { unitOptions, catOptions, contField } from './catalogue.js';
+import { unitOptions, catOptions, catSubOptions, subName, contField } from './catalogue.js';
 import { SLOT, tile, isAwake, syncWake } from './plats.js';
 import { startScan } from './scan.js';
 import { I, btnI } from './icons.js';
@@ -367,6 +367,26 @@ function basePanel(l) {
 
 // Preparer (liste datee en cours) : suggestions a valider, puis un bloc par magasin retenu
 // (nombre d'articles, sous-total), articles dans l'ordre des rayons du magasin, sans coche.
+// Sous-rayons : intitule sous le rayon (« Autres » pour les articles sans sous-rayon), dans l'ordre du magasin.
+const subsOf = (cid) => ((S.house.categories.find((c) => c.id === cid) || {}).subs || []);
+const subRank = (i, store) => {
+  const subs = subsOf(i.category_id);
+  if (!subs.length || !i.subcategory_id) return subs.length ? 1e6 : 0;
+  const k = [...((store && store.subOrder) || []), ...subs.map((x) => x.id)].indexOf(i.subcategory_id);
+  return k < 0 ? 1e6 : k;
+};
+function rowsWithSubs(its, store, rowFn) {
+  let last = null, out = '';
+  for (const i of its) {
+    const subs = subsOf(i.category_id);
+    if (subs.length) {
+      const key = `${i.category_id}:${i.subcategory_id || 0}`;
+      if (key !== last) { out += `<div class="subh">${esc((subs.find((x) => x.id === i.subcategory_id) || {}).name || 'Autres')}</div>`; last = key; }
+    } else last = null;
+    out += rowFn(i);
+  }
+  return out;
+}
 function prepBody(l) {
   const sugg = l.items.filter((i) => i.suggestion);
   const rest = l.items.filter((i) => !i.suggestion && i.status !== 'unavailable'), unav = l.items.filter((i) => !i.suggestion && i.status === 'unavailable');
@@ -376,10 +396,10 @@ function prepBody(l) {
     const its = rest.filter((i) => i.at_store_id === s.id);
     if (!its.length) return '';
     const ord = [...(s.categoryOrder || []), ...categoryOrder()], rank = (i) => { const k = ord.indexOf(i.category_id); return k < 0 ? 1e6 : k; };
-    its.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'fr'));
+    its.sort((a, b) => rank(a) - rank(b) || subRank(a, s) - subRank(b, s) || a.name.localeCompare(b.name, 'fr'));
     const p = st(s.id);
     return `<div class="rayon"><span class="dot" style="background:${esc(s.color)}"></span><b style="color:var(--ink)">${esc(s.name)}</b><span class="n">${plural(its.length, 'article')}${p ? ` · ${eur(p.itemsTotal)}` : ''}</span></div>
-      <div class="group">${its.map((i) => itemRow(i, l)).join('')}</div>`;
+      <div class="group">${rowsWithSubs(its, s, (i) => itemRow(i, l))}</div>`;
   }).join('');
   return `${sugg.length ? `<div class="rayon" style="color:var(--carrot)">${I('bulb', 's')} Suggestions à valider<span class="n">${sugg.length}</span></div><div class="group">${sugg.map((i) => itemRow(i, l)).join('')}</div>` : ''}
     ${blocks}
@@ -395,7 +415,7 @@ function itemsBody(l, items, order, o = {}) {
   const known = new Set(order);
   const groups = [...order, ...new Set(todo.map((i) => i.category_id).filter((c) => !known.has(c)))].map((cid) => [cid, todo.filter((i) => i.category_id === cid)]).filter(([, is]) => is.length);
   const key = `cart${l.id}`;
-  return `${groups.map(([cid, is]) => `<div class="rayon">${esc(catName(cid))}<span class="n">${is.length}</span></div><div class="group">${is.map((i) => itemRow(i, l, o)).join('')}</div>`).join('')}
+  return `${groups.map(([cid, is]) => `<div class="rayon">${esc(catName(cid))}<span class="n">${is.length}</span></div><div class="group">${rowsWithSubs([...is].sort((a, b) => subRank(a, o.store) - subRank(b, o.store)), o.store, (i) => itemRow(i, l, o))}</div>`).join('')}
     ${!items.length ? `<div class="empty">${I('basket', 'l')}<p>${o.empty || `Liste vide. ${isManager() ? 'Ajoutez un article ci-dessous.' : 'Suggérez un article ci-dessous.'}`}</p></div>`
       : !todo.length && cart.length ? `<div class="empty">${I('check', 'l')}<p><b>Tout est dans le caddie.</b></p></div>` : ''}
     ${unav.length ? `<div class="rayon">Indisponibles<span class="n">${unav.length}</span></div><div class="group">${unav.map((i) => itemRow(i, l, o)).join('')}</div>` : ''}
@@ -518,7 +538,7 @@ export function storeListView(sid) {
       <div class="shopbar2" style="--c:${esc(s.color)}"><b>${done.length}/${items.length}</b><div class="prog"><i style="width:${pct}%"></i></div><span class="price muted small">≈ ${eur(total)}</span>
         ${others(l).length ? `<span class="avatar sm" style="--c:var(--plum)" title="${esc(others(l).join(', '))} ${others(l).length > 1 ? 'sont' : 'est'} aussi sur cette liste">${esc(others(l)[0][0])}</span>` : ''}</div>
       ${filt}
-      ${itemsBody(l, items, s.categoryOrder, { shop: true, allStores: all, here: all ? null : s.id, empty: 'Aucun article à prendre.' })}</div>`,
+      ${itemsBody(l, items, s.categoryOrder, { shop: true, store: all ? null : s, allStores: all, here: all ? null : s.id, empty: 'Aucun article à prendre.' })}</div>`,
     dock: open ? `<div class="btn-row">${btnI('plus', isManager() ? 'Ajouter un oubli' : 'Suggérer un article', 'data-a="add-open"')}${real.length ? btnI('check', esc(endLbl), `data-a="shop-end" data-sid="${all ? '' : s.id}" style="flex-grow:3;background:${esc(s.color)}"`, '') : ''}</div>` : null,
   };
 }
@@ -716,7 +736,7 @@ on('click', 'add-new', () => {
   const q = document.getElementById('add-q').value.trim();
   sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté aux produits du foyer, puis à la liste.</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(q)}">
-    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions()}</select></label>
+    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="rayon">${catSubOptions()}</select></label>
     <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
     ${contField()}
     <div class="row end"><button class="btn" data-a="add-new-ok">Créer et ajouter</button></div>`);
@@ -729,11 +749,11 @@ on('click', 'add-new-ok', async () => {
   const known = S.products.find((p) => norm(p.name) === norm(name));
   if (known) { await addItem(known.id, newQty); return; }
   // Un seul envoi : le serveur cree le produit puis l'ajoute a la liste (marche aussi sans reseau).
-  const tmpId = `tmp-p${Date.now()}`, qty = newQty, cat = Number(f.category_id);
-  await runOps([newOp({ type: 'product.add', name, category_id: cat, unit: f.unit, cont_n: f.cont_n, cont_u: f.cont_u, list_id: current.id, qty })], (l) => {
-    S.products.push({ id: tmpId, name, category_id: cat, unit: f.unit, prices: {}, best_store_id: null });
+  const tmpId = `tmp-p${Date.now()}`, qty = newQty, [catS, subS] = String(f.rayon).split(':'), cat = Number(catS), sub = subS ? Number(subS) : null;
+  await runOps([newOp({ type: 'product.add', name, rayon: f.rayon, unit: f.unit, cont_n: f.cont_n, cont_u: f.cont_u, list_id: current.id, qty })], (l) => {
+    S.products.push({ id: tmpId, name, category_id: cat, subcategory_id: sub, unit: f.unit, prices: {}, best_store_id: null });
     const sid = (activeStores()[0] || {}).id;
-    l.items.push({ id: `tmp-${Date.now()}`, product_id: tmpId, name, category_id: cat, unit: f.unit, qty, origin: 'manual', status: 'todo',
+    l.items.push({ id: `tmp-${Date.now()}`, product_id: tmpId, name, category_id: cat, subcategory_id: sub, unit: f.unit, qty, origin: 'manual', status: 'todo',
       suggestion: isManager() ? null : 'pending', suggested_by: S.me.id, suggested_by_name: S.me.name, prices: {}, promos: [], at_store_id: sid, best_store_id: null });
   });
   toast(isManager() ? `${name} créé et ajouté` : 'Suggestion envoyée au gestionnaire');
