@@ -120,7 +120,8 @@ svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .chk{width:28px;height:28px;border-radius:50%;border:2px solid var(--faint);flex:none;display:grid;place-items:center;color:transparent}
 .chk.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .row.gone .nm b{text-decoration:line-through;color:var(--faint)}
-.row.far{background:transparent}
+.row.far{background:var(--bg);border-left:3px solid var(--co)}
+.row.far.im{border-left-color:var(--im)}
 .row.far .nm b{color:var(--muted)}
 .take{font-size:12.5px;font-weight:600;color:var(--accent);padding:5px 10px;border-radius:99px;border:1.5px solid var(--accent);white-space:nowrap}
 .delta{font-size:12px;font-weight:600;color:var(--warn)}
@@ -304,7 +305,7 @@ function rowFar(i) {
   const h = S.here, o = OTHER[h];
   const here = i.p[h];
   const d = here == null ? null : here - i.p[o];
-  return `<div class="row far">
+  return `<div class="row far ${o}">
     <div class="nm"><b>${i.name}</b><small>${i.qty} · ${here == null ? 'pas vendu ici' : `ici ${eur(here)}`} · ${ST[o].n} ${eur(i.p[o])}</small></div>
     <div class="right">${here == null ? '' : `<button class="take" data-a="take" data-id="${i.id}">Prendre ici</button><span class="delta num">${d > 0 ? '+' + eur(d) : d < 0 ? '−' + eur(-d) : 'même prix'}</span>`}</div>
   </div>`;
@@ -317,10 +318,9 @@ function renderShop() {
   $('allhere').hidden = !far.length;
   $('allhere').innerHTML = far.length ? `<span>Tout prendre ici : <b class="num">${extra > 0 ? '+' : '−'}${eur(Math.abs(extra))}</b> sur ${far.length} art.</span><button data-a="all">Tout ici</button>` : '';
   const todo = remaining(h);
-  const aisles = AISLES[h].map(a => [a, todo.filter(i => i.aisle === a)]).filter(g => g[1].length);
-  let html = aisles.map(([a, l]) => `<div class="aisle"><span>${a}</span><span>${l.length}</span></div><div class="list">${l.map(rowHere).join('')}</div>`).join('');
-  if (!todo.length) html += `<div class="aisle"><span>Rien d'autre à prendre ici</span></div>`;
-  if (far.length) html += `<div class="aisle"><span>Conseillés chez ${ST[o].n}</span><span>${far.length}</span></div><div class="list">${far.map(rowFar).join('')}</div>`;
+  const aisles = AISLES[h].map(a => [a, todo.filter(i => i.aisle === a), far.filter(i => i.aisle === a)]).filter(g => g[1].length || g[2].length);
+  let html = aisles.map(([a, l, f]) => `<div class="aisle"><span>${a}</span><span>${l.length + f.length}</span></div><div class="list">${l.map(rowHere).join('')}${f.map(rowFar).join('')}</div>`).join('');
+  if (!todo.length && !far.length) html += `<div class="aisle"><span>Rien d'autre à prendre</span></div>`;
   const got = S.items.filter(i => i.done);
   if (got.length) {
     html += `<button class="fold" data-a="cart"><span>Dans le caddie (${got.length})</span><span>${S.cart ? 'Masquer' : 'Voir'}</span></button>`;
