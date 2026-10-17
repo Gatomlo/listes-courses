@@ -407,3 +407,10 @@ ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;
 .drag-ghost{position:fixed;z-index:50;pointer-events:none;padding:10px 14px;border-radius:14px;background:var(--ink);color:var(--bg);font-weight:650;font-size:14px;box-shadow:var(--shadow);transform:translate(-50%,-120%)}
 .card.wish{touch-action:pan-x;cursor:grab;user-select:none}
 .gs-res .row .ico{flex:none}
+
+/* Sous-rayons */
+.subrayon{display:flex;align-items:center;gap:8px;margin:10px 4px 4px 14px;font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--muted)}
+.subrayon::before{content:'';width:10px;height:1.5px;background:var(--line)}
+.subrayon .n{margin-left:auto;color:var(--faint);font-weight:600}
+.sub-row{padding-left:30px;min-height:44px;background:color-mix(in srgb,var(--raised) 60%,transparent)}
+.subord{margin:0 0 6px 28px;border-left:2px solid var(--line)}

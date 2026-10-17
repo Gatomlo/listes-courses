@@ -31,21 +31,24 @@ A['csv-ok'] = () => { closeSheet(); toast('4 produits créés · 15 relevés ajo
 
 // ---------- Produits ----------
 VIEWS.products = () => {
-  const n = norm(S.q.pq), c = S.q.pc || '';
-  const ps = Object.values(P).filter((p) => (!n || norm(p.n).includes(n)) && (!c || p.cat === c)).sort((a, b) => a.n.localeCompare(b.n, 'fr'));
+  const n = norm(S.q.pq), c = S.q.pc || '', sb = c && SUBS[c] ? (S.q.ps || '') : '';
+  const ps = Object.values(P).filter((p) => (!n || norm(p.n).includes(n)) && (!c || p.cat === c) && (!sb || p.sub === sb)).sort((a, b) => a.n.localeCompare(b.n, 'fr'));
   return {
     title: 'Produits', sub: `Prix moyens : ${HOUSE.records} derniers relevés hors promo, moins de 6 mois`,
     actions: `<button class="ib" data-a="csv" aria-label="Importer">${I('upload')}</button>`,
     body: `<div class="search" style="margin-bottom:10px">${I('search')}<input class="in" id="pq" placeholder="Rechercher un produit…" value="${esc(S.q.pq || '')}" data-in="pq"></div>
       <div class="chips" style="margin-bottom:12px"><button class="chip ${!c ? 'on' : ''}" data-a="pc" data-c="">Tous</button>${Object.entries(CATS).map(([k, v]) => `<button class="chip ${c === k ? 'on' : ''}" data-a="pc" data-c="${k}">${v}</button>`).join('')}</div>
+      ${c && SUBS[c] ? `<div class="chips" style="margin:-4px 0 12px">${Object.entries(SUBS[c]).map(([k, v]) => `<button class="chip ${sb === k ? 'on' : ''}" data-a="ps" data-s="${k}" style="height:30px;font-size:12.5px">${v}</button>`).join('')}</div>` : ''}
       <div class="group">${ps.map((p) => { const adv = advised(p.id); return `<button class="row tap" data-a="go" data-v="product" data-id="${p.id}">
-        <span class="grow"><b>${p.n}</b><span class="sub" style="display:block">${CATS[p.cat]} · ${p.u}${p.base ? ' · de base' : ''}${p.imp ? ` · imposé ${STORES[p.imp].n}` : ''}</span></span>
+        <span class="grow"><b>${p.n}</b><span class="sub" style="display:block">${catLabel(p)} · ${p.u}${p.base ? ' · de base' : ''}${p.imp ? ` · imposé ${STORES[p.imp].n}` : ''}</span></span>
         <span style="display:grid;gap:2px;justify-items:end">${activeStores().map((s) => `<span class="small num ${s === adv ? 'b' : 'faint'}" style="${s === adv ? `color:${STORES[s].c}` : ''}">${dotS(s)} ${eur(price(p.id, s))}</span>`).join('')}</span></button>`; }).join('')}</div>`,
     dock: `<button class="addbar" data-a="noop">${I('plus')}<span class="grow">Nouveau produit</span></button>`,
   };
 };
 IN.pq = (el) => { S.q.pq = el.value; render(); const i = $('pq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
-A.pc = (el) => { S.q.pc = el.dataset.c; render(); };
+CH['prod-cat'] = (el) => { const p = P[el.dataset.id], [cat, sub] = el.value.split(':'); p.cat = cat; p.sub = sub || null; toast(`${p.n} : ${catLabel(p)}`); render(); };
+A.pc = (el) => { S.q.pc = el.dataset.c; S.q.ps = ''; render(); };
+A.ps = (el) => { S.q.ps = S.q.ps === el.dataset.s ? '' : el.dataset.s; render(); };
 function spark(rs) {
   const W = 320, H = 84, pad = 10, xs = rs.map((r) => dt(r.date).getTime()), ys = rs.map((r) => r.price);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys) * 0.96, y1 = Math.max(...ys) * 1.04;
@@ -60,7 +63,7 @@ VIEWS.product = (t) => {
   const p = P[t.id], rs = records(p.id), adv = advised(p.id);
   const inLists = LISTS.filter((l) => l.status !== 'closed' && l.items.some((i) => i.pid === p.id));
   return {
-    title: p.n, sub: `${CATS[p.cat]} · ${p.u}`,
+    title: p.n, sub: `${catLabel(p)} · ${p.u}`,
     actions: `<button class="ib" data-a="prod-menu" data-id="${p.id}" aria-label="Actions">${I('more')}</button>`,
     body: `<div class="cols"><div>
       <div class="cmp">${activeStores().map((s) => `<div style="--c:${STORES[s].c};--cs:${STORES[s].cs}" class="${adv === s ? 'best' : ''}"><div class="between"><b class="small">${STORES[s].n}</b>${adv === s ? `<span class="xs b">${p.imp === s ? 'imposé' : 'conseillé'}</span>` : ''}</div>
@@ -72,7 +75,7 @@ VIEWS.product = (t) => {
       <div class="sh"><span>Réglages</span></div>
       <div class="group">
         <label class="row"><span class="grow">Magasin</span><select class="in" style="width:58%;height:38px"><option>Conseil : le moins cher</option>${activeStores().map((s) => `<option ${p.imp === s ? 'selected' : ''}>Toujours ${STORES[s].n}</option>`).join('')}</select></label>
-        <label class="row"><span class="grow">Rayon</span><select class="in" style="width:58%;height:38px">${Object.entries(CATS).map(([k, v]) => `<option ${k === p.cat ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label class="row"><span class="grow">Rayon<span class="sub" style="display:block">et sous-rayon, facultatif</span></span><select class="in" style="width:58%;height:38px" data-ch="prod-cat" data-id="${p.id}">${catOptions(p.sub ? `${p.cat}:${p.sub}` : p.cat)}</select></label>
         <label class="row"><span class="grow">Emballage</span><input class="in" style="width:58%;height:38px" value="${p.u}"></label>
         <div class="row"><span class="grow">Ingrédient de base<span class="sub" style="display:block">vérifié, pas ajouté d’office</span></span><span class="sw ${p.base ? 'on' : ''}"></span></div>
         <div class="row"><span class="grow">Récurrent</span><span class="pill">${p.rec ? (p.rec === 1 ? 'chaque liste' : `toutes les ${p.rec} listes`) : 'non'}</span></div>
@@ -101,11 +104,15 @@ VIEWS.stores = () => ({
     <button class="grow" style="text-align:left" data-a="go" data-v="store" data-id="${k}"><b>${s.n}</b><span class="sub" style="display:block">${s.active ? 'Actif' : 'Inactif : ignoré dans les conseils'}</span></button>
     <button class="sw ${s.active ? 'on' : ''}" data-a="store-act" data-id="${k}" aria-label="Actif"></button></div>`).join('')}</div>
     <div class="sh"><span>Rayons</span><button data-a="cat-add">＋ Rayon</button></div>
-    <div class="group">${Object.entries(CATS).map(([k, v]) => `<button class="row tap" data-a="cat-edit" data-id="${k}"><span class="grow">${v}</span><span class="sub">${Object.values(P).filter((p) => p.cat === k).length} produits</span>${I('edit', 's chev')}</button>`).join('')}</div>`,
+    <div class="group">${Object.entries(CATS).map(([k, v]) => `<button class="row tap" data-a="cat-edit" data-id="${k}"><span class="grow">${v}</span><span class="sub">${Object.values(P).filter((p) => p.cat === k).length} produits</span>${I('edit', 's chev')}</button>`
+      + Object.entries(SUBS[k] || {}).map(([s, n]) => `<button class="row tap sub-row" data-a="sub-edit" data-cat="${k}" data-id="${s}"><span class="faint">›</span><span class="grow">${n}</span><span class="sub">${Object.values(P).filter((p) => p.cat === k && p.sub === s).length}</span>${I('edit', 's chev')}</button>`).join('')
+      + (isM() ? `<button class="row tap sub-row" data-a="sub-add" data-cat="${k}" style="color:var(--accent)"><span class="faint">＋</span><span class="grow">Sous-rayon de ${v}</span></button>` : '')).join('')}</div>`,
   dock: isM() ? `<button class="addbar" data-a="noop">${I('plus')}<span class="grow">Nouveau magasin</span></button>` : null,
 });
 A['store-act'] = (el) => { const s = STORES[el.dataset.id]; if (s.active && activeStores().length < 2) { toast('Il faut au moins un magasin actif'); return; } s.active = !s.active; render(); };
 A['cat-add'] = () => sheet(`<h3>Nouveau rayon</h3><input class="in" placeholder="ex. Surgelés"><p class="sub" style="margin-top:8px">Ajouté en fin de parcours de tous les magasins.</p><div class="foot"><button class="btn" data-a="close">Créer</button></div>`);
+A['sub-add'] = (el) => sheet(`<h3>Nouveau sous-rayon</h3><p class="lead">Dans ${CATS[el.dataset.cat]}. Les produits peuvent être classés dedans ensuite (en masse depuis la liste des produits).</p><input class="in" placeholder="ex. Surgelés, Conserves…"><div class="foot"><button class="btn" data-a="close">Créer</button></div>`);
+A['sub-edit'] = (el) => sheet(`<h3>${CATS[el.dataset.cat]} › ${SUBS[el.dataset.cat][el.dataset.id]}</h3><input class="in" value="${SUBS[el.dataset.cat][el.dataset.id]}"><p class="sub" style="margin-top:8px">Supprimer un sous-rayon laisse ses produits dans ${CATS[el.dataset.cat]}.</p><div class="foot"><button class="btn danger" data-a="close">Supprimer</button><button class="btn" data-a="close">Renommer</button></div>`);
 A['cat-edit'] = (el) => sheet(`<h3>Rayon</h3><input class="in" value="${CATS[el.dataset.id]}"><div class="foot"><button class="btn danger" data-a="close">Supprimer</button><button class="btn" data-a="close">Renommer</button></div>`);
 VIEWS.store = (t) => {
   const s = STORES[t.id], ord = ORDER[t.id];
@@ -115,9 +122,15 @@ VIEWS.store = (t) => {
       <div class="field"><span>Couleur</span><div class="hstack">${['var(--im)', 'var(--co)', 'var(--al)', 'var(--accent)', 'var(--plum)', 'var(--warn)'].map((c) => `<button class="avatar" style="--c:${c};${s.c === c ? 'outline:3px solid var(--ink);outline-offset:2px' : ''}" data-a="store-col" data-id="${t.id}" data-c="${c}" aria-label="Couleur"></button>`).join('')}</div></div></div>
       <div class="sh"><span>Ordre des rayons</span><span class="xs" style="text-transform:none;letter-spacing:0">glisser sur PC</span></div>
       <div class="group">${ord.map((c, k) => `<div class="row"><span class="faint">${I('grip')}</span><span class="num faint small" style="width:18px">${k + 1}</span><span class="grow">${CATS[c]}</span>
-        <button class="ib" data-a="ord" data-id="${t.id}" data-k="${k}" data-d="-1" ${k ? '' : 'disabled'} aria-label="Monter">${I('up', 's')}</button><button class="ib" data-a="ord" data-id="${t.id}" data-k="${k}" data-d="1" ${k < ord.length - 1 ? '' : 'disabled'} aria-label="Descendre">${I('down', 's')}</button></div>`).join('')}</div>`,
+        ${SUBS[c] ? `<button class="chip" data-a="so-toggle" data-key="${t.id}${c}" style="height:28px;font-size:12px">sous-rayons ${I(S.q['so' + t.id + c] ? 'up' : 'down', 's')}</button>` : ''}
+        <button class="ib" data-a="ord" data-id="${t.id}" data-k="${k}" data-d="-1" ${k ? '' : 'disabled'} aria-label="Monter">${I('up', 's')}</button><button class="ib" data-a="ord" data-id="${t.id}" data-k="${k}" data-d="1" ${k < ord.length - 1 ? '' : 'disabled'} aria-label="Descendre">${I('down', 's')}</button></div>
+        ${SUBS[c] && S.q['so' + t.id + c] ? `<div class="subord">${subsOf(c, t.id).map((sk, j, a) => `<div class="row"><span class="num faint small" style="width:18px">${j + 1}</span><span class="grow">${SUBS[c][sk]}</span>
+          <button class="ib" data-a="sord" data-id="${t.id}" data-cat="${c}" data-k="${j}" data-d="-1" ${j ? '' : 'disabled'} aria-label="Monter">${I('up', 's')}</button><button class="ib" data-a="sord" data-id="${t.id}" data-cat="${c}" data-k="${j}" data-d="1" ${j < a.length - 1 ? '' : 'disabled'} aria-label="Descendre">${I('down', 's')}</button></div>`).join('')}
+          <p class="sub" style="margin:4px 14px 8px">Sans ordre précis, les sous-rayons suivent l’ordre par défaut.</p></div>` : ''}`).join('')}</div>`,
   };
 };
+A['so-toggle'] = (el) => { S.q['so' + el.dataset.key] = !S.q['so' + el.dataset.key]; render(); };
+A.sord = (el) => { const st = el.dataset.id, c = el.dataset.cat, o = subsOf(c, st), k = Number(el.dataset.k), j = k + Number(el.dataset.d); [o[k], o[j]] = [o[j], o[k]]; SUBORDER[st] = SUBORDER[st] || {}; SUBORDER[st][c] = o; render(); };
 A.ord = (el) => { const o = ORDER[el.dataset.id], k = Number(el.dataset.k), j = k + Number(el.dataset.d); [o[k], o[j]] = [o[j], o[k]]; render(); };
 A['store-col'] = (el) => { const s = STORES[el.dataset.id]; s.c = el.dataset.c; s.cs = `color-mix(in srgb, ${el.dataset.c} 16%, var(--surface))`; render(); };
 

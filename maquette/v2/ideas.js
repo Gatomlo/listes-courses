@@ -9,7 +9,7 @@ const gsRows = (q) => {
   const dishes = Object.keys(DISHES).filter((k) => norm(DISHES[k].n).includes(n) || DISHES[k].ings.some(([pid]) => norm(P[pid].n).includes(n))).slice(0, 5);
   const lists = LISTS.filter((l) => l.items.some((i) => norm(P[i.pid].n).includes(n)));
   const sec = (t, rows) => (rows ? `<div class="sh"><span>${t}</span></div><div class="group">${rows}</div>` : '');
-  const out = sec('Produits', prods.map((p) => `<button class="row tap" data-a="go" data-v="product" data-id="${p.id}"><span class="ico">${I('tag')}</span><span class="grow"><b>${p.n}</b><span class="sub" style="display:block">${CATS[p.cat]} · ${p.u}</span></span>${I('chev', 's chev')}</button>`).join(''))
+  const out = sec('Produits', prods.map((p) => `<button class="row tap" data-a="go" data-v="product" data-id="${p.id}"><span class="ico">${I('tag')}</span><span class="grow"><b>${p.n}</b><span class="sub" style="display:block">${catLabel(p)} · ${p.u}</span></span>${I('chev', 's chev')}</button>`).join(''))
     + sec('Plats', dishes.map((k) => `<button class="row tap" data-a="go" data-v="dish" data-id="${k}"><span class="ico plum">${I('bowl')}</span><span class="grow"><b>${DISHES[k].n}</b><span class="sub" style="display:block">${DISHES[k].ings.some(([pid]) => norm(P[pid].n).includes(n)) && !norm(DISHES[k].n).includes(n) ? 'contient ' + DISHES[k].ings.filter(([pid]) => norm(P[pid].n).includes(n)).map(([pid]) => P[pid].n).join(', ') : ppShort(k) ? ppShort(k) + ' / pers.' : ''}</span></span>${I('chev', 's chev')}</button>`).join(''))
     + sec('Dans vos listes', lists.map((l) => { const i = l.items.find((x) => norm(P[x.pid].n).includes(n)); return `<button class="row tap" data-a="go" data-v="list" data-id="${l.id}"><span class="ico">${I('basket')}</span><span class="grow"><b>${P[i.pid].n}</b><span class="sub" style="display:block">${listName(l)}${l.status === 'closed' ? ' · clôturée' : ''}</span></span>${I('chev', 's chev')}</button>`; }).join(''));
   return out || `<p class="empty">Rien pour « ${esc(q)} ».</p>`;
@@ -39,14 +39,14 @@ A['add-multi'] = (el) => {
   live(muHtml);
 };
 const muHtml = () => `<h3>${plural(S.q.mu.filter((x) => x.on).length, 'article')} à ajouter</h3><p class="lead">${S.q.addL === 'ap' ? 'À « À prévoir »' : 'À la liste'} · décochez ce que vous ne voulez pas.</p>
-  <div class="group">${S.q.mu.map((x, k) => `<button class="row tap" data-a="mu-t" data-k="${k}"><span class="ck sq ${x.on ? 'on' : ''}">${I('check')}</span><span class="grow"><b>${x.p ? P[x.p].n : x.name}</b>${x.q !== 1 ? ` <span class="faint">× ${x.q}</span>` : ''}<span class="sub" style="display:block">${x.p ? CATS[P[x.p].cat] + ' · ' + P[x.p].u : 'nouveau produit, sera créé (rayon Épicerie)'}</span></span>${x.p ? '' : '<span class="pill warn">à créer</span>'}</button>`).join('')}</div>
+  <div class="group">${S.q.mu.map((x, k) => `<button class="row tap" data-a="mu-t" data-k="${k}"><span class="ck sq ${x.on ? 'on' : ''}">${I('check')}</span><span class="grow"><b>${x.p ? P[x.p].n : x.name}</b>${x.q !== 1 ? ` <span class="faint">× ${x.q}</span>` : ''}<span class="sub" style="display:block">${x.p ? catLabel(P[x.p]) + ' · ' + P[x.p].u : 'nouveau produit, sera créé (rayon Épicerie)'}</span></span>${x.p ? '' : '<span class="pill warn">à créer</span>'}</button>`).join('')}</div>
   <div class="foot"><button class="btn sec" data-a="close">Annuler</button><button class="btn" data-a="mu-ok">Ajouter</button></div>`;
 A['mu-t'] = (el) => { const x = S.q.mu[Number(el.dataset.k)]; x.on = !x.on; refresh(); };
 A['mu-ok'] = () => {
   const l = listById(S.q.addL); let n = 0;
   S.q.mu.filter((x) => x.on).forEach((x) => {
     let pid = x.p;
-    if (!pid) { pid = 'x' + Date.now() + n; P[pid] = { id: pid, n: x.name, cat: 'ep', u: 'paquet', avg: { im: null, co: null, al: null }, rc: 0 }; }
+    if (!pid) { pid = 'x' + Date.now() + n; P[pid] = { id: pid, n: x.name, cat: 'ep', sub: null, u: 'paquet', avg: { im: null, co: null, al: null }, rc: 0 }; }
     const ex = l.items.find((i) => i.pid === pid && !i.sugg);
     if (ex && isM()) ex.q += x.q; else l.items.push(it(pid, x.q, { sugg: isM() ? null : 'Thomas' }));
     n++;

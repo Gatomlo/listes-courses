@@ -212,3 +212,21 @@ const TICKET = [
   { raw: 'SACS CONGEL.', q: 1, pr: 229, pid: null },
   { raw: 'REMISE 2E -50%', q: 1, pr: -45, pid: 'fet', remise: true },
 ];
+
+// ---------- Sous-rayons ----------
+// Un sous-rayon appartient a un rayon (Epicerie > Conserves). Un produit a un rayon et, facultativement, un sous-rayon ;
+// chaque magasin peut ordonner les sous-rayons d'un rayon (sinon ordre par defaut).
+const SUBS = { ep: { con: 'Conserves', pas: 'Pâtes, riz & céréales', cond: 'Condiments & épices', bis: 'Pain & biscuits', boi: 'Boissons' }, fr: { lai: 'Laitages & œufs', fro: 'Fromages' } };
+const SUBORDER = { im: { ep: ['con', 'pas', 'cond', 'bis', 'boi'] }, co: { ep: ['boi', 'bis', 'pas', 'con', 'cond'] } };
+Object.entries({ poi: 'con', con: 'con', coc: 'con', pat: 'pas', riz: 'pas', bou: 'pas', tah: 'cond', pes: 'cond', hui: 'cond', sel: 'cond', cum: 'cond', caf: 'boi', pit: 'bis', eau: 'boi', jus: 'boi', lai: 'lai', yao: 'lai', oeu: 'lai', beu: 'lai', fet: 'fro', moz: 'fro', gru: 'fro' })
+  .forEach(([pid, s]) => { P[pid].sub = s; });
+// « Boissons » n'est plus un rayon a part : sous-rayon d'Epicerie.
+Object.values(P).forEach((p) => { if (p.cat === 'bs') { p.cat = 'ep'; p.sub = 'boi'; } });
+delete CATS.bs;
+Object.keys(ORDER).forEach((k) => { ORDER[k] = ORDER[k].filter((c) => c !== 'bs'); });
+const subsOf = (cat, st) => { const all = Object.keys(SUBS[cat] || {}), o = ((SUBORDER[st] || {})[cat]) || []; return [...o.filter((k) => all.includes(k)), ...all.filter((k) => !o.includes(k))]; };
+const catLabel = (p) => (p.sub && SUBS[p.cat] && SUBS[p.cat][p.sub] ? `${CATS[p.cat]} › ${SUBS[p.cat][p.sub]}` : CATS[p.cat]);
+// Articles d'un rayon regroupes par sous-rayon (dans l'ordre du magasin) : [[cle | '', articles]].
+const bySub = (cat, items, st) => { const ks = subsOf(cat, st), g = ks.map((k) => [k, items.filter((i) => P[i.pid].sub === k)]).filter(([, xs]) => xs.length), rest = items.filter((i) => !ks.includes(P[i.pid].sub)); if (rest.length) g.push(['', rest]); return g; };
+// Choix « Rayon » / « Rayon › Sous-rayon » (une seule liste) : valeur « cat » ou « cat:sub ».
+const catOptions = (cur) => Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${v}</option>` + Object.entries(SUBS[k] || {}).map(([s, n]) => `<option value="${k}:${s}" ${cur === `${k}:${s}` ? 'selected' : ''}>${v} › ${n}</option>`).join('')).join('');
