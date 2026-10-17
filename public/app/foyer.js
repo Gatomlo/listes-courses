@@ -25,6 +25,7 @@ export function foyerView() {
         body: `<div class="form">
           <label class="row"><span class="grow"><b>Nom du foyer</b></span><input class="txt w12" name="name" value="${esc(h.name)}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Seuil « 2 magasins »</b><span class="muted block">Économie minimale (€) pour conseiller de faire les deux</span></span><input class="txt w5" name="threshold" inputmode="decimal" value="${(h.threshold_cents / 100).toFixed(2).replace('.', ',')}" ${mgr ? '' : 'disabled'}></label>
+          <label class="row"><span class="grow"><b>Palier « Économique » (€ par personne)</b><span class="muted block">Un plat dont le coût par personne est en dessous reçoit automatiquement le tag Économique. Vide : pas de tag.</span></span><input class="txt w5" name="eco" inputmode="decimal" placeholder="—" value="${h.eco_cents ? (h.eco_cents / 100).toFixed(2).replace('.', ',') : ''}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Prix moyen</b><span class="muted block">Nombre de derniers relevés pris en compte</span></span><input class="txt w5" type="number" min="1" max="20" name="avg_records" value="${h.avg_records}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Rythme des courses</b><span class="muted block">Jours entre deux listes (date proposée)</span></span><input class="txt w5" type="number" min="1" max="90" name="rhythm_days" value="${h.rhythm_days}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Durée d'un menu</b><span class="muted block">Jours proposés pour un nouveau menu</span></span><input class="txt w5" type="number" min="1" max="62" name="menu_days" value="${h.menu_days}" ${mgr ? '' : 'disabled'}></label>
@@ -32,8 +33,8 @@ export function foyerView() {
           <label class="row"><span class="grow"><b>Délai avant de reproposer un plat</b><span class="muted block">Génération du menu : jours sans ce plat avant de le proposer à nouveau</span></span><input class="txt w5" type="number" min="0" max="365" name="menu_gap_days" value="${h.menu_gap_days}" ${mgr ? '' : 'disabled'}></label>
           ${mgr ? '<div class="row end"><button class="btn" data-a="settings-save">Enregistrer</button></div>' : ''}</div>` })}
       ${acc('tags', { icon: `${I('tag', 's')} `, title: 'Tags des plats', sum: ` · ${H.tags.length}`,
-        body: H.tags.map((t) => `<div class="ord"><span class="grow">#${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}</span></span>
-          ${mgr ? `<button class="ic" title="Renommer" data-a="tag-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="tag-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="tag-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
+        body: H.tags.map((t) => `<div class="ord"><span class="grow">#${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}${t.auto ? ` · automatique${H.household.eco_cents ? `, sous ${eur(H.household.eco_cents)} par personne` : ' (palier à fixer dans les réglages)'}` : ''}</span></span>
+          ${mgr && !t.auto ? `<button class="ic" title="Renommer" data-a="tag-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="tag-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="tag-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
           || '<p class="muted">Aucun tag : ajoutez-en depuis la fiche d’un plat.</p>' })}
       ${acc('types', { icon: `${I('bowl', 's')} `, title: 'Types de plats', sum: ` · ${H.types.length}`,
         body: `${H.types.map((t) => `<div class="ord"><span class="grow">${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}</span></span>
@@ -52,7 +53,9 @@ const refresh = async () => { await loadHouse(); render(); };
 on('click', 'settings-save', async () => {
   const f = formData(document.querySelector('.acc .form'));
   const threshold_cents = Math.round(parseFloat(String(f.threshold).replace(',', '.')) * 100);
-  if (await attempt(() => patch(hp(), { name: f.name, threshold_cents, avg_records: f.avg_records, rhythm_days: f.rhythm_days, menu_days: f.menu_days, menu_start_dow: f.menu_start_dow, menu_gap_days: f.menu_gap_days }))) {
+  const eco = parseFloat(String(f.eco || '').replace(',', '.'));
+  const eco_cents = eco > 0 ? Math.round(eco * 100) : '';
+  if (await attempt(() => patch(hp(), { name: f.name, threshold_cents, avg_records: f.avg_records, rhythm_days: f.rhythm_days, menu_days: f.menu_days, menu_start_dow: f.menu_start_dow, menu_gap_days: f.menu_gap_days, eco_cents }))) {
     toast('Réglages enregistrés'); await refresh();
   }
 });

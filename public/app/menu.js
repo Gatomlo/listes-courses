@@ -1,9 +1,9 @@
 // Menu : planning des repas (jours x creneaux ; grille semaine sur PC), ajout d'un plat
 // avec ingredients en reserve, fiche repas, export / impression, lien d'affichage.
-import { esc, fmtDate, on, sheet, closeSheet, confirmSheet, toast, isPc, localDay } from './ui.js';
+import { esc, eur, fmtDate, on, sheet, closeSheet, confirmSheet, toast, isPc, localDay } from './ui.js';
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
-import { SLOT, tagChips, allTags, loadDishes, newDishFrom, chosenOf, dishIngredients, tile } from './plats.js';
+import { SLOT, tagChips, allTags, loadDishes, newDishFrom, chosenOf, dishIngredients, tile, ppShort } from './plats.js';
 import { I, btnI } from './icons.js';
 import { ruleText, copyRules } from './modeles.js';
 
@@ -46,6 +46,16 @@ const outBtn = (o, label) => `<button class="meal out" data-a="out-open" data-da
 const cell = (d, s, label) => { const o = outAt(d, s), m = mealAt(d, s); return o ? outBtn(o, label) : m ? mealBtn(m, label) : addBtn(d, s, label); };
 const addBtn = (d, s, label) => `<button class="add" data-a="meal-add" data-date="${d}" data-slot="${s}" aria-label="Ajouter un plat">${I('plus', 's')}${label ? ` ${SLOT[s]}` : ''}</button>`;
 
+// Budget estime de la periode affichee (repas valides : personnes, variantes, produits en reserve).
+// Pas dans l'export ni l'impression.
+function budgetCard() {
+  const c = menu.cost, ms = menu.meals.filter((m) => !m.suggestion && m.cost != null);
+  if (!c || !menu.meals.some((m) => !m.suggestion)) return '';
+  const persons = ms.reduce((n, m) => n + m.persons, 0);
+  const note = c.partial ? ` · estimation partielle${c.unknown ? ` (${c.unknown} repas sans prix)` : ' (des ingrédients sans prix)'}` : '';
+  return `<div class="card row" style="margin:8px 0;gap:10px"><span class="ico leaf">${I('tag')}</span><span class="grow"><b>Budget estimé : ${c.partial ? 'dès ' : '≈ '}${eur(c.total)}</b>
+    <span class="muted small block">${persons ? `≈ ${eur(Math.round(c.total / persons))} par personne et par repas` : ''}${note}</span></span></div>`;
+}
 export function menuView() {
   const days = []; for (let d = menu.from; d <= menu.to; d = addDays(d, 1)) days.push(d);
   const slots = slotsShown(), p = menu.period, mgr = isManager();
@@ -70,6 +80,7 @@ export function menuView() {
     body: `<div class="row"><button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.from, -1)}" aria-label="Menu précédent">${I('back', 's')}</button>
       <div class="grow c"><b>${range}</b><span class="muted small block">${days.length} jours</span></div>
       <button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.to, 1)}" aria-label="Menu suivant">${I('chev', 's')}</button></div>
+      ${budgetCard()}
       <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}</div>
       ${body}
       ${wishesHtml()}
@@ -87,9 +98,10 @@ function wishCard(w) {
   acts.push(btnI('calendar', mgr ? 'Mettre au menu' : 'Suggérer au menu', `data-a="plan-dish" data-id="${w.dish_id}"`, ''));
   if (mgr || (mine && w.status === 'pending')) acts.push(btnI('x', mgr && w.status === 'pending' ? 'Refuser l’envie' : 'Retirer l’envie', `data-a="wish-del" data-id="${w.id}"`, 'sec2 danger-t'));
   return `<div class="card wish">${tile(w.name, w.status === 'pending' ? '<span class="pill">à valider</span>' : '', '', w.photo)}
-    <b>${w.draft ? I('edit', 's') + ' ' : ''}${esc(w.name)}</b><span class="muted small">${w.created_by === S.me.id ? 'Votre envie' : `Envie de ${esc(w.created_by_name || '?')}`}</span>
+    <b>${w.draft ? I('edit', 's') + ' ' : ''}${esc(w.name)}</b><span class="muted small">${w.created_by === S.me.id ? 'Votre envie' : `Envie de ${esc(w.created_by_name || '?')}`}</span>${wishCost(w)}
     <div class="btn-row icons">${acts.join('')}</div></div>`;
 }
+const wishCost = (w) => { const d = (S.dishes || []).find((x) => x.id === w.dish_id); return d && d.cost_pp != null ? `<span class="price small">${esc(ppShort(d))} / pers.</span>` : ''; };
 function wishesHtml() {
   const ws = S.wishes || [];
   return `<div class="sec">Envies de plats <button data-a="wish-add">＋ Proposer</button></div>
@@ -103,7 +115,7 @@ function wishSheet() {
   sheet(`<h3>Envie de plat</h3><p class="muted small">Sans date : un gestionnaire la mettra au menu. Un nom nouveau crée une fiche à compléter.</p>
     <div class="search">${I('search')}<input class="txt" id="wish-q" placeholder="Plat existant ou nouveau nom…" value="${esc(wq)}" data-in="wish-q" autofocus></div>
     ${wq.trim() && !exact ? `<button class="btn full" data-a="wish-name">＋ Proposer « ${esc(wq.trim())} »</button>` : ''}
-    <div class="pick">${list.map((d) => `<button class="card click" data-a="wish-pick" data-id="${d.id}"><b>${esc(d.name)}</b>${d.last_date ? `<span class="muted block">dernière fois le ${esc(fmtDate(d.last_date))}</span>` : ''}</button>`).join('') || '<p class="muted">Aucun plat existant ne correspond.</p>'}</div>`);
+    <div class="pick">${list.map((d) => `<button class="card click" data-a="wish-pick" data-id="${d.id}"><b>${esc(d.name)}</b>${d.last_date ? `<span class="muted block">dernière fois le ${esc(fmtDate(d.last_date))}</span>` : ''}${d.cost_pp != null ? `<span class="price small block">${esc(ppShort(d))} / pers.</span>` : ''}</button>`).join('') || '<p class="muted">Aucun plat existant ne correspond.</p>'}</div>`);
 }
 const afterWish = async (w, msg) => {
   if (!w) return;
@@ -359,7 +371,7 @@ function pickSheet() {
   sheet(`<h3>${esc(fmtDate(pm.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[pm.slot]}</h3>
     <input class="txt" id="pick-q" placeholder="Rechercher un plat…" value="${esc(pm.q || '')}" data-in="pick-q">
     ${tagChips('pick-tag', pm.tag)}
-    <div class="pick">${list.map((d) => `<button class="card click" data-a="pick-dish" data-id="${d.id}"><b>${wished.has(d.id) ? `${I('bulb', 's')} ` : ''}${d.draft ? `${I('edit', 's')} ` : ''}${esc(d.name)}</b><span class="muted block">${d.parts ? `${I('puzzle', 's')} ${esc((d.part_names || []).join(', '))}` : d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}` : 'rappel seulement'}${d.last_date ? ` · dernière fois le ${esc(fmtDate(d.last_date))}` : ''}</span></button>`).join('') || '<p class="muted">Aucun plat.</p>'}</div>
+    <div class="pick">${list.map((d) => `<button class="card click" data-a="pick-dish" data-id="${d.id}"><b>${wished.has(d.id) ? `${I('bulb', 's')} ` : ''}${d.draft ? `${I('edit', 's')} ` : ''}${esc(d.name)}</b><span class="muted block">${d.parts ? `${I('puzzle', 's')} ${esc((d.part_names || []).join(', '))}` : d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}` : 'rappel seulement'}${d.last_date ? ` · dernière fois le ${esc(fmtDate(d.last_date))}` : ''}</span>${d.cost_pp != null ? `<span class="price small">${esc(ppShort(d))} / pers.</span>` : ''}</button>`).join('') || '<p class="muted">Aucun plat.</p>'}</div>
     ${isManager() ? `<button class="btn sec2 full" data-a="pick-new">＋ Nouveau plat${pm.q ? ` « ${esc(pm.q)} »` : ''}</button>
       <button class="btn sec2 full" style="margin-top:8px" data-a="out-set">${I('pin', 's')} Repas à l’extérieur</button>` : ''}`);
 }
@@ -493,6 +505,7 @@ async function mealSheet(m) {
   const lists = (await get(hp('/lists')).catch(() => ({ upcoming: [] }))).upcoming;
   sheet(`<h3>${esc(m.dish)}</h3><p class="muted">${esc(fmtDate(m.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[m.slot]}${m.suggestion ? ` · suggéré par ${esc(m.suggested_by_name || '?')}` : ''}</p>
     <div class="row"><span class="grow">Personnes</span><b>${m.persons}</b></div>
+    ${m.cost != null ? `<div class="row"><span class="grow">Coût estimé</span><b>${m.cost_partial ? 'dès ' : '≈ '}${eur(m.cost)}</b><span class="muted small">· ${eur(Math.round(m.cost / m.persons))} / pers.</span></div>` : ''}
     ${m.parts.length ? `<div class="sec">Recettes</div>${m.parts.map((x) => `<a class="item click${x.skipped ? ' skipped' : ''}" href="#/plats/${x.dish_id}" data-a="close-nav"><span class="ico plum">${I('puzzle')}</span><span class="grow">${esc(x.name)}${x.skipped ? ' <span class="muted small">· pas cette fois</span>' : ''}</span>${I('chev', 's chev')}</a>`).join('')}` : ''}
     ${m.skip.length ? `<p class="muted small">${I('box', 's')} ${m.skip.length} ingrédient${m.skip.length > 1 ? 's' : ''} en réserve (non acheté${m.skip.length > 1 ? 's' : ''})</p>` : ''}
     ${mgr && !m.suggestion ? `<label class="row line"><span>Liste</span><select class="txt grow" data-ch="meal-list" data-id="${m.id}">

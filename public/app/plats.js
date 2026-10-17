@@ -1,6 +1,6 @@
 // Plats : liste (recherche par nom ou ingredient, filtres), fiche (informations,
 // ingredients, recette facultative avec import depuis un lien, menu et historique).
-import { esc, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
+import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder } from './state.js';
 import { matchLines } from './ticket.mjs';
@@ -38,6 +38,11 @@ const allTypes = () => [...new Set([...(S.house.types || []).map((t) => t.name),
 export async function loadDishes() { S.dishes = await get(hp('/dishes')); }
 // Tags connus : ceux du foyer (S.house.tags) et ceux des plats charges.
 export const allTags = () => [...new Set([...(S.house.tags || []).map((t) => t.name), ...(S.dishes || []).flatMap((d) => d.tags)])].sort((a, b) => a.localeCompare(b, 'fr'));
+// Cout estime par personne (centimes, NULL si inconnu) : « ≈ 1,08 € / pers. », « dès 0,75 € » si des ingredients n'ont pas de prix.
+export const ppShort = (d) => (d.cost_pp == null ? '' : `${d.cost_partial ? 'dès ' : '≈ '}${eur(d.cost_pp)}`);
+export const ppLabel = (d) => (d.cost_pp == null ? '' : `${ppShort(d)} / pers.`);
+const PRICES = [['', 'Tous'], ['2', '≤ 2 €'], ['3', '≤ 3 €'], ['4', '≤ 4 €'], ['5', '≤ 5 €'], ['over', '> 5 €'], ['unk', 'Sans prix']];
+const priceOk = (d, k) => !k || (k === 'unk' ? d.cost_pp == null : k === 'over' ? d.cost_pp != null && d.cost_pp > 500 : d.cost_pp != null && d.cost_pp <= Number(k) * 100);
 // Pastilles de filtre par tag (action « act », tag actif « cur »).
 export const tagChips = (act, cur) => {
   const ts = allTags();
@@ -56,7 +61,7 @@ function filteredDishes() {
   const f = S.q.dishFilter || 'all', tg = S.q.dishTag || '', ty = S.q.dishType || '', sl = S.q.dishSlot || '';
   const n = norm(S.q.dish || '').trim();
   return S.dishes.filter((d) => (!n || norm(d.name).includes(n) || d.tags.some((x) => norm(x).includes(n)) || (d.types || []).some((x) => norm(x).includes(n)) || d.ingredient_names.some((x) => norm(x).includes(n)) || (d.part_names || []).some((x) => norm(x).includes(n)))
-    && (!tg || d.tags.includes(tg)) && (!ty || (d.types || []).includes(ty)) && (!sl || (d.slots || []).includes(sl))
+    && (!tg || d.tags.includes(tg)) && priceOk(d, S.q.dishPrice) && (!ty || (d.types || []).includes(ty)) && (!sl || (d.slots || []).includes(sl))
     && (f === 'all' || (f === 'wish' && d.wish) || (f === 'recipe' && d.has_recipe) || (f === 'memo' && !d.ingredients && !d.parts) || (f === 'planned' && d.next_date) || (f === 'draft' && d.draft) || (f === 'parts' && d.parts)));
 }
 // Filtres actifs : [cle de S.q, libelle].
@@ -65,6 +70,7 @@ const activeFilters = () => [
   ...(S.q.dishSlot ? [['dishSlot', SLOT[S.q.dishSlot]]] : []),
   ...(S.q.dishType ? [['dishType', S.q.dishType]] : []),
   ...(S.q.dishTag ? [['dishTag', `#${S.q.dishTag}`]] : []),
+  ...(S.q.dishPrice ? [['dishPrice', `Prix ${PRICES.find(([k]) => k === S.q.dishPrice)[1]} / pers.`]] : []),
 ];
 export function platsView() {
   const q = S.q.dish || '', f = S.q.dishFilter || 'all', tg = S.q.dishTag || '', ty = S.q.dishType || '', sl = S.q.dishSlot || '';
@@ -72,7 +78,7 @@ export function platsView() {
   const list = filteredDishes(), act = activeFilters();
   const card = (d) => {
     const hits = n && !norm(d.name).includes(n) ? [...(d.part_names || []), ...d.ingredient_names].filter((x) => norm(x).includes(n)) : [];
-    const pills = `${d.wish ? `<span class="pill" title="Envie">${I('bulb', 's')}</span>` : ''}${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts}</span>` : ''}${d.has_recipe ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`;
+    const pills = `${d.cost_pp != null ? `<span class="pill" title="Coût estimé par personne${d.cost_partial ? ' (des ingrédients n’ont pas de prix)' : ''}">${esc(ppShort(d))}</span>` : ''}${d.wish ? `<span class="pill" title="Envie">${I('bulb', 's')}</span>` : ''}${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts}</span>` : ''}${d.has_recipe ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`;
     // Tags en badges sur la photo : 3 au plus, puis « +N ».
     const tags = d.tags.slice(0, 3).map((t) => `<span class="pill">#${esc(t)}</span>`).join('') + (d.tags.length > 3 ? `<span class="pill">+${d.tags.length - 3}</span>` : '');
     return `<a class="dcard" href="#/plats/${d.id}">${tile(d.name, pills + tags, '', d.photo)}<div><h4>${esc(d.name)}</h4>
@@ -84,7 +90,8 @@ export function platsView() {
   const filters = isPc() ? `${search}
       <div class="frow"><div class="fgrp">${FILTERS.map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
       <div class="fgrp"><span class="flbl">Repas</span>${SLOT_ORDER.map((k) => `<button class="${sl === k ? 'on' : ''}" data-a="dish-slot" data-t="${k}">${SLOT[k]}</button>`).join('')}</div>
-      <div class="fgrp">${ddBtn('type', 'Type', ty, 'Tous')}${ddBtn('tag', 'Tag', tg && `#${tg}`, 'Tous')}</div></div>`
+      <div class="fgrp">${ddBtn('type', 'Type', ty, 'Tous')}${ddBtn('tag', 'Tag', tg && `#${tg}`, 'Tous')}</div>
+      <div class="fgrp"><span class="flbl">Prix / pers.</span>${PRICES.filter(([k]) => k).map(([k, t]) => `<button class="${S.q.dishPrice === k ? 'on' : ''}" data-a="dish-price" data-k="${k}">${t}</button>`).join('')}</div></div>`
     : `<div class="row gap">${search}<button class="btn sec2 fbtn" data-a="dish-filters" aria-label="Filtres">${I('sliders')}${act.length ? `<span class="badge">${act.length}</span>` : ''}</button></div>
       ${act.length ? `<div class="pills" style="margin:8px 2px 0">${act.map(([k, t]) => `<button class="pill p-grey" data-a="dish-unset" data-k="${k}">${esc(t)} ✕</button>`).join('')}</div>` : ''}`;
   return {
@@ -150,6 +157,7 @@ function filterSheet() {
     html = `<h3>${I('sliders', 's')} Filtres</h3>
       <div class="sec">Afficher</div><div class="opt wrap">${FILTERS.map(([k, t]) => `<button class="${(S.q.dishFilter || 'all') === k ? 'on' : ''}" data-a="fs-set" data-k="dishFilter" data-v="${k}">${t}</button>`).join('')}</div>
       <div class="sec">Repas</div><div class="seg">${SLOT_ORDER.map((k) => `<button class="${S.q.dishSlot === k ? 'on' : ''}" data-a="fs-set" data-k="dishSlot" data-v="${k}">${SLOT[k]}</button>`).join('')}</div>
+      <div class="sec">Prix par personne</div><div class="opt wrap">${PRICES.filter(([k]) => k).map(([k, t]) => `<button class="${S.q.dishPrice === k ? 'on' : ''}" data-a="fs-set" data-k="dishPrice" data-v="${k}">${t}</button>`).join('')}</div>
       <div class="group" style="margin-top:14px">${pick('Type', 'type', S.q.dishType, 'Tous les types')}${pick('Tag', 'tag', S.q.dishTag && `#${S.q.dishTag}`, 'Tous les tags')}</div>
       <div class="row gap" style="margin-top:14px">${activeFilters().length ? `<button class="btn sec2" data-a="fs-clear">Effacer</button>` : ''}<button class="btn grow" data-a="close">Voir ${n} plat${n > 1 ? 's' : ''}</button></div>`;
   } else {
@@ -164,12 +172,13 @@ on('click', 'dish-filters', () => { fview = 'main'; fq = ''; filterSheet(); });
 on('click', 'fs-view', (el) => { fview = el.dataset.v; fq = ''; filterSheet(); });
 on('click', 'fs-set', (el) => { const k = el.dataset.k; S.q[k] = S.q[k] === el.dataset.v ? '' : el.dataset.v; render(); filterSheet(); });
 on('click', 'fs-pick', (el) => { S.q[el.dataset.k] = el.dataset.v; fview = 'main'; fq = ''; render(); filterSheet(); });
-on('click', 'fs-clear', () => { S.q.dishFilter = ''; S.q.dishSlot = ''; S.q.dishType = ''; S.q.dishTag = ''; render(); filterSheet(); });
+on('click', 'fs-clear', () => { S.q.dishPrice = ''; S.q.dishFilter = ''; S.q.dishSlot = ''; S.q.dishType = ''; S.q.dishTag = ''; render(); filterSheet(); });
 on('input', 'fs-q', (el) => { fq = el.value; filterSheet(); const i = document.getElementById('fs-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('input', 'dish-q', (el) => { S.q.dish = el.value; render(); const i = document.getElementById('dish-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('click', 'dish-filter', (el) => { S.q.dishFilter = el.dataset.f; render(); });
+on('click', 'dish-price', (el) => { S.q.dishPrice = S.q.dishPrice === el.dataset.k ? '' : el.dataset.k; render(); });
 on('click', 'dish-slot', (el) => { S.q.dishSlot = S.q.dishSlot === el.dataset.t ? '' : el.dataset.t; render(); });
-on('click', 'dish-unfilter', () => { S.q.dishFilter = ''; S.q.dishTag = ''; S.q.dishType = ''; S.q.dishSlot = ''; render(); });
+on('click', 'dish-unfilter', () => { S.q.dishPrice = ''; S.q.dishFilter = ''; S.q.dishTag = ''; S.q.dishType = ''; S.q.dishSlot = ''; render(); });
 on('click', 'dish-new-named', () => { pendingName = S.q.dish; go('#/plats/nouveau'); });
 
 // ---------- Import CSV de plats (gestionnaire) : apercu puis import ----------
@@ -260,7 +269,7 @@ export function dishView() {
   const mgr = isManager(), canEdit = mgr || !!(ed.draft && ed.draft_by === S.me.id);
   const ro = !canEdit || (!!ed.id && S.q.deditId !== ed.id);
   const ingRows = (t, empty) => ingsOf(t).map((i, k) => `<div class="item"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}${i.is_base ? ' <span class="pill p-grey">de base</span>' : ''}</span>
-    ${ro ? `<b class="price">${i.qty != null ? esc(amountText(i.qty, i)) : '<span class="muted fw4">selon goût</span>'}</b>` : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" data-ch="ing-qty" data-t="${t}" data-k="${k}"><select class="txt sm w6" data-ch="ing-unit" data-t="${t}" data-k="${k}" aria-label="Unité">${[['', i.unit], ...IUNITS].map(([v, l]) => `<option value="${v}" ${(i.iunit || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`}
+    ${ro ? `<b class="price">${i.qty != null ? esc(amountText(i.qty, i)) : '<span class="muted fw4">selon goût</span>'}</b>${i.cost != null ? `<span class="muted small" style="min-width:46px;text-align:right">≈ ${eur(i.cost)}</span>` : ''}` : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" data-ch="ing-qty" data-t="${t}" data-k="${k}"><select class="txt sm w6" data-ch="ing-unit" data-t="${t}" data-k="${k}" aria-label="Unité">${[['', i.unit], ...IUNITS].map(([v, l]) => `<option value="${v}" ${(i.iunit || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`}
     ${i.is_base || convertible(i) ? '' : mgr ? `<button class="pill p-carrot" data-a="ing-cont" data-id="${i.product_id}" title="Indiquer la contenance de l'emballage (ex. 500 g) ou le poids d'une pièce ; en attendant : 1 ${esc(i.unit)}">contenance ?</button>` : `<span class="pill p-carrot" title="Contenance du produit inconnue : 1 ${esc(i.unit)} par recette">contenance ?</span>`}
     ${ro ? '' : `<button class="ib" data-a="ing-del" data-t="${t}" data-k="${k}" aria-label="Retirer">${I('x', 's')}</button>`}</div>`).join('') || empty;
   const ingAdd = (t, ph) => (ro ? '' : `<div class="addbox" style="margin:8px 0"><input class="txt" id="ing-q-${t}" autocomplete="off" placeholder="${ph}" data-in="ing-q" data-t="${t}" data-enter="ing-first"><div id="ing-ac-${t}"></div></div>`);
@@ -274,7 +283,7 @@ export function dishView() {
         <button class="btn sec2 sm" data-a="opt-add" data-g="${gk}">＋ Option</button></div>`).join('')}
       <button class="btn ghost" data-a="grp-add">${I('plus', 's')} Groupe de variantes</button>
       ${!ed.groups.length ? '<p class="muted small">Ex. Légume : carottes / épinards ; Viande : saucisse / haché. Les ingrédients ci-dessus sont communs à toutes les variantes.</p>' : ''}`;
-  const tabIng = `${ro ? `<p class="muted small" style="margin:0 4px 8px">${I('users', 's')} Pour ${ed.portions} personne${ed.portions > 1 ? 's' : ''}${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''}</p>` : ''}<div class="card">${ingRows('c', ed.parts.length ? '<p class="muted">Rien en plus des recettes (ex. pain pita, olives…).</p>' : '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient (produit)…')}${ro || !mgr ? '' : `<button class="btn sec2 full" data-a="rec-paste">${I('upload', 's')} Coller une liste d’ingrédients</button>`}</div>
+  const tabIng = `${ro ? `<p class="muted small" style="margin:0 4px 8px">${I('users', 's')} Pour ${ed.portions} personne${ed.portions > 1 ? 's' : ''}${ed.cost_pp != null ? ` · <b>${esc(ppLabel(ed))}</b>` : ''}${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''}</p>` : ''}<div class="card">${ingRows('c', ed.parts.length ? '<p class="muted">Rien en plus des recettes (ex. pain pita, olives…).</p>' : '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient (produit)…')}${ro || !mgr ? '' : `<button class="btn sec2 full" data-a="rec-paste">${I('upload', 's')} Coller une liste d’ingrédients</button>`}</div>
     ${ro ? '' : '<p class="muted small" style="margin:0 4px">Quantités facultatives, ajustées au nombre de personnes : en emballages, ou en g, ml, pièces (convertis grâce à la contenance du produit).</p>'}${variants}`;
   const steps = String(ed.steps || '').split('\n').map((x) => x.trim()).filter(Boolean);
   const aheadRo = ed.ahead ? `<div class="card ahead"><div class="row small" style="margin-bottom:4px">${I('bell', 's')}<b>À faire à l’avance</b><span class="muted">· la veille</span></div><div class="pre">${esc(ed.ahead)}</div></div>` : '';
@@ -300,7 +309,7 @@ export function dishView() {
   const cur = tabs.some(([k]) => k === S.q.dtab) ? S.q.dtab : ed.parts.length ? 'parts' : 'ing';
   const pills = `${ed.parts.length ? `<span class="pill">${I('puzzle', 's')} plat composé</span>` : ''}${ed.tags.map((t) => `<span class="pill">#${esc(t)}</span>`).join('')}`;
   // Lecture : informations en liste (sous les onglets sur telephone, a gauche sur PC).
-  const infoRo = `<div class="group" style="margin-top:12px">${[['Portions', `${ed.portions} personne${ed.portions > 1 ? 's' : ''}`], ['Temps', ed.time_text], ['Repas', slotsLabel(ed.slots)],
+  const infoRo = `<div class="group" style="margin-top:12px">${[['Portions', `${ed.portions} personne${ed.portions > 1 ? 's' : ''}`], ['Coût', ed.cost_pp == null ? '' : `${ppLabel(ed)}${ed.cost_partial ? ` · ${ed.cost_missing} ingrédient${ed.cost_missing > 1 ? 's' : ''} sans prix` : ''}`], ['Temps', ed.time_text], ['Repas', slotsLabel(ed.slots)],
     ['Types', ed.types.join(', ')], ['Tags', ed.tags.map((t) => `#${t}`).join(' ')]].filter(([, v]) => v)
     .map(([k, v]) => `<div class="item"><span class="muted w6">${k}</span><span class="grow">${esc(v)}</span></div>`).join('')}</div>`;
   const info = ro ? infoRo
@@ -313,7 +322,7 @@ export function dishView() {
       <div class="opt" style="margin:4px 0 4px;padding:2px 0;flex-wrap:wrap">${allTypes().map((t) => `<button class="${ed.types.includes(t) ? 'on' : ''}" data-a="ed-type" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       <div class="row gap" style="margin-bottom:8px"><input class="txt grow" id="type-new" placeholder="Autre type (ex. poisson, pâtes…)" data-enter="type-new"><button class="btn sm sec2" data-a="type-new">＋</button></div>
       <label class="muted small">Tags</label>
-      <div class="pills">${ed.tags.map((t, k) => `<span class="pill p-grey">#${esc(t)} <button class="x" data-a="tag-rm" data-i="${k}" aria-label="Retirer">✕</button></span>`).join('')}</div>
+      <div class="pills">${ed.tags.map((t, k) => (norm(t) === 'economique' ? `<span class="pill p-leaf" title="Automatique : coût par personne sous le palier des réglages">#${esc(t)} · auto</span>` : `<span class="pill p-grey">#${esc(t)} <button class="x" data-a="tag-rm" data-i="${k}" aria-label="Retirer">✕</button></span>`)).join('')}</div>
       <div class="row gap" style="margin-top:6px"><input class="txt grow" id="tag-in" autocomplete="off" placeholder="Chercher ou créer un tag…" data-in="tag-q" data-enter="tag-add"><button class="btn sm sec2" data-a="tag-add">＋</button></div>
       <div class="pills" id="tag-sug" style="margin-top:6px">${tagSug('')}</div></div>`;
   const banner = ed.draft ? `<div class="banner">${I('edit')}<span>Proposé par un membre : ${mgr ? 'enregistrer valide la fiche' : 'à valider par un gestionnaire'}.</span></div>` : '';
@@ -494,7 +503,7 @@ on('click', 'ing-cont-ok', async () => {
 // Tags existants proposes sous le champ, filtres pendant la frappe (tous au depart).
 function tagSug(q) {
   const n = norm(q.replace(/^#/, '')).trim();
-  return allTags().filter((t) => !ed.tags.some((x) => norm(x) === norm(t)) && (!n || norm(t).includes(n)))
+  return allTags().filter((t) => norm(t) !== 'economique' && !ed.tags.some((x) => norm(x) === norm(t)) && (!n || norm(t).includes(n)))
     .map((t) => `<button class="pill" data-a="tag-pick" data-t="${esc(t)}">#${esc(t)}</button>`).join('');
 }
 on('input', 'tag-q', (el) => { document.getElementById('tag-sug').innerHTML = tagSug(el.value); });
