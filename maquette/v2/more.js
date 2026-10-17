@@ -1,19 +1,10 @@
 // Le Cabas · maquette v2 : onglet Plus (produits, magasins, foyer, import, installation) et écrans d'accès.
-// Menu du haut (☰) : ajouter, puis le reste. Remplace l'ancien onglet Plus et le bouton ＋ du bas.
+// Menu du haut (☰) : remplace l'ancien onglet Plus (produits, magasins, foyer, import, installation). Le ＋ central reste en bas.
 A.menu = () => {
   const row = (v, ic, t, sub, attrs = '') => `<button class="row tap" ${attrs || `data-a="go" data-v="${v}"`}><span class="ico">${I(ic)}</span><span class="grow"><b>${t}</b>${sub ? `<span class="sub" style="display:block">${sub}</span>` : ''}</span>${I('chev', 's chev')}</button>`;
   topSheet(`<div class="th"><button class="row tap" style="padding:0;background:none;gap:12px;flex:1" data-a="go" data-v="house">${avatar(MEMBERS[0])}<span class="grow" style="text-align:left"><b>Thomas</b><span class="sub" style="display:block">${isM() ? 'Gestionnaire' : 'Membre'} · ${HOUSE.name}</span></span></button>
       <button class="ib x" data-a="close" aria-label="Fermer">${I('x')}</button></div>
-    <div class="sh" style="margin-top:0"><span>Ajouter</span></div>
-    <div class="qa">
-      <button data-a="qa" data-k="item"><span class="ico acc">${I('basket', 'l')}</span>Article</button>
-      <button data-a="qa" data-k="meal"><span class="ico acc">${I('calendar', 'l')}</span>Repas au menu</button>
-      <button data-a="qa" data-k="wish"><span class="ico warn">${I('bulb', 'l')}</span>Envie de plat</button>
-      <button data-a="qa" data-k="dish"><span class="ico plum">${I('bowl', 'l')}</span>Nouveau plat</button>
-      <button data-a="qa" data-k="promo"><span class="ico warn">${I('tag', 'l')}</span>Promo</button>
-      <button data-a="qa" data-k="scan"><span class="ico">${I('receipt', 'l')}</span>Ticket</button>
-    </div>
-    ${isM() ? `<div class="sh"><span>Gérer</span></div><div class="group">
+    ${isM() ? `<div class="group">
       ${row('products', 'tag', 'Produits', `${Object.keys(P).length} produits · prix moyens`)}
       ${row('stores', 'store', 'Magasins', 'Couleurs, rayons et parcours')}
       ${row('promos', 'flame', 'Promos', `${PROMOS.filter((p) => p.until >= TODAY).length} en cours`)}

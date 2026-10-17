@@ -60,8 +60,8 @@ const S = { role: 'manager', online: true, queue: 0, format: 'phone', stack: [{ 
 const isM = () => S.role === 'manager';
 const topV = () => S.stack[S.stack.length - 1];
 const A = {}, IN = {}, CH = {}, VIEWS = {};
-// 4 onglets ; « Ajouter » et « Plus » sont dans le menu du haut (bouton ☰ de l'en-tête).
-const TABS = [['home', 'Accueil', 'home'], ['lists', 'Listes', 'basket'], ['menu', 'Menu', 'calendar'], ['dishes', 'Plats', 'bowl']];
+// Accueil, Listes, ＋ central (ajout rapide), Menu, Plats ; l'ancien onglet Plus est dans le menu du haut (bouton ☰ de l'en-tête).
+const TABS = [['home', 'Accueil', 'home'], ['lists', 'Listes', 'basket'], ['fab'], ['menu', 'Menu', 'calendar'], ['dishes', 'Plats', 'bowl']];
 const badge = { lists: () => LISTS.reduce((n, l) => n + l.items.filter((i) => i.sugg).length, 0), menu: () => WISHES.filter((w) => w.status === 'pending').length + MEALS.filter((m) => m.sugg).length };
 
 function go(v, params = {}) { S.stack.push({ v, ...params }); render('f'); }
@@ -77,7 +77,7 @@ function render(dir) {
   const sub = S.stack.length > 1;
   view.innerHTML = `<header class="bar${sub ? ' sub' : ''}" id="bar">
       <div class="side">${sub ? `<button class="ib" data-a="back" aria-label="Retour">${I('back')}</button>` : ''}</div>
-      <div class="t">${v.title}</div><div class="side r">${v.actions || ''}${sub ? '' : `<button class="ib menu-b" data-a="menu" aria-label="Menu : ajouter, produits, magasins…">${I('menu')}</button>`}</div></header>
+      <div class="t">${v.title}</div><div class="side r">${v.actions || ''}${sub ? '' : `<button class="ib menu-b" data-a="menu" aria-label="Menu : produits, magasins, foyer…">${I('menu')}</button>`}</div></header>
     <div class="scroll${dir ? ' anim-' + dir : ''}${v.cls ? ' ' + v.cls : ''}" id="scroll" data-v="${t.v}">
       ${v.large ? `<h1 class="ltitle">${v.title}</h1>${v.sub ? `<p class="lsub root">${v.sub}</p>` : ''}` : v.sub ? `<p class="lsub">${v.sub}</p>` : ''}
       ${!S.online ? `<div class="banner off">${I('wifioff')}<span class="grow">Hors-ligne${S.queue ? ` · ${plural(S.queue, 'modification')} en attente` : ''}</span><span class="xs">envoi au retour du réseau</span></div>` : ''}
@@ -96,7 +96,8 @@ function render(dir) {
 function navHtml() {
   return `<div class="brand"><span class="logo">${I('basket')}</span>Le Cabas</div>
     <button class="hh" data-a="house-switch">${avatar({ n: 'F', c: 'var(--accent)' }, 's')}<span class="grow ellip">${HOUSE.name}</span>${I('down', 's')}</button>
-    ${TABS.map(([k, n, ic]) => `<button class="tab${S.tab === k ? ' on' : ''}" data-a="tab" data-t="${k}">${I(ic, 'l')}<span>${n}</span>${badge[k] && badge[k]() ? `<span class="bd">${badge[k]()}</span>` : ''}</button>`).join('')}`;
+    ${TABS.map(([k, n, ic]) => (k === 'fab' ? `<button class="fab" data-a="quick" aria-label="Ajouter">${I('plus', 'l')}<span>Ajouter</span></button>`
+      : `<button class="tab${S.tab === k ? ' on' : ''}" data-a="tab" data-t="${k}">${I(ic, 'l')}<span>${n}</span>${badge[k] && badge[k]() ? `<span class="bd">${badge[k]()}</span>` : ''}</button>`)).join('')}`;
 }
 
 // ---------- Panneaux et toasts ----------
@@ -156,7 +157,7 @@ A.noop = () => toast('Dans l’app : action réelle');
 
 // ---------- Panneau de maquette ----------
 const JUMPS = [
-  ['Accueil', () => tab('home')], ['Listes (À prévoir + prochaine)', () => tab('lists')], ['Menu du haut (☰)', () => A.menu()], ['Liste en cours', () => { tab('lists'); go('list', { id: 'l13' }); }],
+  ['Accueil', () => tab('home')], ['Listes (À prévoir + prochaine)', () => tab('lists')], ['Menu du haut (☰ : ex-Plus)', () => A.menu()], ['Liste en cours', () => { tab('lists'); go('list', { id: 'l13' }); }],
   ['Mode courses', () => { tab('lists'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'co' }); }],
   ['Mode courses (tout)', () => { tab('lists'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'all' }); }],
   ['Scan du ticket', () => { tab('lists'); go('scan', { id: 'l13', st: 'co' }); }],
@@ -177,7 +178,7 @@ function panelHtml() {
     <h3>Thème</h3>${seg('theme', [['auto', 'Système'], ['light', 'Clair'], ['dark', 'Sombre']])}
     <h3>Aller à</h3><div class="jump">${JUMPS.map(([t], k) => `<button data-a="jump" data-k="${k}">${t}</button>`).join('')}</div>
     <h3>Ce qui change</h3><ul>
-      <li>4 onglets seulement : Accueil, Listes, Menu, Plats. Le bouton ☰ en haut à droite ouvre un menu qui descend : Ajouter (article, repas, envie, plat, promo, ticket), puis Produits, Magasins, Promos, Foyer, import, installation.</li>
+      <li>En bas : Accueil, Listes, ＋ (ajout rapide : article, repas, envie, plat, promo, ticket), Menu, Plats. L’ancien onglet Plus devient le bouton ☰ en haut à droite : un menu qui descend avec Produits, Magasins, Promos, Foyer, import, installation.</li>
       <li>Accueil : repas du jour, prochaine liste et « À prévoir » d’un coup d’œil. Onglet Listes : « À prévoir » et la prochaine liste en grand ; les autres listes (2 ou 3 par an) et l’historique restent repliés.</li>
       <li>Liste : barre d’ajout en bas, filtre par magasin collant, caddie replié, suggestions en ligne.</li>
       <li>Panneaux qui montent du bas (dialogues sur PC), titres qui se replient au défilement.</li>

@@ -415,7 +415,16 @@ A['promo-add'] = () => {
 };
 A['promo-ok'] = () => { closeSheet(); toast('Promo enregistrée · conseils recalculés'); };
 
-// ---------- Ajout rapide (tuiles du menu ☰) ----------
+// ---------- Bouton ＋ central ----------
+A.quick = () => sheet(`<h3>Ajouter</h3><p class="lead">Aussi en appui long sur l’icône de l’app.</p>
+  <div class="qa">
+    <button data-a="qa" data-k="item"><span class="ico acc">${I('basket', 'l')}</span>Article</button>
+    <button data-a="qa" data-k="meal"><span class="ico acc">${I('calendar', 'l')}</span>Repas au menu</button>
+    <button data-a="qa" data-k="wish"><span class="ico warn">${I('bulb', 'l')}</span>Envie de plat</button>
+    <button data-a="qa" data-k="dish"><span class="ico plum">${I('bowl', 'l')}</span>Nouveau plat</button>
+    <button data-a="qa" data-k="promo"><span class="ico warn">${I('tag', 'l')}</span>Promo</button>
+    <button data-a="qa" data-k="scan"><span class="ico">${I('receipt', 'l')}</span>Ticket</button>
+  </div>`);
 A.qa = (el) => {
   closeSheet();
   const k = el.dataset.k;
