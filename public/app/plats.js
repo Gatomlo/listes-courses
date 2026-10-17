@@ -115,33 +115,6 @@ function pickRows(kind, search, act) {
     ${items.map((v) => row(v, esc(kind === 'tag' ? `#${v}` : v), count(v))).join('') || `<p class="muted" style="padding:12px 14px;margin:0">${all.length ? 'Aucun résultat.' : kind === 'type' ? 'Aucun type : à créer dans Foyer.' : 'Aucun tag.'}</p>`}`;
 }
 
-// ---------- Menus deroulants Type / Tag (PC) ----------
-const ddBtn = (kind, label, cur, empty) => `<button class="btn sm sec2 dd-btn${cur ? ' on' : ''}" data-a="dd-open" data-kind="${kind}"><span class="muted">${label} :</span> ${esc(cur || empty)} ${I('down', 's')}</button>`;
-let dd = null; // { kind, q, anchor }
-function ddClose() { document.querySelectorAll('.dd-pop').forEach((x) => x.remove()); dd = null; }
-function ddRender(keepFocus) {
-  let pop = document.querySelector('.dd-pop');
-  if (!pop) { pop = document.createElement('div'); pop.className = 'dd-pop'; document.body.appendChild(pop); }
-  const r = dd.anchor.getBoundingClientRect();
-  Object.assign(pop.style, { left: `${Math.min(r.left, window.innerWidth - 300)}px`, top: `${r.bottom + 6}px` });
-  pop.innerHTML = `${pickAll(dd.kind).length > 6 ? `<div class="search">${I('search')}<input class="txt" id="dd-q" placeholder="Rechercher…" value="${esc(dd.q)}" data-in="dd-q" autocomplete="off"></div>` : ''}
-    <div class="group fs-list">${pickRows(dd.kind, dd.q, 'dd-pick')}</div>`;
-  const i = pop.querySelector('#dd-q');
-  if (i && keepFocus !== false) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
-}
-on('click', 'dd-open', (el) => {
-  const same = dd && dd.kind === el.dataset.kind;
-  ddClose();
-  if (same) return;
-  dd = { kind: el.dataset.kind, q: '', anchor: el };
-  ddRender();
-});
-on('input', 'dd-q', (el) => { dd.q = el.value; ddRender(); });
-on('click', 'dd-pick', (el) => { S.q[el.dataset.k] = el.dataset.v; ddClose(); render(); });
-document.addEventListener('mousedown', (e) => { if (dd && !e.target.closest('.dd-pop, [data-a="dd-open"]')) ddClose(); });
-document.addEventListener('keydown', (e) => { if (dd && e.key === 'Escape') ddClose(); });
-window.addEventListener('hashchange', ddClose);
-window.addEventListener('scroll', (e) => { if (dd && !(e.target.closest && e.target.closest('.dd-pop'))) ddClose(); }, true);
 const CLOSE = '<button class="ib x" data-a="close" aria-label="Fermer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
 function filterSheet() {
   const n = filteredDishes().length;

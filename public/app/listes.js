@@ -569,7 +569,7 @@ on('click', 'shop-end', (el) => {
 });
 // Parcours appris : ordre dans lequel les rayons ont ete parcourus pendant ce passage.
 async function routeAsk(sid, lid) {
-  if (!sid || !isManager() || !net.online) return;
+  if (!sid || !isManager() || !net.online || (storeById(sid) || {}).auto_route) return; // automatique : deja applique par le serveur
   const r = await get(hp(`/stores/${sid}/route?list=${lid}`)).catch(() => null);
   if (!r || !r.changed) return;
   const nm = (id) => esc(catName(id));

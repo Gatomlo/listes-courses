@@ -51,3 +51,23 @@ test('parcours appris : ordre des rayons d apres le cochage', async () => {
   assert.equal(r.changed, true);
   assert.deepEqual(r.order, order.map((c) => c.id));
 });
+
+test('parcours automatique : applique a la fin du passage', async () => {
+  const hh = await household('Auto');
+  const t = hh.thomas, hx = hh.h;
+  const cats = (await t.get(hx)).data.categories.slice(0, 3);
+  const store = (await t.get(hx)).data.stores[0];
+  await t.put(`${hx}/stores/${store.id}/order`, { categoryIds: cats.map((c) => c.id) });
+  await t.patch(`${hx}/stores/${store.id}`, { auto_route: true });
+  const lid = (await t.post(`${hx}/lists`, { date: day(1) })).data.id;
+  for (const [k, c] of [cats[2], cats[1], cats[0]].entries()) for (const j of [0, 1]) {
+    const p = (await t.post(`${hx}/products`, { name: `A${k}${j}`, category_id: c.id })).data;
+    const it = (await t.post(`${hx}/lists/${lid}/items`, { product_id: p.id, qty: 1 })).data;
+    const itemId = it.items.find((x) => x.product_id === p.id).id;
+    await t.patch(`${hx}/items/${itemId}`, { status: 'bought', bought_store_id: store.id });
+    db.prepare('UPDATE list_items SET updated_at = ? WHERE id = ?').run(1000 + k * 10 + j, itemId);
+  }
+  await t.post(`/api/h/${hx.split('/').pop()}/sync`, { ops: [{ op_id: 'x1', type: 'trip.finish', list_id: lid, store_id: store.id }] });
+  const st = (await t.get(hx)).data.stores.find((s) => s.id === store.id);
+  assert.deepEqual(st.categoryOrder.slice(0, 3), [cats[2].id, cats[1].id, cats[0].id]);
+});

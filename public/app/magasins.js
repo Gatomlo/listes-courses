@@ -44,7 +44,8 @@ on('click', 'store-edit', (el) => {
   sheet(`<h3>${s.id ? 'Modifier le magasin' : 'Nouveau magasin'}</h3>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(s.name)}" placeholder="ex. Aldi Jambes">
     <div class="sec">Couleur</div><div class="swatches">${COLORS.map((c) => `<label><input type="radio" name="color" value="${c}" ${s.color === c ? 'checked' : ''}><span style="background:${c}"></span></label>`).join('')}</div>
-    ${s.id ? `<label class="row" style="margin-top:10px"><span class="grow"><b>Actif</b><span class="muted block">Inactif : masqué des conseils et listes, prix conservés</span></span><input type="checkbox" class="cb" name="active" ${s.active ? 'checked' : ''}></label>`
+    ${s.id ? `<label class="row" style="margin-top:10px"><span class="grow"><b>Parcours automatique</b><span class="muted block">À la fin d’un passage, l’ordre des rayons suit l’ordre où vous avez coché</span></span><input type="checkbox" class="cb" name="auto_route" ${s.auto_route ? 'checked' : ''}></label>
+    <label class="row" style="margin-top:10px"><span class="grow"><b>Actif</b><span class="muted block">Inactif : masqué des conseils et listes, prix conservés</span></span><input type="checkbox" class="cb" name="active" ${s.active ? 'checked' : ''}></label>`
     : `<label class="muted" style="display:block;margin-top:10px">Rayons de départ</label><select class="txt" name="copy_from">${S.house.stores.map((x, k) => `<option value="${x.id}" ${k ? '' : 'selected'}>Comme ${esc(x.name)}</option>`).join('')}<option value="none">Aucun (ex. pharmacie : rayons à créer)</option></select>
       <p class="muted small">Modifiables ensuite : ajouter, retirer, réordonner. Prix inconnus jusqu'aux premiers relevés.</p>`}
     <div class="row end"><button class="btn" data-a="store-save" data-id="${s.id || ''}">Enregistrer</button></div>`);
@@ -53,7 +54,7 @@ on('click', 'store-save', async (el) => {
   const root = document.querySelector('.sheet');
   const f = formData(root);
   const color = (root.querySelector('[name=color]:checked') || {}).value;
-  const body = { name: f.name, color, ...(el.dataset.id ? { active: f.active } : { copy_from: f.copy_from }) };
+  const body = { name: f.name, color, ...(el.dataset.id ? { active: f.active, auto_route: f.auto_route } : { copy_from: f.copy_from }) };
   const r = await attempt(() => (el.dataset.id ? patch(hp(`/stores/${el.dataset.id}`), body) : post(hp('/stores'), body)));
   if (r) { closeSheet(); toast('Magasin enregistré'); await refresh(); }
 });
