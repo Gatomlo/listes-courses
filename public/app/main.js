@@ -4,6 +4,7 @@ import { esc, on, toggleAcc, isPc, toast, closeSheet, localDay } from './ui.js';
 import { I } from './icons.js';
 import { plusView, promosView, loadPromos } from './plus.js';
 import { get, post, ApiError, net, outbox, onNetChange, onFlushed, flush } from './api.js';
+import { warm } from './offline.js';
 import { S, setRenderer, render, loadHouse, loadProducts, go, hp, isManager } from './state.js';
 import { loginView, foyersView, setInvite, setReset, loadOptions, loadInvitation, acceptPending, resetPending } from './connexion.js';
 import { foyerView } from './foyer.js';
@@ -136,6 +137,7 @@ async function route() {
     if (name === 'menu') await loadMenu();
     if (name === 'menuexport') await loadExport();
     shell(ROUTES[name]());
+    prefetch(); // limite : au plus toutes les 20 min (offline.js)
     if (pendingClick) { const a = pendingClick; pendingClick = null; document.querySelector(`[data-a="${a}"]`)?.click(); }
   } catch (e) {
     if (e instanceof ApiError && e.status === 404 && name === 'produit') { go('#/catalogue'); return; }
@@ -204,18 +206,12 @@ async function reloadView() {
     if (!document.querySelector('.sheet-bg')) render();
   } catch { /* hors-ligne : on garde l'affichage */ }
 }
-onNetChange(() => { connectEvents(); if (S.me) render(); });
+onNetChange(() => { connectEvents(); if (S.me) { render(); if (net.online) prefetch(); } });
 onFlushed(() => reloadView());
 
-// Listes a venir gardees sur l'appareil a l'ouverture (magasins sans reseau).
-async function prefetch() {
-  if (!net.online || !S.me || !S.me.householdId) return;
-  try {
-    const s = await get(`h/${S.me.householdId}/lists`);
-    for (const l of [s.backlog, ...s.upcoming]) await get(`h/${S.me.householdId}/lists/${l.id}`);
-    await get(`h/${S.me.householdId}/products`);
-  } catch { /* sans importance */ }
-}
+// Ecrans utiles en magasin gardes sur l'appareil (voir offline.js) : au demarrage et au
+// retour du reseau.
+const prefetch = () => warm(S.me && S.me.householdId);
 
 // Application installable et utilisable sans reseau (voir sw.js).
 if ('serviceWorker' in navigator) {

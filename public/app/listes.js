@@ -1,10 +1,11 @@
 // Listes : accueil (A prevoir, prochaines courses, historique), detail d'une liste
 // (articles par rayon, ajout, suggestions, fiche article, actions), creation, cloture.
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
-import { get, post, patch, del, attempt, sync, newOp, setCached } from './api.js';
+import { get, post, patch, del, attempt, sync, newOp, setCached, net } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
 import { unitOptions, catOptions, contField } from './catalogue.js';
 import { SLOT, tile } from './plats.js';
+import { startScan } from './scan.js';
 import { I, btnI } from './icons.js';
 
 const STATUS = { prep: 'En préparation', shopping: 'En courses', closed: 'Clôturée' };
@@ -52,8 +53,26 @@ async function runOps(ops, local) {
     if (l) await refreshList(l);
   }
 }
-const itemUpdate = (i, fields) => runOps([newOp({ type: 'item.update', item_id: i.id, fields })], () => Object.assign(i, fields,
-  fields.store_id !== undefined ? { manual_store: !!fields.store_id, at_store_id: fields.store_id || i.best_store_id || i.at_store_id } : {}));
+const itemUpdate = (i, fields) => runOps([newOp({ type: 'item.update', item_id: i.id, fields })], () => {
+  Object.assign(i, fields, fields.store_id !== undefined ? { manual_store: !!fields.store_id, at_store_id: fields.store_id || i.best_store_id || i.at_store_id } : {});
+  if (fields.status) { i.bought_store_id = fields.status === 'bought' ? (fields.bought_store_id || i.bought_store_id || null) : null; i.bought_at = fields.status === 'bought' ? (i.bought_store_id || i.at_store_id) : null; }
+});
+
+// Tickets a saisir : un par magasin ou des articles ont ete pris, scannes tout de suite ou plus tard.
+const ticketRows = (tickets, lid, withDate) => tickets.map((t) => `<div class="item"><span class="dot" style="background:${esc(t.color || 'var(--muted)')}"></span>
+  <span class="grow"><b>${esc(t.name)}</b><span class="muted block">${plural(t.items, 'article')}${withDate && t.date ? ` · courses du ${esc(fmtDate(t.date, { day: 'numeric', month: 'long' }))}` : ''}</span></span>
+  <button class="ib" data-a="ticket-skip" data-lid="${t.list_id || lid}" data-sid="${t.store_id}" aria-label="Pas de ticket" title="Pas de ticket">${I('x')}</button>
+  <button class="btn sm" data-a="scan-start" data-lid="${t.list_id || lid}" data-sid="${t.store_id}" aria-label="Scanner le ticket ${esc(t.name)}">${I('camera', 's')}</button></div>`).join('');
+const ticketsBox = (tickets, lid, withDate) => (tickets && tickets.length ? box('Tickets à saisir', '', ticketRows(tickets, lid, withDate), 'tickets-c') : '');
+on('click', 'ticket-skip', async (el) => {
+  const lid = Number(el.dataset.lid), sid = Number(el.dataset.sid);
+  const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'trip.skip', list_id: lid, store_id: sid })]));
+  if (r === undefined) return;
+  if (summary) summary.tickets = (summary.tickets || []).filter((t) => !(t.list_id === lid && t.store_id === sid));
+  if (current && current.id === lid) current.tickets = (current.tickets || []).filter((t) => t.store_id !== sid);
+  toast('Ticket écarté');
+  render();
+});
 
 // ---------- Accueil ----------
 // Carte de la prochaine liste (progression, estimation, conseil de magasin), suggestions,
@@ -130,6 +149,7 @@ export function listesView() {
     body: `${sug && mgr ? `<button class="banner" data-a="sugg-sheet">${I('bulb')}<span class="grow">${plural(S.house.pending, 'suggestion')} à valider</span>${I('chev', 's')}</button>` : ''}
       <div class="home-grid${isPc() ? ' three' : ''}"><div>
       ${todayCard()}
+      ${ticketsBox(s.tickets, 0, true)}
       ${next ? heroCard(next) : box('Prochaines courses', '', `<p class="muted">Aucune liste de courses prévue.</p>${mgr ? '<button class="btn" data-a="list-new">＋ Nouvelle liste</button>' : ''}`, 'hero-c')}
       ${box('À prévoir', `<a href="#/listes/${b.id}">Voir</a>`, `<a class="item click" href="#/listes/${b.id}"><span class="grow"><b>${plural(b.items, 'article')}</b>${b.pending ? ` <span class="pill p-carrot">${plural(b.pending, 'suggestion')}</span>` : ''}
         <span class="muted block">Sans date : à importer dans une prochaine liste${b.estimate != null && b.items ? ` · ≈ ${eur(b.estimate)}` : ''}.</span></span>${I('chev', 's chev')}</a>`)}
@@ -204,7 +224,7 @@ function itemRow(i, l, o = {}) {
     i.promos && i.promos.length && open ? `<span style="color:var(--carrot)">${I('tag', 's')} promo</span>` : '',
     i.carried_label ? `<span>→ ${i.carried_label === 'À prévoir' ? 'À prévoir' : esc(fmtDate(i.carried_label))}</span>` : '',
     !o.shop && dated && open && i.status === 'bought' ? `<span style="color:var(--leaf)">${I('check', 's')} dans le caddie</span>` : '',
-    o.shop && o.allStores && storeById(i.at_store_id) ? `<span style="color:${esc(storeById(i.at_store_id).color)}">● ${esc(storeById(i.at_store_id).name)}</span>` : '',
+    o.shop && storeById(i.at_store_id) && (o.allStores || (o.here && i.at_store_id !== o.here)) ? `<span style="color:${esc(storeById(i.at_store_id).color)}">● ${o.allStores ? '' : 'conseillé chez '}${esc(storeById(i.at_store_id).name)}</span>` : '',
   ].join('');
   const check = o.shop && open && !i.suggestion
     ? `<button class="chk${i.status === 'bought' ? ' on' : ''}" data-a="item-check" data-id="${i.id}" aria-label="Acheté">${I('check')}</button>` : '';
@@ -337,7 +357,7 @@ export function listView() {
   const real = l.items.filter((i) => !i.suggestion), done = real.filter((i) => i.status === 'bought').length;
   const meals = dated && l.meals && l.meals.length ? `<div class="sec">Repas couverts <a href="#/menu">Menu</a></div>
     <div class="hscroll">${l.meals.map((m) => `<button class="card click" style="width:150px;padding:12px" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted small">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric' }))} · ${SLOT[m.slot]}</span><div style="font-weight:650;line-height:1.25;margin-top:2px">${esc(m.dish)}</div></button>`).join('')}</div>` : '';
-  const body = !open ? closedBody(l) : `${presenceLine(l)}<div class="split"><div>
+  const body = !open ? `${ticketsBox(l.tickets, l.id)}${closedBody(l)}` : `${presenceLine(l)}${ticketsBox(l.tickets, l.id)}<div class="split"><div>
       ${dated ? prepBody(l) : itemsBody(l, l.items, categoryOrder())}</div>
       <div class="side">${dated ? scenCard(l) : ''}${meals}${dated ? basePanel(l) : ''}</div></div>`;
   const shopLbl = l.status === 'shopping' ? 'Reprendre les courses' : 'Partir faire les courses';
@@ -351,60 +371,115 @@ export function listView() {
   };
 }
 
-// Mode courses : un magasin (ses articles, dans l'ordre de ses rayons) ou tous ensemble
-// (« tous » : toute la liste, ordre des rayons de reference, magasin indique par article).
+// Mode courses : « Où fais-tu les courses ? ». Un magasin : toute la liste dans l'ordre de ses
+// rayons (les articles conseilles ailleurs portent une mention, filtrables) ; « plusieurs
+// magasins » : chaque article chez son magasin retenu, sans separation.
 on('click', 'shop-pick', async (el) => {
   const id = Number(el.dataset.id);
   const l = current && current.id === id ? current : await attempt(() => get(hp(`/lists/${id}`)));
-  if (!l) return;
-  const left = (sid) => l.items.filter((i) => !i.suggestion && i.status === 'todo' && (!sid || i.at_store_id === sid)).length;
-  sheet(`<h3>Faire les courses</h3><p class="muted small">Un magasin à la fois, ou toute la liste sans séparation. Fonctionne sans réseau.</p>
-    <div class="group"><a class="item click" href="#/listes/${l.id}/magasin/tous" data-a="close-go"><span class="ico leaf">${I('cart')}</span><span class="grow"><b>Tous les magasins</b><span class="muted block">${plural(left(), 'article')} à prendre · sans séparation</span></span>${I('arrowR')}</a>
-    ${activeStores().map((x) => `<a class="item click" href="#/listes/${l.id}/magasin/${x.id}" data-a="close-go"><span class="dot" style="background:${esc(x.color)}"></span><span class="grow"><b>${esc(x.name)}</b><span class="muted block">${plural(left(x.id), 'article')} à prendre</span></span>${I('arrowR')}</a>`).join('')}</div>`);
+  if (l) shopPickSheet(l);
 });
+function shopPickSheet(l, exclude) {
+  const left = (sid) => l.items.filter((i) => !i.suggestion && i.status === 'todo' && (!sid || i.at_store_id === sid)).length;
+  const all = left();
+  sheet(`<h3>Où fais-tu les courses ?</h3><p class="muted small">Tous les articles restants sont affichés ; ceux conseillés ailleurs portent une mention. Fonctionne sans réseau.</p>
+    <div class="group">${activeStores().filter((x) => x.id !== exclude).map((x) => `<a class="item click" href="#/listes/${l.id}/magasin/${x.id}" data-a="close-go"><span class="dot" style="background:${esc(x.color)}"></span><span class="grow"><b>${esc(x.name)}</b><span class="muted block">${plural(all, 'article')} à prendre · dont ${left(x.id)} conseillé${left(x.id) > 1 ? 's' : ''} ici</span></span>${I('arrowR')}</a>`).join('')}
+    ${exclude ? '' : `<a class="item click" href="#/listes/${l.id}/magasin/tous" data-a="close-go"><span class="ico leaf">${I('cart')}</span><span class="grow"><b>Plusieurs magasins</b><span class="muted block">Chaque article chez son magasin conseillé · choix du magasin au cochage</span></span>${I('arrowR')}</a>`}</div>`);
+}
 on('click', 'close-go', (el) => { closeSheet(); go(el.getAttribute('href')); });
+
+// Magasins dont les articles sont masques en mode courses (par liste, sur l'appareil).
+const hiddenStores = (l) => S.q[`shopf${l.id}`] || [];
+on('click', 'shop-filter', (el) => {
+  const k = `shopf${current.id}`, id = Number(el.dataset.sid), cur = hiddenStores(current);
+  S.q[k] = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+  render();
+});
 export function storeListView(sid) {
   if (!current) return { title: 'Chargement…', body: '' };
-  const l = current, all = sid === 'tous', s = all ? { id: 'tous', name: 'Tous les magasins', color: 'var(--leaf)', categoryOrder: categoryOrder() } : storeById(Number(sid));
+  const l = current, all = sid === 'tous', s = all ? { id: 'tous', name: 'Plusieurs magasins', color: 'var(--leaf)', categoryOrder: categoryOrder() } : storeById(Number(sid));
   if (!s) return { title: 'Magasin', back: `#/listes/${l.id}`, body: '<p class="muted">Magasin inactif.</p>' };
-  const items = l.items.filter((i) => !i.suggestion && (all || i.at_store_id === s.id));
+  const real = l.items.filter((i) => !i.suggestion);
+  // Dans un magasin : tout ce qui reste, plus ce qui y a ete pris (les articles pris ailleurs
+  // lors d'un passage precedent ne s'affichent plus) ; les magasins decoches sont masques.
+  const hidden = all ? [] : hiddenStores(l);
+  const items = real.filter((i) => (all || i.status !== 'bought' || i.bought_at === s.id) && !(hidden.includes(i.at_store_id) && i.at_store_id !== s.id && i.status !== 'bought'));
   const done = items.filter((i) => i.status === 'bought');
-  const st = all ? { itemsTotal: l.pricing ? l.pricing.split : 0, itemsUnknown: 0 } : (l.pricing && l.pricing.stores.find((x) => x.id === s.id)) || { itemsTotal: 0, itemsUnknown: 0 };
+  const priceHere = (i) => (all ? i.prices[i.at_store_id] : (i.prices[s.id] ?? i.prices[i.best_store_id]));
+  const sum = (arr) => arr.reduce((t, i) => t + (priceHere(i) != null ? priceHere(i) * i.qty : 0), 0);
+  const cartTotal = sum(done), cartUnknown = done.filter((i) => priceHere(i) == null).length;
+  const total = sum(items.filter((i) => i.status !== 'unavailable'));
   const open = l.status !== 'closed';
-  const cartPx = (i) => i.prices[i.at_store_id], cartTotal = done.reduce((t, i) => t + (cartPx(i) != null ? cartPx(i) * i.qty : 0), 0), cartUnknown = done.filter((i) => cartPx(i) == null).length;
   const pct = items.length ? Math.round((done.length / items.length) * 100) : 0;
-  const left = (id) => l.items.filter((i) => !i.suggestion && i.status === 'todo' && (id === 'tous' || i.at_store_id === id)).length;
-  const tabs = activeStores().length > 1 ? `<div class="seg sticky">${[{ id: 'tous', name: 'Tous' }, ...activeStores()].map((x) => `<a class="${String(x.id) === String(s.id) ? 'on' : ''}" href="#/listes/${l.id}/magasin/${x.id}">${x.color ? `<span class="dot" style="background:${esc(x.color)}"></span>` : ''}${esc(x.name)} <span class="faint">${left(x.id)}</span></a>`).join('')}</div>` : '';
+  const stores = activeStores();
+  const where = stores.length > 1 ? `<div class="seg sticky">${[...stores, { id: 'tous', name: 'Plusieurs', color: '' }].map((x) => `<a class="${String(x.id) === String(s.id) ? 'on' : ''}" href="#/listes/${l.id}/magasin/${x.id}">${x.color ? `<span class="dot" style="background:${esc(x.color)}"></span>` : ''}${esc(x.name)}</a>`).join('')}</div>` : '';
+  // Filtre : afficher aussi les articles conseillés dans d'autres magasins.
+  const other = all ? [] : stores.filter((x) => x.id !== s.id && real.some((i) => i.at_store_id === x.id && i.status !== 'bought'));
+  const filt = other.length ? `<div class="row wrap small" style="margin:0 0 10px"><span class="muted">Aussi afficher :</span>${other.map((x) => `<button class="chip${hidden.includes(x.id) ? '' : ' on'}" data-a="shop-filter" data-sid="${x.id}" aria-pressed="${!hidden.includes(x.id)}"><span class="dot" style="background:${esc(x.color)}"></span>${esc(x.name)} · ${real.filter((i) => i.at_store_id === x.id && i.status === 'todo').length}</button>`).join('')}</div>` : '';
   const endLbl = all ? 'Terminer les courses' : `Terminer chez ${s.name}`;
   return {
     title: s.name, back: `#/listes/${l.id}`, noNav: true, sub: `Courses du ${shortTitle(l)}`,
-    body: `<div class="shop">${tabs}
+    body: `<div class="shop">${where}
       <div class="card" style="--c:${esc(s.color)};padding:0;overflow:hidden"><div class="shopbar"></div><div style="padding:14px 16px">
-        <div class="row"><span class="mid grow">${done.length} / ${items.length}</span><span class="price muted">≈ ${eur(st.itemsTotal)}</span></div>
+        <div class="row"><span class="mid grow">${done.length} / ${items.length}</span><span class="price muted">≈ ${eur(total)}</span></div>
         <div class="row small" style="margin-top:6px"><span class="grow muted">Dans le caddie${cartUnknown ? ` · ${cartUnknown} sans prix` : ''}</span><b class="price" style="color:var(--leaf)">≈ ${eur(cartTotal)}</b></div>
         <div class="prog" style="margin-top:10px"><i style="width:${pct}%;background:${esc(s.color)}"></i></div>
         ${others(l).length ? `<p class="row small muted" style="margin:10px 0 0">${I('users', 's')} ${esc(others(l).join(', '))} ${others(l).length > 1 ? 'sont' : 'est'} aussi sur cette liste · en direct</p>` : ''}</div></div>
-      ${itemsBody(l, items, s.categoryOrder, { shop: true, allStores: all, empty: all ? 'Aucun article à prendre.' : `Aucun article prévu chez ${esc(s.name)}.` })}</div>`,
-    dock: open ? `<div class="btn-row">${btnI('plus', isManager() ? 'Ajouter un oubli' : 'Suggérer un article', 'data-a="add-open"')}${items.length ? btnI('check', esc(endLbl), `data-a="shop-end" data-sid="${all ? '' : s.id}" style="flex-grow:3;background:${esc(s.color)}"`, '') : ''}</div>` : null,
+      ${filt}
+      ${itemsBody(l, items, s.categoryOrder, { shop: true, allStores: all, here: all ? null : s.id, empty: 'Aucun article à prendre.' })}</div>`,
+    dock: open ? `<div class="btn-row">${btnI('plus', isManager() ? 'Ajouter un oubli' : 'Suggérer un article', 'data-a="add-open"')}${real.length ? btnI('check', esc(endLbl), `data-a="shop-end" data-sid="${all ? '' : s.id}" style="flex-grow:3;background:${esc(s.color)}"`, '') : ''}</div>` : null,
   };
 }
+
+// Fin d'un passage. Articles non pris : continuer dans un autre magasin (la liste reste
+// « En courses »), reporter (cloture de la liste), ou indisponibles. Le ticket se scanne
+// tout de suite ou plus tard (« Tickets à saisir »).
 on('click', 'shop-end', (el) => {
   const sid = Number(el.dataset.sid) || null;
-  const left = current.items.filter((i) => !i.suggestion && (!sid || i.at_store_id === sid) && i.status === 'todo');
-  const scans = sid ? [storeById(sid)] : activeStores();
+  const real = current.items.filter((i) => !i.suggestion);
+  const left = real.filter((i) => i.status === 'todo');
+  const bought = real.filter((i) => i.status === 'bought' && (!sid || i.bought_at === sid));
+  const elsewhere = sid ? activeStores().filter((x) => x.id !== sid) : [];
+  const awayLeft = left.some((i) => i.at_store_id !== sid);
+  const mgr = isManager();
+  const def = !left.length ? '' : elsewhere.length && (awayLeft || !mgr) ? 'continue' : mgr ? 'report' : 'continue';
+  const opt = (v, t, d) => `<label class="row line"><input type="radio" class="cb" name="fate" value="${v}" ${def === v ? 'checked' : ''}><span class="grow">${t}<span class="muted block small">${d}</span></span></label>`;
   sheet(`<h3>${sid ? `Terminer chez ${esc(storeName(sid))}` : 'Terminer les courses'}</h3>
-    <div class="group">${scans.map((x) => `<button class="item click" data-a="scan-start" data-lid="${current.id}" data-sid="${x.id}"><span class="ico leaf">${I('camera')}</span><span class="grow"><b>Scanner le ticket${sid ? '' : ` ${esc(x.name)}`}</b><span class="muted block">Met à jour les prix et coche les articles achetés</span></span>${I('chev', 's chev')}</button>`).join('')}</div>
-    ${left.length ? `<p class="muted">${plural(left.length, 'article')} non pris. Les marquer « indisponible » ? Ils seront reportés à la clôture de la liste.</p>` : ''}
-    <div class="row end">${left.length ? `<button class="btn sec2" data-a="shop-end-unav" data-sid="${sid || ''}">Marquer indisponibles</button>` : ''}<button class="btn" data-a="shop-end-ok">Terminer</button></div>`);
+    <p class="muted">${plural(bought.length, 'article')} pris${sid ? ' ici' : ''}.${bought.length ? ' Le ticket peut être scanné maintenant ou plus tard, à la maison.' : ''}</p>
+    ${left.length ? `<div class="sec">${plural(left.length, 'article')} non pris</div>
+      ${elsewhere.length ? opt('continue', 'Continuer dans un autre magasin', 'La liste reste ouverte ; ils restent à prendre.') : ''}
+      ${!sid ? opt('keep', 'Laisser sur la liste', 'La liste reste ouverte pour une autre sortie.') : ''}
+      ${mgr ? opt('report', 'Reporter et clôturer la liste', 'Choix par article à l’étape suivante.') : ''}
+      ${opt('unav', 'Marquer indisponibles', 'Ils seront reportés à la clôture de la liste.')}` : ''}
+    <div class="row end wide">${bought.length ? `<button class="btn sec2" data-a="shop-end-go" data-sid="${sid || ''}" data-scan="1">${I('camera', 's')} Scanner le ticket</button>` : ''}<button class="btn" data-a="shop-end-go" data-sid="${sid || ''}">${bought.length ? 'Ticket plus tard' : 'Terminer'}</button></div>`);
 });
-on('click', 'shop-end-unav', async (el) => {
-  const sid = Number(el.dataset.sid) || null;
-  const left = current.items.filter((i) => !i.suggestion && (!sid || i.at_store_id === sid) && i.status === 'todo' && !isTemp(i.id));
+on('click', 'shop-end-go', (el) => {
+  const sid = Number(el.dataset.sid) || null, scanNow = !!el.dataset.scan;
+  const fate = (document.querySelector('.sheet [name=fate]:checked') || {}).value || '';
+  const l = current;
+  const real = l.items.filter((i) => !i.suggestion);
+  const left = real.filter((i) => i.status === 'todo' && !isTemp(i.id));
+  // Magasins ou des articles ont ete pris pendant ce passage.
+  const stores = [...new Set(real.filter((i) => i.status === 'bought' && (!sid || i.bought_at === sid)).map((i) => i.bought_at).filter(Boolean))];
+  const ops = stores.map((x) => newOp({ type: 'trip.finish', list_id: l.id, store_id: x }));
+  if (fate === 'unav') ops.push(...left.map((i) => newOp({ type: 'item.update', item_id: i.id, fields: { status: 'unavailable' } })));
+  const done = ops.length ? runOps(ops, () => {
+    if (fate === 'unav') left.forEach((i) => { i.status = 'unavailable'; });
+    l.tickets = l.tickets || [];
+    for (const x of stores) if (!l.tickets.some((t) => t.store_id === x)) {
+      const st = storeById(x) || {};
+      l.tickets.push({ store_id: x, name: st.name, color: st.color, items: real.filter((i) => i.status === 'bought' && i.bought_at === x).length });
+    }
+  }) : Promise.resolve();
+  // Le choix de la photo doit partir directement du clic.
+  if (scanNow) { startScan(l.id, sid || stores[0]); return; }
   closeSheet();
-  await runOps(left.map((i) => newOp({ type: 'item.update', item_id: i.id, fields: { status: 'unavailable' } })), () => left.forEach((i) => { i.status = 'unavailable'; }));
-  go(`#/listes/${current.id}`);
+  done.then(() => {
+    if (fate === 'continue') shopPickSheet(current, sid);
+    else if (fate === 'report' || (!left.length && isManager())) closeListSheet();
+    else go(`#/listes/${l.id}`);
+  });
 });
-on('click', 'shop-end-ok', () => { closeSheet(); go(`#/listes/${current.id}`); });
 
 on('click', 'store-cycle', async (el) => {
   const i = current.items.find((x) => x.id === Number(el.dataset.id));
@@ -514,11 +589,22 @@ on('click', 'add-new', () => {
     <div class="row end"><button class="btn" data-a="add-new-ok">Créer et ajouter</button></div>`);
 });
 on('click', 'add-new-ok', async () => {
-  const p = await attempt(() => post(hp('/products'), formData(document.querySelector('.sheet'))));
-  if (!p) return;
+  const f = formData(document.querySelector('.sheet'));
+  const name = f.name.trim();
+  if (!name) return;
   closeSheet();
-  await loadProducts();
-  await addItem(p.id, newQty);
+  const known = S.products.find((p) => norm(p.name) === norm(name));
+  if (known) { await addItem(known.id, newQty); return; }
+  // Un seul envoi : le serveur cree le produit puis l'ajoute a la liste (marche aussi sans reseau).
+  const tmpId = `tmp-p${Date.now()}`, qty = newQty, cat = Number(f.category_id);
+  await runOps([newOp({ type: 'product.add', name, category_id: cat, unit: f.unit, cont_n: f.cont_n, cont_u: f.cont_u, list_id: current.id, qty })], (l) => {
+    S.products.push({ id: tmpId, name, category_id: cat, unit: f.unit, prices: {}, best_store_id: null });
+    const sid = (activeStores()[0] || {}).id;
+    l.items.push({ id: `tmp-${Date.now()}`, product_id: tmpId, name, category_id: cat, unit: f.unit, qty, origin: 'manual', status: 'todo',
+      suggestion: isManager() ? null : 'pending', suggested_by: S.me.id, suggested_by_name: S.me.name, prices: {}, promos: [], at_store_id: sid, best_store_id: null });
+  });
+  toast(isManager() ? `${name} créé et ajouté` : 'Suggestion envoyée au gestionnaire');
+  if (net.online) loadProducts().catch(() => {}); // sans reseau : le produit temporaire reste dans la liste locale
 });
 
 // ---------- Coche, suggestions ----------
@@ -526,23 +612,30 @@ on('click', 'item-check', async (el) => {
   const i = current.items.find((x) => String(x.id) === el.dataset.id);
   if (!i || isTemp(i.id)) return;
   const buying = i.status !== 'bought';
-  await itemUpdate(i, { status: buying ? 'bought' : 'todo' });
+  // Magasin ou on est (mode « plusieurs magasins » : celui de l'article, modifiable au prix).
+  const here = S.route[2] === 'tous' ? i.at_store_id : Number(S.route[2]);
+  await itemUpdate(i, buying ? { status: 'bought', bought_store_id: here } : { status: 'todo' });
   // Mode courses : prix paye facultatif (devient un releve du magasin).
-  if (buying && S.route[0] === 'magasin') priceSheet(i, S.route[2] === 'tous' ? i.at_store_id : Number(S.route[2]));
+  if (buying && S.route[0] === 'magasin') priceSheet(i, here);
 });
 function priceSheet(i, sid) {
   const avg = i.prices[sid];
-  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Prix payé chez ${esc(storeName(sid))} (facultatif)${avg != null ? ` — moyenne ${eur(avg)}` : ''}</p>
-    <input class="txt big" name="price" inputmode="decimal" placeholder="${avg != null ? (avg / 100).toFixed(2).replace('.', ',') : '0,00'}" data-enter="price-ok" data-id="${i.id}" data-sid="${sid}">
+  const stores = activeStores();
+  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Prix payé (facultatif)${avg != null ? ` — moyenne ${eur(avg)} chez ${esc(storeName(sid))}` : ''}</p>
+    <input class="txt big" name="price" inputmode="decimal" placeholder="${avg != null ? (avg / 100).toFixed(2).replace('.', ',') : '0,00'}" data-enter="price-ok" data-id="${i.id}">
+    ${stores.length > 1 ? `<label class="row line"><span class="grow">Magasin</span><select class="txt w12" name="store_id">${stores.map((x) => `<option value="${x.id}" ${x.id === sid ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>` : `<input type="hidden" name="store_id" value="${sid}">`}
     <label class="row line"><input type="checkbox" class="cb" name="promo"><span class="grow">Prix promo (hors moyenne)</span></label>
-    <div class="row end"><button class="btn sec2" data-a="close">Passer</button><button class="btn" data-a="price-ok" data-id="${i.id}" data-sid="${sid}">Enregistrer le prix</button></div>`);
+    <div class="row end"><button class="btn sec2" data-a="close">Passer</button><button class="btn" data-a="price-ok" data-id="${i.id}">Enregistrer le prix</button></div>`);
 }
 on('click', 'price-ok', async (el) => {
   const f = formData(document.querySelector('.sheet'));
   closeSheet();
-  if (!String(f.price).trim()) return;
   const i = current.items.find((x) => String(x.id) === el.dataset.id);
-  const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'record.add', product_id: i.product_id, store_id: Number(el.dataset.sid), price: f.price, promo: f.promo })]));
+  const sid = Number(f.store_id);
+  // Le magasin choisi est aussi celui ou l'article a ete pris.
+  if (sid && sid !== (i.bought_at || i.at_store_id)) await itemUpdate(i, { status: 'bought', bought_store_id: sid });
+  if (!String(f.price).trim()) return;
+  const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'record.add', product_id: i.product_id, store_id: sid, price: f.price, promo: f.promo })]));
   toast(r === null ? 'Prix gardé, envoyé au retour du réseau' : 'Relevé enregistré · moyenne recalculée');
 });
 on('click', 'sugg-ok', async (el) => { const l = await attempt(() => post(hp(`/items/${el.dataset.id}/accept`))); if (l) { toast('Suggestion acceptée'); refreshList(l); } });
@@ -627,7 +720,8 @@ on('click', 'list-del', async () => {
 });
 
 // Cloture : destination de chaque article non achete.
-on('click', 'list-close', () => {
+on('click', 'list-close', () => closeListSheet());
+function closeListSheet() {
   const left = current.items.filter((i) => i.status !== 'bought' && !i.suggestion);
   const next = current.next;
   const opts = (i) => `<select class="txt w12" data-fate="${i.id}">${next ? `<option value="next">Liste du ${esc(fmtDate(next.date))}</option>` : ''}<option value="backlog">À prévoir</option><option value="drop">Abandonner</option></select>`;
@@ -636,12 +730,12 @@ on('click', 'list-close', () => {
     ${left.map((i) => `<div class="row line"><span class="grow">${qtyText(i.qty)} × ${esc(i.name)}</span>${opts(i)}</div>`).join('')}` : '<p class="muted">Tous les articles ont été achetés.</p>'}
     ${current.items.some((i) => i.suggestion) ? '<p class="muted small">Les suggestions en attente seront abandonnées.</p>' : ''}
     <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="list-close-ok">Clôturer</button></div>`);
-});
+}
 on('click', 'list-close-ok', async () => {
   const fates = {};
   document.querySelectorAll('.sheet [data-fate]').forEach((s) => { fates[s.dataset.fate] = s.value; });
   const r = await attempt(() => post(hp(`/lists/${current.id}/close`), { fates }));
-  if (r) { closeSheet(); summary = null; toast('Liste clôturée'); await refreshList(); }
+  if (r) { closeSheet(); summary = null; toast('Liste clôturée'); await refreshList(); if (S.route[0] === 'magasin') go(`#/listes/${current.id}`); }
 });
 on('click', 'list-copy', async () => {
   const r = await attempt(() => post(hp(`/lists/${current.id}/copy-to-backlog`)));

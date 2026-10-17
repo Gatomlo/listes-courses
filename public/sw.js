@@ -2,11 +2,12 @@
 // Portee = dossier de l'app (/cabas/ dans la passerelle). L'API n'est jamais mise en
 // cache ici : les donnees hors-ligne sont gerees par l'app (public/app/api.js).
 // Changer VERSION quand la liste des fichiers change.
-const VERSION = 'cabas-v70';
+const VERSION = 'cabas-v71';
+const PHOTOS = 'cabas-photos'; // photos des plats (adresse changee a chaque photo : copie gardee sans risque)
 const FILES = [
   './', 'style.css', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'badge-96.png',
   'app/main.js', 'app/ui.js', 'app/api.js', 'app/state.js', 'app/connexion.js',
-  'app/foyer.js', 'app/magasins.js', 'app/install.js', 'app/catalogue.js', 'app/listes.js', 'app/scan.js', 'app/ticket.mjs', 'app/plats.js', 'app/menu.js', 'app/icons.js', 'app/plus.js', 'app/modeles.js', 'app/rappels.js',
+  'app/foyer.js', 'app/magasins.js', 'app/install.js', 'app/catalogue.js', 'app/listes.js', 'app/scan.js', 'app/ticket.mjs', 'app/plats.js', 'app/menu.js', 'app/icons.js', 'app/plus.js', 'app/modeles.js', 'app/rappels.js', 'app/offline.js',
 ];
 // Le lecteur de tickets (vendor/, ~ 6 Mo) est garde a sa premiere utilisation.
 
@@ -15,7 +16,7 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== PHOTOS).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
@@ -24,6 +25,16 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   const url = new URL(req.url);
+  if (req.method === 'GET' && url.origin === location.origin && /\/api\/h\/\d+\/dishes\/\d+\/photo$/.test(url.pathname)) {
+    e.respondWith(caches.open(PHOTOS).then(async (c) => {
+      const hit = await c.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) c.put(req, res.clone());
+      return res;
+    }));
+    return;
+  }
   if (req.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/api/')) return;
   const scope = new URL(self.registration.scope).pathname;
   const key = req.mode === 'navigate' ? scope : req; // la page, quelle que soit l'adresse (#, ?login=...)

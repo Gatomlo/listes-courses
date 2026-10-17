@@ -13,7 +13,7 @@ let scan = null; // { listId, storeId, date, status, progress, text, lines: [...
 
 // ---------- Prise de photo ----------
 // Le choix du fichier doit partir directement du clic (exigence des navigateurs).
-on('click', 'scan-start', (el) => {
+export function startScan(lid, sid) {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
@@ -21,12 +21,13 @@ on('click', 'scan-start', (el) => {
   input.addEventListener('change', () => {
     if (!input.files[0]) return;
     closeSheet();
-    scan = { listId: Number(el.dataset.lid) || null, storeId: Number(el.dataset.sid) || null, date: localDay(), status: 'reading', progress: 0, lines: [] };
+    scan = { listId: Number(lid) || null, storeId: Number(sid) || null, date: localDay(), status: 'reading', progress: 0, lines: [] };
     go('#/scan');
     read(input.files[0]);
   });
   input.click();
-});
+}
+on('click', 'scan-start', (el) => startScan(el.dataset.lid, el.dataset.sid));
 
 // Image preparee : largeur ramenee entre 1000 et 1800 px, niveaux de gris, contraste
 // etire (les tickets thermiques sont souvent pales).

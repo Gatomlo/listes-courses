@@ -552,3 +552,8 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 .fgrp>button.on:not(.dd-btn){background:var(--ink);border-color:var(--ink);color:var(--bg)}
 .fgrp .flbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-right:3px}
 .fgrp .dd-btn{height:32px;padding:0 11px;font-size:12.5px}
+
+/* Filtre de magasins du mode courses */
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 11px;border-radius:99px;border:1.5px solid var(--line,#d9d4c9);background:none;color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.chip.on{background:var(--surface);color:var(--ink);border-color:var(--ink)}
+.chip .dot{width:9px;height:9px;border-radius:50%}
