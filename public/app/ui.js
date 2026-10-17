@@ -66,6 +66,15 @@ export function sheet(html) {
   if (first) first.focus();
   return bg.querySelector('.sheet');
 }
+// Menu qui descend du haut de l'ecran (☰ des ecrans d'onglet).
+export function topSheet(html) {
+  closeSheet();
+  const bg = document.createElement('div');
+  bg.className = 'sheet-bg topbg';
+  bg.innerHTML = `<div class="sheet topsheet" role="dialog" aria-modal="true"><button class="ib x" data-a="close" aria-label="Fermer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>${html}</div>`;
+  bg.addEventListener('click', (e) => { if (e.target === bg) closeSheet(); });
+  document.body.appendChild(bg);
+}
 export function closeSheet() { document.querySelectorAll('.sheet-bg').forEach((e) => e.remove()); }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
 

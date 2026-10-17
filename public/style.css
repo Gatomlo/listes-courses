@@ -565,3 +565,11 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 .fbar{display:flex;align-items:center;gap:10px;width:100%;min-height:40px;margin:0 0 10px;padding:0 12px;border-radius:12px;border:1.5px solid var(--line);background:none;color:var(--muted);font:inherit;font-size:13px;font-weight:600;text-align:left;cursor:pointer}
 .fbar .dots{display:flex;gap:3px}
 .fbar .dot{width:9px;height:9px;border-radius:50%}
+
+/* Menu du haut (☰) */
+.sheet-bg.topbg{align-items:flex-start;justify-content:center}
+.topsheet{border-radius:0 0 28px 28px !important;padding-top:calc(18px + env(safe-area-inset-top)) !important;animation:dropin .22s cubic-bezier(.2,.9,.25,1) !important;max-height:88vh}
+.topsheet::before{display:none}
+@keyframes dropin{from{transform:translateY(-30px);opacity:0}to{transform:none;opacity:1}}
+.fold{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:12px 4px;color:var(--muted);font:600 14px var(--body);text-align:left;cursor:pointer}
+.fold .n{margin-left:auto;font-weight:400;font-size:12.5px}

@@ -4,6 +4,7 @@ export const PATHS = {
   calendar: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
   bowl: 'M3 11h18a9 9 0 0 1-18 0zM9 7c0-2 2-2 2-4M14 7c0-2 2-2 2-4',
   grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  home: 'M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5', menu: 'M4 7h16M4 12h16M4 17h16',
   plus: 'M12 5v14M5 12h14', minus: 'M5 12h14',
   back: 'M15 5l-7 7 7 7', chev: 'M9 5l7 7-7 7', down: 'M6 9l6 6 6-6', up: 'M6 15l6-6 6 6',
   more: 'M5 12h.01M12 12h.01M19 12h.01',

@@ -1,6 +1,6 @@
 // Onglet Plus (produits, magasins, promos, foyer, compte, outils), écran Promos et
 // bouton ＋ d'ajout rapide (article, repas, envie, plat, promo, ticket).
-import { esc, eur, fmtDate, on, sheet, closeSheet, toast, formData, localDay } from './ui.js';
+import { esc, eur, fmtDate, on, sheet, topSheet, closeSheet, toast, formData, localDay } from './ui.js';
 import { get, post, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadProducts, activeStores, storeById } from './state.js';
 import { I } from './icons.js';
@@ -13,11 +13,9 @@ const act = (a, ic, title, sub, cls = '') => `<button class="item click ${cls}" 
 
 // ---------- Onglet Plus ----------
 // Gestionnaire : outils du foyer + profil ; membre : son profil seulement.
-export function plusView() {
+function plusBody() {
   const H = S.house, me = H.members.find((m) => m.me) || { name: S.me.name };
-  return {
-    title: 'Plus', sub: H.household.name, large: true,
-    body: `<a class="card click row" href="#/foyers"><span class="avatar">${esc((me.name || '?')[0])}</span><span class="grow"><b>${esc(S.me.name)}</b><span class="muted block">${isManager() ? 'Gestionnaire' : 'Membre'} · ${esc(H.household.name)} · changer de foyer</span></span>${I('chev', 's chev')}</a>
+  return `<a class="card click row" href="#/foyers"><span class="avatar">${esc((me.name || '?')[0])}</span><span class="grow"><b>${esc(S.me.name)}</b><span class="muted block">${isManager() ? 'Gestionnaire' : 'Membre'} · ${esc(H.household.name)} · changer de foyer</span></span>${I('chev', 's chev')}</a>
       ${isManager() ? `<div class="group tiles">
         ${row('#/catalogue', 'tag', 'Produits', 'Prix moyens, relevés, magasin conseillé')}
         ${row('#/magasins', 'store', 'Magasins', 'Couleurs, magasins actifs, parcours des rayons')}
@@ -36,10 +34,12 @@ export function plusView() {
         ${act('me-password', 'lock', S.me.hasPassword ? 'Changer mon mot de passe' : 'Choisir un mot de passe', '')}
         ${isManager() || !me.id ? '' : `<button class="item click danger-t" data-a="member-del" data-id="${me.id}"><span class="ico">${I('x')}</span><span class="grow"><b>Quitter le foyer</b><span class="muted block">${esc(H.household.name)}</span></span>${I('chev', 's chev')}</button>`}
         ${act('logout', 'logout', 'Se déconnecter', '', 'danger-t')}
-      </div>`,
-  };
+      </div>`;
 }
-on('click', 'history', () => { S.q.histOpen = true; go('#/listes'); setTimeout(() => document.getElementById('history')?.scrollIntoView({ behavior: 'smooth' }), 300); });
+export const plusView = () => ({ title: 'Plus', sub: S.house.household.name, body: plusBody() });
+// Menu du haut (telephone) : meme contenu que l'ancien onglet Plus.
+export const topMenu = () => topSheet(plusBody());
+on('click', 'history', () => { S.q.otherOpen = true; closeSheet(); go('#/listes'); setTimeout(() => document.getElementById('history')?.scrollIntoView({ behavior: 'smooth' }), 300); });
 
 // ---------- Promos ----------
 let promos = [];

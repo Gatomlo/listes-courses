@@ -101,7 +101,7 @@ on('click', 'auth-submit', async (el) => {
   }
   if (m === 'reset') toast('Mot de passe enregistré');
   await loadHouse().catch(() => {});
-  go(S.me.householdId ? '#/listes' : '#/foyers');
+  go(S.me.householdId ? '#/accueil' : '#/foyers');
   await acceptPending();
 });
 
@@ -118,14 +118,14 @@ export async function acceptPending() {
   pending.invite = null; pending.invitation = null;
   if (!yes) return;
   const me = await attempt(() => post(`invitations/${encodeURIComponent(token)}/accept`));
-  if (me) { S.me = me; await loadHouse(); toast(`Bienvenue dans ${inv.household}`); go('#/listes'); }
+  if (me) { S.me = me; await loadHouse(); toast(`Bienvenue dans ${inv.household}`); go('#/accueil'); }
 }
 
 // ---------- Mes foyers ----------
 export function foyersView() {
   const hs = S.me.households;
   return {
-    title: 'Mes foyers', sub: hs.length ? 'Choisir le foyer affiché' : 'Créez votre premier foyer', back: hs.length ? '#/listes' : null, noNav: !hs.length,
+    title: 'Mes foyers', sub: hs.length ? 'Choisir le foyer affiché' : 'Créez votre premier foyer', back: hs.length ? '#/accueil' : null, noNav: !hs.length,
     body: `${hs.map((h) => `<button class="card click row" data-a="foyer-pick" data-id="${h.id}"><span class="acc-i">${I('users', 's')}</span><span class="grow"><b>${esc(h.name)}</b><span class="muted block">${h.members} membre${h.members > 1 ? 's' : ''} · ${h.role === 'manager' ? 'gestionnaire' : 'membre'}</span></span>${h.id === S.me.householdId ? '<span class="pill p-leaf">actuel</span>' : ''}</button>`).join('')}
       <div class="card narrow"><label class="muted" for="new-house">Nouveau foyer</label><input class="txt" id="new-house" placeholder="ex. Foyer Phoenix" data-enter="foyer-create">
       <button class="btn full" style="margin-top:8px" data-a="foyer-create">＋ Créer le foyer</button><p class="muted small">Vous en serez gestionnaire. Magasins et rayons de départ : Intermarché, Colruyt, rayons courants (modifiables).</p></div>
@@ -138,7 +138,7 @@ export function foyersView() {
 
 on('click', 'foyer-pick', async (el) => {
   const me = await attempt(() => patch('me', { householdId: Number(el.dataset.id) }));
-  if (me) { S.me = me; await loadHouse(); S.products = null; go('#/listes'); }
+  if (me) { S.me = me; await loadHouse(); S.products = null; go('#/accueil'); }
 });
 on('click', 'foyer-create', async () => {
   const name = document.getElementById('new-house').value.trim();

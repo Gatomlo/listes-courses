@@ -7,6 +7,7 @@ import { unitOptions, catOptions, contField } from './catalogue.js';
 import { SLOT, tile } from './plats.js';
 import { startScan } from './scan.js';
 import { I, btnI } from './icons.js';
+import { multiAdd } from './multi.js';
 
 const STATUS = { prep: 'En préparation', shopping: 'En courses', closed: 'Clôturée' };
 const longDate = (d) => fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -17,13 +18,15 @@ const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 
 let summary = null;   // GET /lists
 let promos = [];      // GET /promos (accueil)
+let backlogList = null; // contenu de « À prévoir » (accueil)
 let nextList = null, week = null; // PC : apercu de la prochaine liste ; repas des jours a venir (7 sur PC, 2 sur telephone)
 let current = null;   // liste affichee (GET /lists/:id)
 
 export async function loadSummary() {
   [summary, promos] = await Promise.all([get(hp('/lists')), get(hp('/promos')).catch(() => promos)]);
   // PC : la place permet d'afficher le contenu de la prochaine liste et le menu de la semaine.
-  const n = summary.upcoming[0];
+  const n = summary.upcoming.find((l) => !overdue(l));
+  backlogList = await get(hp(`/lists/${summary.backlog.id}`)).catch(() => backlogList);
   [nextList, week] = await Promise.all([n && isPc() ? get(hp(`/lists/${n.id}`)).catch(() => null) : null,
     get(hp(`/menu?from=${localDay()}&days=${isPc() ? 7 : 2}`)).catch(() => null)]);
 }
@@ -121,45 +124,99 @@ export function todayMeals(w = week) {
   }).filter(Boolean);
   return { late, day, rows };
 }
-function todayCard() {
+function todayCard(extra = '') {
   const t = todayMeals();
-  if (!t || !t.rows.length) return '';
+  if (!t || (!t.rows.length && !extra)) return '';
   const row = (r) => (r.out
     ? `<a class="item click" href="#/menu"><span class="ico">${I('pin')}</span><span class="grow"><span class="faint small block">${SLOT[r.slot]}</span><b>À l’extérieur</b>${r.out.note ? `<span class="muted small block">${esc(r.out.note)}</span>` : ''}</span></a>`
     : `<div class="item"><button class="tm-o" data-a="meal-open" data-id="${r.meal.id}" data-date="${r.meal.date}">${tile(r.meal.dish_name, '', 'tm', r.meal.photo)}<span class="grow"><span class="faint small block">${SLOT[r.slot]} · ${r.meal.persons} pers.</span><b>${esc(r.meal.dish)}</b></span></button>
       ${r.meal.dish_deleted ? '' : `<a class="ib" href="#/plats/${r.meal.dish_id}/cuisine/${r.meal.persons}" aria-label="Cuisiner ${esc(r.meal.dish_name)}" title="Cuisiner">${I('flame')}</a>`}</div>`);
-  return box(t.late ? 'Demain au menu' : 'Aujourd’hui au menu', '<a href="#/menu">Menu</a>', t.rows.map(row).join(''), 'today-c');
+  return box(t.late ? 'Demain au menu' : 'Aujourd’hui au menu', '<a href="#/menu">Menu</a>', t.rows.map(row).join('') + extra, 'today-c');
 }
 // Bloc de l'accueil : un cadre, son titre et son lien a l'interieur (meme forme partout).
 const box = (title, action, content, cls = '') => `<section class="card box ${cls}"><div class="box-h"><span>${title}</span>${action || ''}</div>${content}</section>`;
+// Liste datee en retard (date passee de plus d'un jour) : plus « la prochaine liste », rappel de cloture.
+const overdue = (l) => l.type === 'dated' && l.status !== 'closed' && l.date < localDay(-1);
+// Rappel de cloture (gestionnaire) : liste en courses dont tout est pris, ou date passee.
+export function closeDue() {
+  if (!summary || !isManager()) return [];
+  return summary.upcoming.map((l) => ({ l, left: l.items - l.bought, allDone: l.status === 'shopping' && l.items > 0 && l.bought >= l.items }))
+    .filter((x) => x.allDone || overdue(x.l));
+}
+const closeRows = () => closeDue().map(({ l, left, allDone }) => `<a class="item click" href="#/listes/${l.id}"><span class="ico leaf">${I('check')}</span>
+  <span class="grow"><b>Clôturer les courses du ${esc(fmtDate(l.date, { day: 'numeric', month: 'long' }))}</b><span class="muted block">${allDone ? 'Tout est pris' : `date passée${left ? ` · ${plural(left, 'article')} non pris` : ''}`}</span></span>${I('chev', 's chev')}</a>`).join('');
+export const closeBanner = (l) => { const x = closeDue().find((d) => d.l.id === l.id);
+  return x ? `<button class="banner" data-a="list-close">${I('check')}<span class="grow" style="text-align:left">${x.allDone ? 'Tout est pris : clôturer la liste ?' : 'Courses passées : clôturer la liste ?'}</span>${I('chev', 's')}</button>` : ''; };
+export const closeCount = () => closeDue().length;
+
+// « À faire » : tout ce qui attend une action (absent s'il n'y a rien).
+function todoBlock() {
+  const mgr = isManager(), sug = S.house.pending || (S.suggestions || []).length;
+  let html = closeRows() + ticketRows(summary.tickets || [], 0, true);
+  if (mgr && sug) html += `<button class="item click" data-a="sugg-sheet"><span class="ico carrot">${I('bulb')}</span><span class="grow"><b>${plural(S.house.pending || (S.suggestions || []).length, 'suggestion')} à valider</b><span class="muted block">articles et plats proposés par les membres</span></span>${I('chev', 's chev')}</button>`;
+  if (mgr && S.house.wishesPending) html += `<a class="item click" href="#/menu"><span class="ico carrot">${I('bulb')}</span><span class="grow"><b>${plural(S.house.wishesPending, 'envie')} de plat à valider</b><span class="muted block">dans le menu</span></span>${I('chev', 's chev')}</a>`;
+  return html ? box('À faire', '', html, 'todo-c') : '';
+}
+// « À préparer à l'avance » : plats d'aujourd'hui et de demain.
+function aheadRows() {
+  if (!week) return '';
+  return [0, 1].flatMap((n) => week.meals.filter((m) => m.date === localDay(n) && !m.suggestion).flatMap((m) => (m.ahead || []).map((a) =>
+    `<div class="item"><span class="ico carrot">${I('clock')}</span><span class="grow"><b>À préparer à l’avance</b><span class="muted block">${n ? 'pour demain' : 'pour ce soir'} · ${esc(a.name)} : ${esc(a.ahead)}</span></span></div>`))).join('');
+}
+// « À prévoir » : pastilles + champ d'ajout rapide (plusieurs articles possibles : « lait, 2 beurre »).
+function backlogBox() {
+  const b = summary.backlog, items = backlogList ? backlogList.items.filter((i) => !i.suggestion && i.status !== 'bought') : [];
+  return box('À prévoir', `<a href="#/listes/${b.id}">Voir</a>`, `${items.length ? `<div class="pills">${items.slice(0, 14).map((i) => `<span class="pill">${esc(i.name)}${i.qty !== 1 ? ` × ${qtyText(i.qty)}` : ''}</span>`).join('')}${items.length > 14 ? `<span class="pill">+${items.length - 14}</span>` : ''}</div>` : `<p class="muted small" style="margin:0">Rien pour l’instant.</p>`}
+    <div class="row" style="margin-top:10px"><input class="txt grow" id="ap-q" placeholder="Ajouter : lait, 2 beurre, œufs…" autocomplete="off" data-enter="ap-add"><button class="btn sm" data-a="ap-add" aria-label="Ajouter">${I('plus', 's')}</button></div>`, 'backlog-c');
+}
+on('click', 'ap-add', async () => {
+  const i = document.getElementById('ap-q');
+  if (!i || !i.value.trim()) return;
+  const text = i.value;
+  if (await multiAdd(summary.backlog.id, text, async () => { await loadSummary(); render(); })) i.value = '';
+});
+// Prochaines courses en une ligne.
+const nextOne = (l) => `<a class="item click" href="#/listes/${l.id}"><span class="ico ${l.status === 'shopping' ? 'leaf' : ''}">${I('basket')}</span>
+  <span class="grow"><b>${esc(shortTitle(l))}</b><span class="muted block">${plural(l.items, 'article')}${l.estimate != null && l.items ? ` · ≈ ${eur(l.estimate)}` : ''}${l.advice && l.advice.stores.length ? ` · ${l.advice.stores.map((x) => esc(x.name)).join(' + ')}` : ''}</span></span>${statusPill(l)}${I('chev', 's chev')}</a>`;
+
+// ---------- Accueil (onglet) : ce qu'il y a a faire aujourd'hui ----------
+export function accueilView() {
+  const s = summary, mgr = isManager(), next = s.upcoming.find((l) => !overdue(l));
+  const today = todayCard(aheadRows());
+  return {
+    title: 'Accueil', sub: `${S.house.household.name} · ${fmtDate(localDay(), { weekday: 'long', day: 'numeric', month: 'long' })}`,
+    body: `${todoBlock()}<div class="home-grid${isPc() ? ' three' : ''}"><div>${today}${backlogBox()}
+      ${box('Prochaines courses', '<a href="#/listes">Listes</a>', next ? nextOne(next) : `<p class="muted small" style="margin:0">Aucune liste prévue.</p>${mgr ? '<button class="btn sm" style="margin-top:8px" data-a="list-new">＋ Nouvelle liste</button>' : ''}`)}
+      </div>${isPc() ? `<div>${weekPreview()}</div>` : ''}</div>`,
+  };
+}
+
+// ---------- Listes (onglet) : « À prévoir » et la prochaine liste ; le reste est replie ----------
 export function listesView() {
-  const s = summary, mgr = isManager(), [next, ...later] = s.upcoming;
-  const sug = S.house.pending || (S.suggestions || []).length;
+  const s = summary, mgr = isManager();
+  const dated = s.upcoming.filter((l) => !overdue(l)), [next, ...later] = dated;
   const listRow = (l) => `<a class="item click" href="#/listes/${l.id}"><span class="ico ${l.status === 'shopping' ? 'leaf' : ''}">${I(l.status === 'closed' ? 'check' : 'basket')}</span>
     <span class="grow"><b>${esc(shortTitle(l))}</b><span class="muted block">${plural(l.items, 'article')}${l.estimate != null && l.items ? ` · ≈ ${eur(l.estimate)}` : ''}${l.pending ? ` · ${plural(l.pending, 'suggestion')}` : ''}</span></span>${l.status !== 'closed' ? statusPill(l) : ''}${I('chev', 's chev')}</a>`;
-  const b = s.backlog;
+  const b = s.backlog, open = S.q.otherOpen || isPc();
   const empty = (t) => `<p class="muted small" style="margin:4px 0 0">${t}</p>`;
-  const promoCards = `<div class="mini-grid">${promos.slice(0, 12).map((p) => { const st = storeById(p.store_id) || { name: '?', color: 'var(--muted)' };
-    return `<a class="mini" href="#/catalogue/${p.product_id}"><span class="st" style="--c:${esc(st.color)}">${esc(st.name)}</span>
-      <b>${esc(p.product)}</b><span><b class="price" style="color:var(--carrot)">${p.price_cents != null ? eur(p.price_cents) : 'promo'}</b> <span class="muted small">${p.list_id ? 'ces courses' : `jusqu’au ${esc(fmtDate(p.valid_until))}`}</span></span></a>`; }).join('')}
-    <button class="mini add" data-a="promo-new">${I('tag')}<b class="small">Signaler une promo</b></button></div>`;
-  const histOpen = S.q.histOpen || isPc();
+  const sug = S.house.pending || (S.suggestions || []).length;
   return {
-    title: 'Courses', sub: S.house.household.name, large: true,
-    body: `${sug && mgr ? `<button class="banner" data-a="sugg-sheet">${I('bulb')}<span class="grow">${plural(S.house.pending, 'suggestion')} à valider</span>${I('chev', 's')}</button>` : ''}
-      <div class="home-grid${isPc() ? ' three' : ''}"><div>
-      ${todayCard()}
+    title: 'Listes', sub: 'À prévoir et prochaine liste',
+    body: `${sug && mgr ? `<button class="banner" data-a="sugg-sheet">${I('bulb')}<span class="grow">${plural(S.house.pending || sug, 'suggestion')} à valider</span>${I('chev', 's')}</button>` : ''}
+      ${closeRows() ? box('À clôturer', '', closeRows(), 'todo-c') : ''}
       ${ticketsBox(s.tickets, 0, true)}
+      <div class="home-grid${isPc() ? ' three' : ''}"><div>
       ${next ? heroCard(next) : box('Prochaines courses', '', `<p class="muted">Aucune liste de courses prévue.</p>${mgr ? '<button class="btn" data-a="list-new">＋ Nouvelle liste</button>' : ''}`, 'hero-c')}
-      ${box('À prévoir', `<a href="#/listes/${b.id}">Voir</a>`, `<a class="item click" href="#/listes/${b.id}"><span class="grow"><b>${plural(b.items, 'article')}</b>${b.pending ? ` <span class="pill p-carrot">${plural(b.pending, 'suggestion')}</span>` : ''}
+      ${box('À prévoir', `<a href="#/listes/${b.id}">Ouvrir</a>`, `<a class="item click" href="#/listes/${b.id}"><span class="grow"><b>${plural(b.items, 'article')}</b>${b.pending ? ` <span class="pill p-carrot">${plural(b.pending, 'suggestion')}</span>` : ''}
         <span class="muted block">Sans date : à importer dans une prochaine liste${b.estimate != null && b.items ? ` · ≈ ${eur(b.estimate)}` : ''}.</span></span>${I('chev', 's chev')}</a>`)}
-      </div>${isPc() ? `<div>${nextPreview()}${weekPreview()}</div>` : ''}<div>
-      ${box('Listes à venir', mgr ? '<button data-a="list-new">＋ Nouvelle liste</button>' : '', later.map(listRow).join('') || empty(next ? 'Pas d’autre liste prévue.' : 'Aucune.'))}
-      ${box('Promos en cours', mgr ? '<a href="#/promos">Toutes</a>' : '', promoCards)}
-      <div id="history">${box('Historique', isPc() ? '' : `<button data-a="hist-toggle">${histOpen ? 'Masquer' : `Voir (${s.closed.length})`}</button>`, histOpen ? s.closed.map(listRow).join('') || empty('Aucune liste clôturée.') : '')}</div>
+      </div>${isPc() ? `<div>${nextPreview()}</div>` : ''}<div>
+      <button class="fold" data-a="other-toggle">${I(open ? 'up' : 'down', 's')}<span>Autres listes</span><span class="n">${later.length ? `${later.length} à venir · ` : ''}${s.closed.length} clôturée${s.closed.length > 1 ? 's' : ''}</span></button>
+      ${open ? `${box('Listes à venir', mgr ? '<button data-a="list-new">＋ Nouvelle liste</button>' : '', later.map(listRow).join('') || empty('Pas d’autre liste prévue.'))}
+        <div id="history">${box('Historique', '', s.closed.map(listRow).join('') || empty('Aucune liste clôturée.'))}</div>` : ''}
       </div></div>`,
   };
 }
+on('click', 'other-toggle', () => { S.q.otherOpen = !S.q.otherOpen; render(); });
 // PC : articles a prendre de la prochaine liste, par magasin retenu.
 function nextPreview() {
   const l = nextList;
@@ -182,7 +239,6 @@ function weekPreview() {
       ...(week.outings || []).filter((o) => o.date === d).map((o) => ({ slot: o.slot, html: `${I('pin', 's')} À l’extérieur${o.note ? ` · ${esc(o.note)}` : ''}` }))].sort((a, b) => rank(a.slot) - rank(b.slot));
     return `<div class="item"><span class="muted small" style="width:78px;flex:none">${esc(fmtDate(d, { weekday: 'short', day: 'numeric' }))}</span><span class="grow small">${ms.map((m) => `<span class="faint">${SLOT[m.slot]}</span> ${m.html}`).join(' · ') || '<span class="faint">—</span>'}</span></div>`; }).join(''));
 }
-on('click', 'hist-toggle', () => { S.q.histOpen = !S.q.histOpen; render(); });
 on('click', 'sugg-sheet', () => sheet(`<h3>Suggestions à valider</h3><p class="muted small">Proposées par les membres du foyer.</p>${suggestionsHtml()}`));
 
 // ---------- Nouvelle liste ----------
@@ -359,7 +415,7 @@ export function listView() {
   const real = l.items.filter((i) => !i.suggestion), done = real.filter((i) => i.status === 'bought').length;
   const meals = dated && l.meals && l.meals.length ? `<div class="sec">Repas couverts <a href="#/menu">Menu</a></div>
     <div class="hscroll">${l.meals.map((m) => `<button class="card click" style="width:150px;padding:12px" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted small">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric' }))} · ${SLOT[m.slot]}</span><div style="font-weight:650;line-height:1.25;margin-top:2px">${esc(m.dish)}</div></button>`).join('')}</div>` : '';
-  const body = !open ? `${ticketsBox(l.tickets, l.id)}${closedBody(l)}` : `${presenceLine(l)}${ticketsBox(l.tickets, l.id)}<div class="split"><div>
+  const body = !open ? `${ticketsBox(l.tickets, l.id)}${closedBody(l)}` : `${presenceLine(l)}${closeBanner(l)}${ticketsBox(l.tickets, l.id)}<div class="split"><div>
       ${dated ? prepBody(l) : itemsBody(l, l.items, categoryOrder())}</div>
       <div class="side">${dated ? scenCard(l) : ''}${meals}${dated ? basePanel(l) : ''}</div></div>`;
   const shopLbl = l.status === 'shopping' ? 'Reprendre les courses' : 'Partir faire les courses';
@@ -774,7 +830,7 @@ function closeListSheet() {
   const opts = (i) => `<select class="txt w12" data-fate="${i.id}">${next ? `<option value="next">Liste du ${esc(fmtDate(next.date))}</option>` : ''}<option value="backlog">À prévoir</option><option value="drop">Abandonner</option></select>`;
   sheet(`<h3>Clôturer la liste</h3>
     ${left.length ? `<p class="muted">${left.length} article${left.length > 1 ? 's' : ''} non acheté${left.length > 1 ? 's' : ''}. Où ${left.length > 1 ? 'les' : 'le'} reporter ?</p>
-    ${left.map((i) => `<div class="row line"><span class="grow">${qtyText(i.qty)} × ${esc(i.name)}</span>${opts(i)}</div>`).join('')}` : '<p class="muted">Tous les articles ont été achetés.</p>'}
+    ${left.map((i) => `<div class="row line"><span class="grow">${qtyText(i.qty)} × ${esc(i.name)}</span>${opts(i)}</div>`).join('')}` : '<p class="muted">Tout a été acheté : la liste passe dans l’historique.</p>'}
     ${current.items.some((i) => i.suggestion) ? '<p class="muted small">Les suggestions en attente seront abandonnées.</p>' : ''}
     <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="list-close-ok">Clôturer</button></div>`);
 }
@@ -803,7 +859,7 @@ const afterSugg = async (msg) => { toast(msg); summary = null; await Promise.all
 on('click', 'fsugg-ok', async (el) => { if (await attempt(() => post(hp(`/items/${el.dataset.id}/accept`)))) afterSugg('Suggestion acceptée'); });
 on('click', 'fsugg-no', async (el) => { if (await attempt(() => post(hp(`/items/${el.dataset.id}/refuse`)))) afterSugg('Suggestion refusée'); });
 
-export const listNeedsLoad = () => !summary;
+export const listNeedsLoad = () => !summary || !backlogList;
 export const resetLists = () => { summary = null; };
 
 on('click', 'store-advice', (el) => {
