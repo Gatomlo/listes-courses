@@ -343,14 +343,21 @@ VIEWS.shop = (t) => {
       ${order.map((c) => [c, todo.filter((i) => P[i.pid].cat === c)]).filter(([, xs]) => xs.length).map(([c, xs]) => `<div class="rayon">${CATS[c]}<span class="n">${xs.length}</span></div>
         <div class="group">${xs.map((i) => `<div class="item"><button class="ck" data-a="shop-check" data-id="${i.id}" aria-label="Dans le caddie">${I('check')}</button><button class="grow" style="text-align:left" data-a="shop-check" data-id="${i.id}"><div class="nm">${P[i.pid].n}</div><div class="meta"><span>${qtyText(i)}</span>${i.note ? `<span>${esc(i.note)}</span>` : ''}${i.need ? `<span>${i.need}</span>` : ''}${badge(i) ? `<span>${badge(i)}</span>` : ''}</div></button></div>`).join('')}</div>`).join('')}
       ${!todo.length ? `<div class="empty">${I('check', 'l')}<p><b>Tout est dans le caddie.</b></p></div>` : ''}
-      ${cart.length ? `<div class="rayon">${I('cart', 's')} Dans le caddie<span class="n">${cart.length}</span></div><div class="group">${cart.map((i) => `<div class="item done"><button class="ck on" data-a="shop-uncheck" data-id="${i.id}" aria-label="Retirer du caddie">${I('check')}</button><div class="grow"><div class="nm">${P[i.pid].n}</div></div>${st === 'all' ? sp(boughtAt(i)) : ''}${i.paid ? `<b class="num small">${eur(i.paid)}</b>` : ''}</div>`).join('')}</div>` : ''}`,
+      ${cart.length ? `<div class="rayon">${I('cart', 's')} Dans le caddie<span class="n">${cart.length}</span></div><div class="group">${cart.map((i) => `<div class="item done"><button class="ck on" data-a="shop-uncheck" data-id="${i.id}" aria-label="Retirer du caddie">${I('check')}</button><div class="grow"><div class="nm">${P[i.pid].n}</div></div>${st === 'all' ? sp(boughtAt(i)) : ''}<button class="pill" data-a="shop-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid ? eur(i.paid) : `${I('plus', 's')} prix`}</button></div>`).join('')}</div>` : ''}`,
     dock: `<div class="btn-row">${bI('plus', isM() ? 'Ajouter un oubli' : 'Suggérer un article', `data-a="add-sheet" data-id="${l.id}"`)}<button class="btn" style="flex:3;background:${col}" data-a="shop-end" data-id="${l.id}" data-st="${st}">${st === 'all' ? 'Terminer les courses' : 'Terminer chez ' + STORES[st].n}</button></div>`,
   };
 };
 // Cocher : prix paye facultatif ; le magasin choisi est aussi le magasin d'achat.
+// Un seul appui : l'article est dans le caddie (magasin = celui ou l'on est). Le prix est facultatif :
+// bouton « ＋ prix » dans la notification, ou sur la ligne du caddie.
 A['shop-check'] = (el) => {
   const { i } = findItem(el.dataset.id), t = topV();
-  S.q.paid = ''; S.q.paidSt = t.st === 'all' ? storeOf(i) : t.st;
+  i.done = true; i.bt = t.st === 'all' ? storeOf(i) : t.st; queued(); render();
+  toast(`${P[i.pid].n} dans le caddie`, null, { label: '＋ prix', a: 'shop-price', id: i.id });
+};
+A['shop-price'] = (el) => {
+  const { i } = findItem(el.dataset.id), t = topV();
+  S.q.paid = ''; S.q.paidSt = i.bt || (t.st === 'all' ? storeOf(i) : t.st);
   live(() => `<h3>${P[i.pid].n}</h3><p class="lead">Prix payé ? Facultatif : il devient un relevé de prix.</p>
     <div class="paid">${S.q.paid ? (Number(S.q.paid) / 100).toFixed(2).replace('.', ',') + ' €' : '<span class="faint">— , — €</span>'}</div>
     ${activeStores().length > 1 ? `<div class="chips" style="justify-content:center;margin:0 0 10px"><span class="muted small" style="align-self:center">Magasin</span>${activeStores().map((s) => `<button class="chip ${S.q.paidSt === s ? 'on' : ''}" data-a="paid-st" data-s="${s}">${dotS(s)} ${STORES[s].n}</button>`).join('')}</div>` : ''}

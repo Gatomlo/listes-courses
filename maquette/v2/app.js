@@ -117,15 +117,15 @@ function live(fn, o = {}) { sheetFn = () => sheet(fn(), { ...o, keep: true }); s
 const refresh = () => sheetFn && sheetFn();
 function closeSheet() { $('layer').innerHTML = ''; sheetFn = null; }
 let toastT;
-function toast(msg, undo) {
+function toast(msg, undo, act) {
   document.querySelector('.toast')?.remove();
   const t = document.createElement('div');
   t.className = 'toast';
-  t.innerHTML = `<span>${msg}</span>${undo ? '<button data-a="undo">Annuler</button>' : ''}`;
+  t.innerHTML = `<span>${msg}</span>${undo ? '<button data-a="undo">Annuler</button>' : ''}${act ? `<button data-a="${act.a}" data-id="${act.id}">${act.label}</button>` : ''}`;
   $('layer').appendChild(t);
   A.undo = () => { t.remove(); undo && undo(); };
   clearTimeout(toastT);
-  toastT = setTimeout(() => t.remove(), 2800);
+  toastT = setTimeout(() => t.remove(), act ? 4500 : 2800);
 }
 function confirmSheet(title, text, ok, fn, danger = true) {
   sheet(`<h3>${title}</h3><p class="lead">${text}</p><div class="foot"><button class="btn sec" data-a="close">Annuler</button><button class="btn ${danger ? 'danger' : ''}" data-a="confirm-ok">${ok}</button></div>`);

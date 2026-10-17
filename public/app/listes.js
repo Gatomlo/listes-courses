@@ -233,6 +233,7 @@ function itemRow(i, l, o = {}) {
   const right = i.suggestion && open
     ? (mgr ? `<button class="ib" data-a="sugg-no" data-id="${i.id}" aria-label="Refuser">${I('x')}</button><button class="btn sm" data-a="sugg-ok" data-id="${i.id}" aria-label="Accepter">${I('check', 's')}</button>`
       : mine ? `<button class="ib" data-a="item-del" data-id="${i.id}" aria-label="Retirer">${I('x')}</button>` : '')
+    : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click" data-a="item-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid != null ? esc(eur(i.paid)) : `${I('plus', 's')} prix`}</button>`
     : priced && dated && !o.shop ? `<span class="px">${price ? `<span class="price small">${price}</span>` : ''}${storeButton(i)}</span>` : '';
   const tap = open && !i.suggestion;
   return `<div class="item line1${i.suggestion ? ' pending' : ''}${i.status === 'bought' && open ? ' done' : ''}${i.deleted ? ' gone' : ''}" id="it${i.id}">${check}
@@ -614,9 +615,15 @@ on('click', 'item-check', async (el) => {
   const buying = i.status !== 'bought';
   // Magasin ou on est (mode « plusieurs magasins » : celui de l'article, modifiable au prix).
   const here = S.route[2] === 'tous' ? i.at_store_id : Number(S.route[2]);
+  // Un seul appui : l'article est dans le caddie. Le prix paye reste facultatif : bouton « ＋ prix » sur la ligne.
   await itemUpdate(i, buying ? { status: 'bought', bought_store_id: here } : { status: 'todo' });
-  // Mode courses : prix paye facultatif (devient un releve du magasin).
-  if (buying && S.route[0] === 'magasin') priceSheet(i, here);
+  if (!buying) delete i.paid;
+  else if (S.route[0] === 'magasin') toast(`${i.name} dans le caddie`, false, { label: '＋ prix', a: 'item-price', id: i.id });
+});
+on('click', 'item-price', (el) => {
+  document.querySelector('.toast')?.remove();
+  const i = current.items.find((x) => String(x.id) === el.dataset.id);
+  if (i && !isTemp(i.id)) priceSheet(i, i.bought_at || i.at_store_id);
 });
 function priceSheet(i, sid) {
   const avg = i.prices[sid];
@@ -635,6 +642,8 @@ on('click', 'price-ok', async (el) => {
   // Le magasin choisi est aussi celui ou l'article a ete pris.
   if (sid && sid !== (i.bought_at || i.at_store_id)) await itemUpdate(i, { status: 'bought', bought_store_id: sid });
   if (!String(f.price).trim()) return;
+  const cents = Math.round(parseFloat(String(f.price).replace(',', '.')) * 100);
+  if (cents > 0) { i.paid = cents; render(); }
   const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'record.add', product_id: i.product_id, store_id: sid, price: f.price, promo: f.promo })]));
   toast(r === null ? 'Prix gardé, envoyé au retour du réseau' : 'Relevé enregistré · moyenne recalculée');
 });

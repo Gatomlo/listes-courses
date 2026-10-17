@@ -82,13 +82,21 @@ export function confirmSheet({ title, text, ok = 'Confirmer', danger = false }) 
 
 // ---------- Message ----------
 let toastTimer;
-export function toast(msg, isError = false) {
+// action facultative : { label, a, id } -> bouton data-a (ex. « ＋ prix » apres avoir coche un article).
+export function toast(msg, isError = false, action = null) {
   let el = document.querySelector('.toast');
   if (!el) { el = document.createElement('div'); el.className = 'toast'; document.body.appendChild(el); }
   el.textContent = msg;
+  if (action) {
+    const b = document.createElement('button');
+    b.textContent = action.label;
+    b.dataset.a = action.a;
+    if (action.id != null) b.dataset.id = action.id;
+    el.appendChild(b);
+  }
   el.classList.toggle('err', isError);
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.remove(), isError ? 4500 : 2400);
+  toastTimer = setTimeout(() => el.remove(), isError ? 4500 : action ? 4500 : 2400);
 }
 
 // Valeurs d'un formulaire (champs name=...) d'un conteneur.
