@@ -371,6 +371,7 @@ export function storeListView(sid) {
   const done = items.filter((i) => i.status === 'bought');
   const st = all ? { itemsTotal: l.pricing ? l.pricing.split : 0, itemsUnknown: 0 } : (l.pricing && l.pricing.stores.find((x) => x.id === s.id)) || { itemsTotal: 0, itemsUnknown: 0 };
   const open = l.status !== 'closed';
+  const cartPx = (i) => i.prices[i.at_store_id], cartTotal = done.reduce((t, i) => t + (cartPx(i) != null ? cartPx(i) * i.qty : 0), 0), cartUnknown = done.filter((i) => cartPx(i) == null).length;
   const pct = items.length ? Math.round((done.length / items.length) * 100) : 0;
   const left = (id) => l.items.filter((i) => !i.suggestion && i.status === 'todo' && (id === 'tous' || i.at_store_id === id)).length;
   const tabs = activeStores().length > 1 ? `<div class="seg sticky">${[{ id: 'tous', name: 'Tous' }, ...activeStores()].map((x) => `<a class="${String(x.id) === String(s.id) ? 'on' : ''}" href="#/listes/${l.id}/magasin/${x.id}">${x.color ? `<span class="dot" style="background:${esc(x.color)}"></span>` : ''}${esc(x.name)} <span class="faint">${left(x.id)}</span></a>`).join('')}</div>` : '';
@@ -380,6 +381,7 @@ export function storeListView(sid) {
     body: `<div class="shop">${tabs}
       <div class="card" style="--c:${esc(s.color)};padding:0;overflow:hidden"><div class="shopbar"></div><div style="padding:14px 16px">
         <div class="row"><span class="mid grow">${done.length} / ${items.length}</span><span class="price muted">≈ ${eur(st.itemsTotal)}</span></div>
+        <div class="row small" style="margin-top:6px"><span class="grow muted">Dans le caddie${cartUnknown ? ` · ${cartUnknown} sans prix` : ''}</span><b class="price" style="color:var(--leaf)">≈ ${eur(cartTotal)}</b></div>
         <div class="prog" style="margin-top:10px"><i style="width:${pct}%;background:${esc(s.color)}"></i></div>
         ${others(l).length ? `<p class="row small muted" style="margin:10px 0 0">${I('users', 's')} ${esc(others(l).join(', '))} ${others(l).length > 1 ? 'sont' : 'est'} aussi sur cette liste · en direct</p>` : ''}</div></div>
       ${itemsBody(l, items, s.categoryOrder, { shop: true, allStores: all, empty: all ? 'Aucun article à prendre.' : `Aucun article prévu chez ${esc(s.name)}.` })}</div>`,
