@@ -85,14 +85,8 @@ export function platsView() {
       <div class="muted small">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.next_date ? `<span style="color:var(--leaf);font-weight:600">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric' }))}</span>` : d.last_date ? `il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</div></div></a>`;
   };
   const search = `<div class="search grow">${I('search')}<input class="txt" id="dish-q" placeholder="Plat, ingrédient, recette…" value="${esc(q)}" data-in="dish-q"></div>`;
-  // Telephone : filtres dans un panneau (bouton a cote de la recherche), filtres actifs en pastilles.
-  // PC : tous les filtres sur une ligne (passe a la ligne si la place manque).
-  const filters = isPc() ? `${search}
-      <div class="frow"><div class="fgrp">${FILTERS.map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="dish-filter" data-f="${k}">${t}</button>`).join('')}</div>
-      <div class="fgrp"><span class="flbl">Repas</span>${SLOT_ORDER.map((k) => `<button class="${sl === k ? 'on' : ''}" data-a="dish-slot" data-t="${k}">${SLOT[k]}</button>`).join('')}</div>
-      <div class="fgrp">${ddBtn('type', 'Type', ty, 'Tous')}${ddBtn('tag', 'Tag', tg && `#${tg}`, 'Tous')}</div>
-      <div class="fgrp"><span class="flbl">Prix / pers.</span>${PRICES.filter(([k]) => k).map(([k, t]) => `<button class="${S.q.dishPrice === k ? 'on' : ''}" data-a="dish-price" data-k="${k}">${t}</button>`).join('')}</div></div>`
-    : `<div class="row gap">${search}<button class="btn sec2 fbtn" data-a="dish-filters" aria-label="Filtres">${I('sliders')}${act.length ? `<span class="badge">${act.length}</span>` : ''}</button></div>
+  // Un seul bouton de filtres (a cote de la recherche) ouvre un panneau ; filtres actifs en pastilles retirables.
+  const filters = `<div class="row gap">${search}<button class="btn sec2 fbtn" data-a="dish-filters" aria-label="Filtres">${I('sliders')}${act.length ? `<span class="badge">${act.length}</span>` : ''}</button></div>
       ${act.length ? `<div class="pills" style="margin:8px 2px 0">${act.map(([k, t]) => `<button class="pill p-grey" data-a="dish-unset" data-k="${k}">${esc(t)} ✕</button>`).join('')}</div>` : ''}`;
   return {
     title: 'Plats', sub: `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`, large: true,
