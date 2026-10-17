@@ -341,7 +341,7 @@ VIEWS.shop = (t) => {
       <div class="hstack small muted" style="margin-top:10px">${avatar(MEMBERS[1], 's')} Léa est aussi sur cette liste</div></div></div>
       ${others.length ? `<div class="chips small" style="margin:6px 0 4px"><span class="muted">Aussi afficher :</span>${others.map((s) => `<button class="chip ${hidden.includes(s) ? '' : 'on'}" data-a="shop-filter" data-id="${l.id}" data-s="${s}">${dotS(s)} ${STORES[s].n} <span class="n">${real.filter((i) => !i.done && storeOf(i) === s).length}</span></button>`).join('')}</div>` : ''}
       ${order.map((c) => [c, todo.filter((i) => P[i.pid].cat === c)]).filter(([, xs]) => xs.length).map(([c, xs]) => `<div class="rayon">${CATS[c]}<span class="n">${xs.length}</span></div>
-        <div class="group">${xs.map((i) => `<div class="item"><button class="ck" data-a="shop-check" data-id="${i.id}" aria-label="Dans le caddie">${I('check')}</button><button class="grow" style="text-align:left" data-a="shop-check" data-id="${i.id}"><div class="nm">${P[i.pid].n}</div><div class="meta"><span>${qtyText(i)}</span>${i.note ? `<span>${esc(i.note)}</span>` : ''}${i.need ? `<span>${i.need}</span>` : ''}${badge(i) ? `<span>${badge(i)}</span>` : ''}</div></button></div>`).join('')}</div>`).join('')}
+        <div class="group">${xs.map((i) => `<div class="item"><button class="ck" data-a="shop-check" data-id="${i.id}" aria-label="Dans le caddie">${I('check')}</button><button class="grow" style="text-align:left" data-a="shop-check" data-id="${i.id}"><div class="nm">${P[i.pid].n}</div><div class="meta"><span>${qtyText(i)}</span>${i.note ? `<span>${esc(i.note)}</span>` : ''}${i.need ? `<span>${i.need}</span>` : ''}${badge(i) ? `<span>${badge(i)}</span>` : ''}</div></button>${isM() ? `<button class="ib" data-a="shop-del" data-id="${i.id}" aria-label="Retirer de la liste">${I('x', 's')}</button>` : ''}</div>`).join('')}</div>`).join('')}
       ${!todo.length ? `<div class="empty">${I('check', 'l')}<p><b>Tout est dans le caddie.</b></p></div>` : ''}
       ${cart.length ? `<div class="rayon">${I('cart', 's')} Dans le caddie<span class="n">${cart.length}</span></div><div class="group">${cart.map((i) => `<div class="item done"><button class="ck on" data-a="shop-uncheck" data-id="${i.id}" aria-label="Retirer du caddie">${I('check')}</button><div class="grow"><div class="nm">${P[i.pid].n}</div></div>${st === 'all' ? sp(boughtAt(i)) : ''}<button class="pill" data-a="shop-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid ? eur(i.paid) : `${I('plus', 's')} prix`}</button></div>`).join('')}</div>` : ''}`,
     dock: `<div class="btn-row">${bI('plus', isM() ? 'Ajouter un oubli' : 'Suggérer un article', `data-a="add-sheet" data-id="${l.id}"`)}<button class="btn" style="flex:3;background:${col}" data-a="shop-end" data-id="${l.id}" data-st="${st}">${st === 'all' ? 'Terminer les courses' : 'Terminer chez ' + STORES[st].n}</button></div>`,
@@ -367,6 +367,12 @@ A['shop-price'] = (el) => {
 A['paid-st'] = (el) => { S.q.paidSt = el.dataset.s; refresh(); };
 A.pad = (el) => { const k = el.dataset.k; S.q.paid = k === 'C' ? '' : k === '⌫' ? S.q.paid.slice(0, -1) : (S.q.paid + k).slice(0, 6); refresh(); };
 A['shop-ok'] = (el) => { const { i } = findItem(el.dataset.id); i.done = true; i.bt = S.q.paidSt || storeOf(i); if (!el.dataset.skip && S.q.paid) i.paid = Number(S.q.paid); queued(); closeSheet(); toast(`${P[i.pid].n} dans le caddie · ${STORES[i.bt].n}${i.paid ? ' · relevé ' + eur(i.paid) : ''}`); render(); };
+// Retirer un article depuis le mode courses (gestionnaire) : marche hors-ligne, « Annuler » le remet.
+A['shop-del'] = (el) => {
+  const { i, l } = findItem(el.dataset.id), k = l.items.indexOf(i);
+  l.items.splice(k, 1); queued(); render();
+  toast(`${P[i.pid].n} retiré de la liste`, () => { l.items.splice(k, 0, i); render(); });
+};
 A['shop-uncheck'] = (el) => { const { i } = findItem(el.dataset.id); i.done = false; i.bt = null; queued(); render(); };
 // Fin d'un passage : articles non pris -> continuer ailleurs / reporter et cloturer / indisponibles.
 A['shop-end'] = (el) => {

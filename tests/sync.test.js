@@ -103,3 +103,14 @@ test('temps reel : presence et changement diffuse aux autres', async () => {
   assert.ok(ch, 'changement recu');
   assert.equal(ch.listId, lid);
 });
+
+test('item.remove : gestionnaire seulement, article retire (mode courses)', async () => {
+  const oeufs = (await thomas.post(`${h}/lists/${lid}/items`, { product_id: P.oeufs })).data.items.find((i) => i.product_id === P.oeufs && !i.suggestion);
+  let r = await sync(lea, [{ op_id: 'rm-1', at: Date.now(), type: 'item.remove', item_id: oeufs.id }]);
+  assert.equal(r.data.results[0].ok, false, 'un membre ne retire pas');
+  r = await sync(thomas, [{ op_id: 'rm-2', at: Date.now(), type: 'item.remove', item_id: oeufs.id }]);
+  assert.ok(r.data.results[0].ok);
+  assert.ok(!item(await list(), 'oeufs'));
+  r = await sync(thomas, [{ op_id: 'rm-3', at: Date.now(), type: 'item.remove', item_id: oeufs.id }]);
+  assert.ok(r.data.results[0].ok && r.data.results[0].ignored, 'deja retire : ignore');
+});

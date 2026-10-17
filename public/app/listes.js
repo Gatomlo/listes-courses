@@ -233,6 +233,7 @@ function itemRow(i, l, o = {}) {
   const right = i.suggestion && open
     ? (mgr ? `<button class="ib" data-a="sugg-no" data-id="${i.id}" aria-label="Refuser">${I('x')}</button><button class="btn sm" data-a="sugg-ok" data-id="${i.id}" aria-label="Accepter">${I('check', 's')}</button>`
       : mine ? `<button class="ib" data-a="item-del" data-id="${i.id}" aria-label="Retirer">${I('x')}</button>` : '')
+    : o.shop && open && mgr && i.status === 'todo' && !isTemp(i.id) ? `<button class="ib" data-a="shop-del" data-id="${i.id}" aria-label="Retirer de la liste" title="Retirer de la liste">${I('x', 's')}</button>`
     : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click" data-a="item-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid != null ? esc(eur(i.paid)) : `${I('plus', 's')} prix`}</button>`
     : priced && dated && !o.shop ? `<span class="px">${price ? `<span class="price small">${price}</span>` : ''}${storeButton(i)}</span>` : '';
   const tap = open && !i.suggestion;
@@ -619,6 +620,23 @@ on('click', 'item-check', async (el) => {
   await itemUpdate(i, buying ? { status: 'bought', bought_store_id: here } : { status: 'todo' });
   if (!buying) delete i.paid;
   else if (S.route[0] === 'magasin') toast(`${i.name} dans le caddie`, false, { label: '＋ prix', a: 'item-price', id: i.id });
+});
+// Retirer un article depuis le mode courses (gestionnaire) : marche hors-ligne, « Annuler » le remet.
+on('click', 'shop-del', async (el) => {
+  const i = current.items.find((x) => String(x.id) === el.dataset.id);
+  if (!i || isTemp(i.id)) return;
+  const back = { product_id: i.product_id, qty: i.manual_qty || i.qty, name: i.name };
+  await runOps([newOp({ type: 'item.remove', item_id: i.id })], (l) => { l.items = l.items.filter((x) => x.id !== i.id); });
+  lastRemoved = back;
+  toast(`${i.name} retiré de la liste`, false, { label: 'Annuler', a: 'shop-del-undo' });
+});
+let lastRemoved = null;
+on('click', 'shop-del-undo', async () => {
+  document.querySelector('.toast')?.remove();
+  if (!lastRemoved) return;
+  const b = lastRemoved; lastRemoved = null;
+  await runOps([newOp({ type: 'item.add', list_id: current.id, product_id: b.product_id, qty: b.qty })], () => {});
+  toast(`${b.name} remis dans la liste`);
 });
 on('click', 'item-price', (el) => {
   document.querySelector('.toast')?.remove();
