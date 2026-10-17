@@ -394,3 +394,7 @@ ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;
   .topsheet{position:relative;left:auto;right:28px;top:62px;width:440px;max-height:calc(100% - 90px);border-radius:24px;padding:20px 22px 22px;animation:pop .2s cubic-bezier(.2,.9,.25,1)}
   .topsheet .handle{display:none}
 }
+
+/* Mode courses : controle compact des autres magasins */
+.fbar{display:flex;align-items:center;gap:10px;width:100%;min-height:40px;margin:2px 0 8px;padding:0 12px;border-radius:12px;border:1.5px solid var(--line);color:var(--muted);font-size:13px;font-weight:600;text-align:left}
+.fbar .dots{display:flex;gap:3px}

@@ -322,7 +322,17 @@ A['shop-pick'] = (el) => {
     ${ex ? '' : `<button class="row tap" data-a="shop-go" data-id="${l.id}" data-st="all" data-sw="${sw || ''}"><span class="ico acc">${I('cart')}</span><span class="grow"><b>Plusieurs magasins</b><span class="sub" style="display:block">Chaque article chez son magasin conseillé · magasin choisi au cochage</span></span>${I('arrowR')}</button>`}</div>`);
 };
 A['shop-go'] = (el) => { closeSheet(); (el.dataset.sw ? replace : go)('shop', { id: el.dataset.id, st: el.dataset.st }); };
-A['shop-filter'] = (el) => { const k = 'shf' + el.dataset.id, h = S.q[k] || []; S.q[k] = h.includes(el.dataset.s) ? h.filter((x) => x !== el.dataset.s) : [...h, el.dataset.s]; render(); };
+const shopOthers = (l, st) => activeStores().filter((s) => s !== st && counted(l).some((i) => !i.done && storeOf(i) === s));
+const shopFilterHtml = () => {
+  const { id, st } = S.q.sf, l = listById(id), hid = S.q['shf' + id] || [];
+  return `<h3>Articles conseillés ailleurs</h3><p class="lead">Cochez les magasins dont vous voulez voir les articles pendant les courses chez ${STORES[st].n}.</p>
+    <div class="group">${shopOthers(l, st).map((s) => { const n = counted(l).filter((i) => !i.done && storeOf(i) === s).length, on = !hid.includes(s);
+      return `<button class="row tap" data-a="shop-filter" data-s="${s}">${dotS(s)}<span class="grow"><b>${STORES[s].n}</b></span><span class="sub">${plural(n, 'article')}</span><span class="ck sq ${on ? 'on' : ''}" aria-hidden="true">${on ? I('check') : ''}</span></button>`; }).join('')}</div>
+    <div class="foot"><button class="btn sec" data-a="shop-filter-all" data-v="none">Seulement ici</button><button class="btn sec" data-a="shop-filter-all" data-v="all">Tout afficher</button><button class="btn" data-a="close">OK</button></div>`;
+};
+A['shop-filters'] = (el) => { S.q.sf = { id: el.dataset.id, st: el.dataset.st }; live(shopFilterHtml); };
+A['shop-filter'] = (el) => { const k = 'shf' + S.q.sf.id, h = S.q[k] || []; S.q[k] = h.includes(el.dataset.s) ? h.filter((x) => x !== el.dataset.s) : [...h, el.dataset.s]; render(); refresh(); };
+A['shop-filter-all'] = (el) => { S.q['shf' + S.q.sf.id] = el.dataset.v === 'none' ? shopOthers(listById(S.q.sf.id), S.q.sf.st) : []; render(); refresh(); };
 VIEWS.shop = (t) => {
   const l = listById(t.id), st = t.st, col = shopColor(st), hidden = S.q['shf' + l.id] || [], real = counted(l);
   // Dans un magasin : ce qui reste (sauf magasins masques) et ce qui y a ete pris.
@@ -334,12 +344,12 @@ VIEWS.shop = (t) => {
   const badge = (i) => (st === 'all' ? sp(storeOf(i)) : storeOf(i) !== st ? sp(storeOf(i), 'conseillé chez ' + STORES[storeOf(i)].n) : '');
   return {
     title: shopName(st), cls: 'shop', noTabs: true,
-    body: `<div class="seg" style="margin-bottom:10px">${[...activeStores(), 'all'].map((s) => `<button class="${s === st ? 'on' : ''}" data-a="shop-go" data-id="${l.id}" data-st="${s}" data-sw="1">${s === 'all' ? 'Plusieurs' : STORES[s].n}</button>`).join('')}</div>
-      <div class="card" style="--c:${col};margin-bottom:6px;overflow:hidden;padding:0"><div class="shopbar"></div><div style="padding:14px 16px">
+    actions: activeStores().length > 1 ? `<button class="ib" data-a="shop-pick" data-id="${l.id}" data-sw="1" aria-label="Changer de magasin">${I('store')}</button>` : '',
+    body: `<div class="card" style="--c:${col};margin-bottom:6px;overflow:hidden;padding:0"><div class="shopbar"></div><div style="padding:14px 16px">
       <div class="between"><span class="mid">${cart.length} / ${mine.length}</span><span class="muted small">${listName(l)}</span></div>
       <div class="prog" style="margin-top:10px"><i style="width:${pct}%;background:${col}"></i></div>
       <div class="hstack small muted" style="margin-top:10px">${avatar(MEMBERS[1], 's')} Léa est aussi sur cette liste</div></div></div>
-      ${others.length ? `<div class="chips small" style="margin:6px 0 4px"><span class="muted">Aussi afficher :</span>${others.map((s) => `<button class="chip ${hidden.includes(s) ? '' : 'on'}" data-a="shop-filter" data-id="${l.id}" data-s="${s}">${dotS(s)} ${STORES[s].n} <span class="n">${real.filter((i) => !i.done && storeOf(i) === s).length}</span></button>`).join('')}</div>` : ''}
+      ${others.length ? `<button class="fbar" data-a="shop-filters" data-id="${l.id}" data-st="${st}"><span class="dots">${others.filter((s) => !hidden.includes(s)).slice(0, 4).map(dotS).join('')}</span><span class="grow">${!hidden.length ? 'Articles des autres magasins affichés' : others.some((s) => !hidden.includes(s)) ? `${others.filter((s) => !hidden.includes(s)).length} autre(s) magasin(s) affiché(s) · ${real.filter((i) => !i.done && hidden.includes(storeOf(i)) && storeOf(i) !== st).length} masqué(s)` : `Seulement ce magasin · ${real.filter((i) => !i.done && hidden.includes(storeOf(i)) && storeOf(i) !== st).length} masqué(s)`}</span>${I('down', 's')}</button>` : ''}
       ${order.map((c) => [c, todo.filter((i) => P[i.pid].cat === c)]).filter(([, xs]) => xs.length).map(([c, xs]) => `<div class="rayon">${CATS[c]}<span class="n">${xs.length}</span></div>
         <div class="group">${xs.map((i) => `<div class="item"><button class="ck" data-a="shop-check" data-id="${i.id}" aria-label="Dans le caddie">${I('check')}</button><button class="grow" style="text-align:left" data-a="shop-check" data-id="${i.id}"><div class="nm">${P[i.pid].n}</div><div class="meta"><span>${qtyText(i)}</span>${i.note ? `<span>${esc(i.note)}</span>` : ''}${i.need ? `<span>${i.need}</span>` : ''}${badge(i) ? `<span>${badge(i)}</span>` : ''}</div></button>${isM() ? `<button class="ib" data-a="shop-del" data-id="${i.id}" aria-label="Retirer de la liste">${I('x', 's')}</button>` : ''}</div>`).join('')}</div>`).join('')}
       ${!todo.length ? `<div class="empty">${I('check', 'l')}<p><b>Tout est dans le caddie.</b></p></div>` : ''}

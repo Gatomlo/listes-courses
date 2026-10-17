@@ -392,11 +392,28 @@ on('click', 'close-go', (el) => { closeSheet(); go(el.getAttribute('href')); });
 
 // Magasins dont les articles sont masques en mode courses (par liste, sur l'appareil).
 const hiddenStores = (l) => S.q[`shopf${l.id}`] || [];
+on('click', 'shop-switch', () => shopPickSheet(current));
+function shopFilterSheet() {
+  const l = current, sid = Number(S.route[2]), real = l.items.filter((i) => !i.suggestion);
+  const others = activeStores().filter((x) => x.id !== sid && real.some((i) => i.at_store_id === x.id && i.status !== 'bought'));
+  const hid = hiddenStores(l);
+  sheet(`<h3>Articles conseillés ailleurs</h3><p class="muted small">Cochez les magasins dont vous voulez voir les articles pendant les courses chez ${esc(storeName(sid))}.</p>
+    <div class="group">${others.map((x) => { const n = real.filter((i) => i.at_store_id === x.id && i.status === 'todo').length; const on = !hid.includes(x.id);
+      return `<button class="item click" data-a="shop-filter" data-sid="${x.id}"><span class="dot" style="background:${esc(x.color)}"></span><span class="grow">${esc(x.name)}</span><span class="muted small">${plural(n, 'article')}</span><span class="chk${on ? ' on' : ''}" aria-hidden="true">${on ? I('check') : ''}</span></button>`; }).join('')}</div>
+    <div class="row gap" style="margin-top:12px"><button class="btn sec2 grow" data-a="shop-filter-all" data-v="none">Seulement ici</button><button class="btn sec2 grow" data-a="shop-filter-all" data-v="all">Tout afficher</button></div>
+    <div class="row end"><button class="btn" data-a="close">OK</button></div>`);
+}
+on('click', 'shop-filters', () => shopFilterSheet());
 on('click', 'shop-filter', (el) => {
   const k = `shopf${current.id}`, id = Number(el.dataset.sid), cur = hiddenStores(current);
   S.q[k] = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-  render();
+  render(); shopFilterSheet();
 });
+on('click', 'shop-filter-all', (el) => {
+  S.q[`shopf${current.id}`] = el.dataset.v === 'none' ? activeStores().map((x) => x.id) : [];
+  render(); shopFilterSheet();
+});
+
 export function storeListView(sid) {
   if (!current) return { title: 'Chargement…', body: '' };
   const l = current, all = sid === 'tous', s = all ? { id: 'tous', name: 'Plusieurs magasins', color: 'var(--leaf)', categoryOrder: categoryOrder() } : storeById(Number(sid));
@@ -414,14 +431,17 @@ export function storeListView(sid) {
   const open = l.status !== 'closed';
   const pct = items.length ? Math.round((done.length / items.length) * 100) : 0;
   const stores = activeStores();
-  const where = stores.length > 1 ? `<div class="seg sticky">${[...stores, { id: 'tous', name: 'Plusieurs', color: '' }].map((x) => `<a class="${String(x.id) === String(s.id) ? 'on' : ''}" href="#/listes/${l.id}/magasin/${x.id}">${x.color ? `<span class="dot" style="background:${esc(x.color)}"></span>` : ''}${esc(x.name)}</a>`).join('')}</div>` : '';
-  // Filtre : afficher aussi les articles conseillés dans d'autres magasins.
+  // Autres magasins : un seul controle compact (resume + panneau), quel que soit leur nombre.
   const other = all ? [] : stores.filter((x) => x.id !== s.id && real.some((i) => i.at_store_id === x.id && i.status !== 'bought'));
-  const filt = other.length ? `<div class="row wrap small" style="margin:0 0 10px"><span class="muted">Aussi afficher :</span>${other.map((x) => `<button class="chip${hidden.includes(x.id) ? '' : ' on'}" data-a="shop-filter" data-sid="${x.id}" aria-pressed="${!hidden.includes(x.id)}"><span class="dot" style="background:${esc(x.color)}"></span>${esc(x.name)} · ${real.filter((i) => i.at_store_id === x.id && i.status === 'todo').length}</button>`).join('')}</div>` : '';
+  const shown = other.filter((x) => !hidden.includes(x.id));
+  const hiddenN = real.filter((i) => i.status !== 'bought' && hidden.includes(i.at_store_id) && i.at_store_id !== s.id).length;
+  const filt = other.length ? `<button class="fbar" data-a="shop-filters"><span class="dots">${shown.slice(0, 4).map((x) => `<span class="dot" style="background:${esc(x.color)}"></span>`).join('')}</span>
+    <span class="grow">${!hidden.length ? 'Articles des autres magasins affichés' : shown.length ? `${shown.length} autre${shown.length > 1 ? 's' : ''} magasin${shown.length > 1 ? 's' : ''} affiché${shown.length > 1 ? 's' : ''} · ${hiddenN} masqué${hiddenN > 1 ? 's' : ''}` : `Seulement ce magasin · ${hiddenN} masqué${hiddenN > 1 ? 's' : ''}`}</span>${I('down', 's')}</button>` : '';
   const endLbl = all ? 'Terminer les courses' : `Terminer chez ${s.name}`;
   return {
     title: s.name, back: `#/listes/${l.id}`, noNav: true, sub: `Courses du ${shortTitle(l)}`,
-    body: `<div class="shop">${where}
+    right: stores.length > 1 ? `<button class="ib" data-a="shop-switch" aria-label="Changer de magasin" title="Changer de magasin">${I('store')}</button>` : '',
+    body: `<div class="shop">
       <div class="card" style="--c:${esc(s.color)};padding:0;overflow:hidden"><div class="shopbar"></div><div style="padding:14px 16px">
         <div class="row"><span class="mid grow">${done.length} / ${items.length}</span><span class="price muted">≈ ${eur(total)}</span></div>
         <div class="row small" style="margin-top:6px"><span class="grow muted">Dans le caddie${cartUnknown ? ` · ${cartUnknown} sans prix` : ''}</span><b class="price" style="color:var(--leaf)">≈ ${eur(cartTotal)}</b></div>
