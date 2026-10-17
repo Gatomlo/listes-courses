@@ -15,7 +15,7 @@ test('tags : saisie, doublons, renommer, fusionner, supprimer, droits', async ()
   assert.deepEqual(a.tags, ['Rapide', 'Végé']);
   const b = (await thomas.post(`${h}/dishes`, { name: 'Soupe', tags: ['RAPIDE', 'Hiver', 'Végétarien'] })).data;
   assert.deepEqual(b.tags, ['Hiver', 'Rapide', 'Végétarien']);
-  assert.equal((await thomas.get(`${h}/tags`)).data.length, 4);
+  assert.equal((await thomas.get(`${h}/tags`)).data.filter((t) => !t.auto).length, 4);
   assert.equal((await tag('Rapide')).dishes, 2);
 
   // Fusion « Végé » -> « Végétarien »
