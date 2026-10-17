@@ -1,6 +1,6 @@
 // Menu : planning des repas (jours x creneaux ; grille semaine sur PC), ajout d'un plat
 // avec ingredients en reserve, fiche repas, export / impression, lien d'affichage.
-import { esc, eur, fmtDate, on, sheet, closeSheet, confirmSheet, toast, isPc, localDay } from './ui.js';
+import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, isPc, localDay } from './ui.js';
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
 import { SLOT, tagChips, allTags, loadDishes, newDishFrom, chosenOf, dishIngredients, tile, ppShort } from './plats.js';
@@ -42,7 +42,8 @@ function mealBtn(m, label) {
   return `<button class="meal${m.suggestion ? ' pending' : ''}"${drag} data-a="meal-open" data-id="${m.id}" data-date="${m.date}">${label ? `<span class="sl">${SLOT[m.slot]}</span>` : ''}<span class="nm">${m.parts?.length ? I('puzzle', 's') + ' ' : ''}${esc(m.dish)}</span>${m.suggestion ? '<span class="pill p-carrot">suggéré</span>' : m.persons !== 4 ? `<span class="pill">${m.persons} p.</span>` : ''}</button>`;
 }
 // Repas a l'exterieur : mention a la place d'un plat (fiche : note, retirer).
-const outBtn = (o, label) => `<button class="meal out" data-a="out-open" data-date="${o.date}" data-slot="${o.slot}">${label ? `<span class="sl">${SLOT[o.slot]}</span>` : ''}<span class="nm">${I('pin', 's')} À l’extérieur${o.note ? `<span class="muted small block">${esc(o.note)}</span>` : ''}</span></button>`;
+export const outLabel = (o) => (o.rest ? `Restes${o.dish ? ` · ${o.dish}` : ''}` : 'À l’extérieur');
+const outBtn = (o, label) => `<button class="meal out${o.rest ? ' rest' : ''}" data-a="out-open" data-date="${o.date}" data-slot="${o.slot}">${label ? `<span class="sl">${SLOT[o.slot]}</span>` : ''}<span class="nm">${I(o.rest ? 'repeat' : 'pin', 's')} ${esc(outLabel(o))}${o.note ? `<span class="muted small block">${esc(o.note)}</span>` : ''}</span></button>`;
 const cell = (d, s, label) => { const o = outAt(d, s), m = mealAt(d, s); return o ? outBtn(o, label) : m ? mealBtn(m, label) : addBtn(d, s, label); };
 const addBtn = (d, s, label) => `<button class="add" data-a="meal-add" data-date="${d}" data-slot="${s}" aria-label="Ajouter un plat">${I('plus', 's')}${label ? ` ${SLOT[s]}` : ''}</button>`;
 
@@ -59,10 +60,11 @@ function budgetCard() {
     const k = Math.floor((Date.parse(m.date) - Date.parse(menu.from)) / 86400000 / 7);
     weeks[k] = (weeks[k] || 0) + m.cost;
   }
-  const wk = weeks.length > 1 ? `<div class="small" style="margin-top:8px;display:grid;gap:2px">${weeks.map((t, k) => (t == null ? '' : `<div class="row"><span class="grow muted">Semaine du ${esc(fmtDate(addDays(menu.from, 7 * k), { day: 'numeric', month: 'short' }))}</span><b class="price">${eur(t)}</b></div>`)).join('')}</div>` : '';
-  return `<div class="card" style="margin:8px 0"><div class="row" style="gap:10px"><span class="ico leaf">${I('tag')}</span><span class="grow"><b>Budget estimé : ${c.partial ? 'dès ' : '≈ '}${eur(c.total)}</b>
-    <span class="muted small block">${persons ? `≈ ${eur(Math.round(c.total / persons))} par personne et par repas` : ''}${note}</span></span></div>${wk}</div>`;
+  const wk = weeks.length > 1 && S.q.budgetOpen ? `<div class="small" style="margin-top:8px;display:grid;gap:2px">${weeks.map((t, k) => (t == null ? '' : `<div class="row"><span class="grow muted">Semaine du ${esc(fmtDate(addDays(menu.from, 7 * k), { day: 'numeric', month: 'short' }))}</span><b class="price">${eur(t)}</b></div>`)).join('')}</div>` : '';
+  return `<div class="card" style="margin:8px 0"><button class="row" style="gap:10px;width:100%;background:none;border:0;padding:0;text-align:left;color:inherit" data-a="budget-toggle" ${weeks.length > 1 ? '' : 'disabled'}><span class="ico leaf">${I('tag')}</span><span class="grow"><b>Budget estimé : ${c.partial ? 'dès ' : '≈ '}${eur(c.total)}</b>
+    <span class="muted small block">${persons ? `≈ ${eur(Math.round(c.total / persons))} par personne et par repas` : ''}${note}</span></span>${weeks.length > 1 ? I(S.q.budgetOpen ? 'up' : 'down', 's') : ''}</button>${wk}</div>`;
 }
+on('click', 'budget-toggle', () => { S.q.budgetOpen = !S.q.budgetOpen; render(); });
 export function menuView() {
   const days = []; for (let d = menu.from; d <= menu.to; d = addDays(d, 1)) days.push(d);
   const slots = slotsShown(), p = menu.period, mgr = isManager();
@@ -91,8 +93,8 @@ export function menuView() {
       <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}</div>
       ${body}
       ${wishesHtml()}
-      ${mgr ? `<div class="sec">Remarques</div><textarea class="txt" rows="3" maxlength="2000" placeholder="Remarques sur ce menu (imprimées avec l’export)" data-ch="menu-note">${esc(menu.note || '')}</textarea>`
-        : menu.note ? `<div class="sec">Remarques</div><div class="card pre">${esc(menu.note)}</div>` : ''}`,
+      ${mgr ? acc('menu_notes', { icon: I('note'), title: 'Remarques', sum: menu.note ? ' · notées' : ' · aucune', def: 'closed', body: `<textarea class="txt" rows="3" maxlength="2000" placeholder="Remarques sur ce menu (imprimées avec l’export)" data-ch="menu-note">${esc(menu.note || '')}</textarea>` })
+        : menu.note ? acc('menu_notes', { icon: I('note'), title: 'Remarques', def: 'closed', body: `<div class="card pre">${esc(menu.note)}</div>` }) : ''}`,
   };
 }
 // ---------- Envies de plats (sans date) ----------
@@ -104,7 +106,9 @@ function wishCard(w) {
   else acts.push(btnI('book', 'Fiche du plat', `href="#/plats/${w.dish_id}"`, 'sec2', 'a'));
   acts.push(btnI('calendar', mgr ? 'Mettre au menu' : 'Suggérer au menu', `data-a="plan-dish" data-id="${w.dish_id}"`, ''));
   if (mgr || (mine && w.status === 'pending')) acts.push(btnI('x', mgr && w.status === 'pending' ? 'Refuser l’envie' : 'Retirer l’envie', `data-a="wish-del" data-id="${w.id}"`, 'sec2 danger-t'));
-  return `<div class="card wish">${tile(w.name, w.status === 'pending' ? '<span class="pill">à valider</span>' : '', '', w.photo)}
+  // Gestionnaire : l'envie se glisse sur un creneau libre (souris, ou appui long sur telephone).
+  const drag = mgr && !w.draft ? `${isPc() ? ' draggable="true"' : ''} data-drag="w${w.dish_id}"` : '';
+  return `<div class="card wish"${drag}>${tile(w.name, w.status === 'pending' ? '<span class="pill">à valider</span>' : '', '', w.photo)}
     <b>${w.draft ? I('edit', 's') + ' ' : ''}${esc(w.name)}</b><span class="muted small">${w.created_by === S.me.id ? 'Votre envie' : `Envie de ${esc(w.created_by_name || '?')}`}</span>${wishCost(w)}
     <div class="btn-row icons">${acts.join('')}</div></div>`;
 }
@@ -270,8 +274,7 @@ document.addEventListener('drop', async (e) => {
   if (!td) return;
   e.preventDefault();
   const id = dragId; dragId = null; clearDrop();
-  const m = menu.meals.find((x) => x.id === Number(id));
-  if (m && (m.date !== td.dataset.drop || m.slot !== td.dataset.slot)) await moveMeal(id, td.dataset.drop, td.dataset.slot);
+  await dropOn(id, td.dataset.drop, td.dataset.slot);
 });
 // Telephone : appui long sur un repas, puis glisser du doigt vers un autre creneau.
 // Le repas suit le doigt ; la page defile pres des bords ; lacher hors creneau annule.
@@ -328,14 +331,24 @@ document.addEventListener('touchend', async () => {
   const id = touch.id, cell = touch.target;
   touchEnd();
   if (!id || !cell) return;
-  const m = menu.meals.find((x) => x.id === Number(id));
-  if (m && (m.date !== cell.dataset.drop || m.slot !== cell.dataset.slot)) await moveMeal(id, cell.dataset.drop, cell.dataset.slot);
+  await dropOn(id, cell.dataset.drop, cell.dataset.slot);
 });
 document.addEventListener('touchcancel', touchEnd);
 // Apres un glisser, le « clic » qui suit le lacher n'ouvre pas la fiche du repas.
 document.addEventListener('click', (e) => { if (touch.swallow) { touch.swallow = false; e.stopPropagation(); e.preventDefault(); } }, true);
 document.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('[data-drag]') && !isPc()) e.preventDefault(); });
 
+// Lacher : repas deplace (id numerique) ou envie posee sur un creneau libre (id « w<plat> »).
+async function dropOn(id, date, slot) {
+  if (String(id).startsWith('w')) {
+    if (mealAt(date, slot) || outAt(date, slot)) { toast('Ce créneau est déjà pris : glissez l’envie sur un créneau libre.', true); return; }
+    const dish_id = Number(String(id).slice(1)), w = (S.wishes || []).find((x) => x.dish_id === dish_id);
+    if (await attempt(() => post(hp('/meals'), { date, slot, dish_id, persons: 4 }))) { toast(`${w ? w.name : 'Plat'} au menu`); afterChange(); }
+    return;
+  }
+  const m = menu.meals.find((x) => x.id === Number(id));
+  if (m && (m.date !== date || m.slot !== slot)) await moveMeal(id, date, slot);
+}
 async function moveMeal(id, date, slot) {
   const inMenu = menu && date >= menu.from && date <= menu.to;
   const other = inMenu ? menu.meals.find((x) => x.date === date && x.slot === slot && !x.suggestion && x.id !== Number(id)) : null;
@@ -380,7 +393,8 @@ function pickSheet() {
     ${tagChips('pick-tag', pm.tag)}
     <div class="pick">${list.map((d) => `<button class="card click" data-a="pick-dish" data-id="${d.id}"><b>${wished.has(d.id) ? `${I('bulb', 's')} ` : ''}${d.draft ? `${I('edit', 's')} ` : ''}${esc(d.name)}</b><span class="muted block">${d.parts ? `${I('puzzle', 's')} ${esc((d.part_names || []).join(', '))}` : d.ingredients ? `${d.ingredients} ingrédient${d.ingredients > 1 ? 's' : ''}` : 'rappel seulement'}${d.last_date ? ` · dernière fois le ${esc(fmtDate(d.last_date))}` : ''}</span>${d.cost_pp != null ? `<span class="price small">${esc(ppShort(d))} / pers.</span>` : ''}</button>`).join('') || '<p class="muted">Aucun plat.</p>'}</div>
     ${isManager() ? `<button class="btn sec2 full" data-a="pick-new">＋ Nouveau plat${pm.q ? ` « ${esc(pm.q)} »` : ''}</button>
-      <button class="btn sec2 full" style="margin-top:8px" data-a="out-set">${I('pin', 's')} Repas à l’extérieur</button>` : ''}`);
+      <button class="btn sec2 full" style="margin-top:8px" data-a="out-set">${I('pin', 's')} Repas à l’extérieur</button>
+      <button class="btn sec2 full" style="margin-top:8px" data-a="rest-set">${I('repeat', 's')} Restes</button>` : ''}`);
 }
 on('click', 'meal-add', (el) => { pm = { date: el.dataset.date, slot: el.dataset.slot, persons: 4, skip: [], q: '' }; pickSheet(); });
 on('input', 'pick-q', (el) => { pm.q = el.value; pickSheet(); const i = document.getElementById('pick-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
@@ -481,6 +495,7 @@ async function afterChange() {
 // ---------- Repas a l'exterieur (gestionnaire) ----------
 function outSheet(date, slot) {
   const o = outAt(date, slot), m = !o && mealAt(date, slot), mgr = isManager();
+  if (o && o.rest) { restSheet(date, slot); return; }
   sheet(`<h3>${I('pin', 's')} Repas à l’extérieur</h3><p class="muted">${esc(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[slot]}</p>
     ${mgr ? `<input class="txt" id="out-note" maxlength="200" placeholder="Où ? (restaurant, chez…) — facultatif" value="${esc(o?.note || '')}" data-enter="out-save" data-date="${date}" data-slot="${slot}">
       ${m && !m.suggestion ? `<p class="muted small">« ${esc(m.dish)} » sera retiré du menu (ingrédients retirés de la liste).</p>` : ''}
@@ -488,6 +503,27 @@ function outSheet(date, slot) {
       <button class="btn" data-a="out-save" data-date="${date}" data-slot="${slot}">Enregistrer</button></div>`
       : o?.note ? `<p>${esc(o.note)}</p>` : '<p class="muted">Pas de repas à préparer pour ce créneau.</p>'}`);
 }
+// ---------- Restes : repas sans achat (plat deja cuisine les 6 jours d'avant, ou restes divers) ----------
+let rs = null; // { date, slot, persons, id }
+function restSheet(date, slot) {
+  const o = outAt(date, slot);
+  if (!rs || rs.date !== date || rs.slot !== slot) rs = { date, slot, persons: (o && o.persons) || 2, id: o ? o.id : null };
+  const d0 = Date.parse(date), srcs = menu.meals.filter((m) => !m.suggestion && !m.dish_deleted && Date.parse(m.date) < d0 && (d0 - Date.parse(m.date)) / 86400000 <= 6)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.slot.localeCompare(a.slot));
+  sheet(`<h3>${I('repeat', 's')} Restes</h3><p class="muted">${esc(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[slot]}. Aucun achat : le repas ne compte ni dans la liste ni dans le budget.</p>
+    <div class="row"><span class="grow">Personnes</span><button class="btn sm sec2" data-a="rest-p" data-d="-1" aria-label="Moins">−</button><b class="c" style="min-width:26px;text-align:center">${rs.persons}</b><button class="btn sm sec2" data-a="rest-p" data-d="1" aria-label="Plus">＋</button></div>
+    <input class="txt" id="rest-note" maxlength="200" style="margin-top:10px" placeholder="Restes variés, frigo… (facultatif)" value="${esc(o?.note || '')}" data-enter="rest-ok" data-id="">
+    <div class="sec">Restes de…</div>
+    ${srcs.map((m) => `<button class="item click" data-a="rest-ok" data-id="${m.dish_id}"><span class="grow"><b>${esc(m.dish_name || m.dish)}</b><span class="muted block">${esc(fmtDate(m.date, { weekday: 'long', day: 'numeric' }))} · ${SLOT[m.slot]} · ${m.persons} pers.</span></span>${I('chev', 's chev')}</button>`).join('') || '<p class="muted small">Aucun repas des 6 derniers jours.</p>'}
+    <div class="row end" style="margin-top:12px">${o ? `<button class="btn sec2 danger-t" data-a="out-del" data-id="${o.id}">Retirer</button>` : ''}<button class="btn" data-a="rest-ok" data-id="">Sans plat précis</button></div>`);
+}
+on('click', 'rest-set', () => { rs = null; restSheet(pm.date, pm.slot); });
+on('click', 'rest-p', (el) => { const note = document.getElementById('rest-note')?.value || ''; rs.persons = Math.max(1, rs.persons + Number(el.dataset.d)); restSheet(rs.date, rs.slot); document.getElementById('rest-note').value = note; });
+on('click', 'rest-ok', async (el) => {
+  const note = document.getElementById('rest-note')?.value || '';
+  if (!(await attempt(() => put(hp('/outings'), { date: rs.date, slot: rs.slot, rest: true, dish_id: Number(el.dataset.id) || null, persons: rs.persons, note })))) return;
+  rs = null; closeSheet(); toast('Restes notés'); afterChange();
+});
 on('click', 'out-open', (el) => outSheet(el.dataset.date, el.dataset.slot));
 on('click', 'out-set', () => outSheet(pm.date, pm.slot));
 const saveOuting = async (date, slot) => {
@@ -576,7 +612,7 @@ function sheetHtml(d, household) {
     ${weeks.map((w) => `<table><colgroup><col class="c-sl">${'<col>'.repeat(7)}</colgroup><tr><th class="sl"></th>${w.map((x) => `<th>${esc(fmtDate(x, { weekday: 'short', day: 'numeric', month: 'short' }))}${ex.shop && shop.has(x) ? ` ${I('cart', 's')}` : ''}</th>`).join('')}${pad(w, 'th')}</tr>
       ${slots.map((s) => `<tr><td class="sl"><span>${SLOT[s]}</span></td>${w.map((x) => {
         const o = outs.find((y) => y.date === x && y.slot === s), m = meals.find((y) => y.date === x && y.slot === s);
-        return `<td>${o ? `<i class="out">À l’extérieur${o.note ? ` <span class="np">(${esc(o.note)})</span>` : ''}</i>` : m ? esc(m.dish) + (ex.persons ? ` <span class="np">(${m.persons} p.)</span>` : '') : ''}</td>`;
+        return `<td>${o ? `<i class="out">${esc(outLabel(o))}${o.note ? ` <span class="np">(${esc(o.note)})</span>` : ''}</i>` : m ? esc(m.dish) + (ex.persons ? ` <span class="np">(${m.persons} p.)</span>` : '') : ''}</td>`;
       }).join('')}${pad(w, 'td')}</tr>`).join('')}</table>`).join('')}
     ${ex.notes ? noteBox(d.note) : ''}
     <div class="foot"><span>Le Cabas</span><span>Imprimé le ${new Date().toLocaleDateString('fr-BE')}</span></div></div>`;

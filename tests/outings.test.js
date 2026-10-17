@@ -61,3 +61,17 @@ test('affichage public : mentions comprises', async () => {
   const p = (await thomas.get(`/api/public/menu/${token}?from=${d}&days=1`)).data;
   assert.deepEqual(p.outings, [{ date: d, slot: 'midi', note: 'Pique-nique' }]);
 });
+
+test('restes : creneau sans achat, plat facultatif', async () => {
+  const a = (await thomas.post(`${h}/dishes`, { name: 'Lasagnes' })).data.id;
+  const d = day(9);
+  assert.equal((await lea.put(`${h}/outings`, { date: d, slot: 'midi', rest: true })).status, 403);
+  assert.equal((await thomas.put(`${h}/outings`, { date: d, slot: 'midi', rest: true, dish_id: 99999 })).status, 404);
+  let o = (await thomas.put(`${h}/outings`, { date: d, slot: 'midi', rest: true, dish_id: a, persons: 2 })).data;
+  assert.equal(o.rest, true); assert.equal(o.dish, 'Lasagnes'); assert.equal(o.persons, 2);
+  o = (await thomas.put(`${h}/outings`, { date: d, slot: 'soir', rest: true, note: 'frigo' })).data;
+  assert.equal(o.rest, true); assert.equal(o.dish_id, null); assert.equal(o.note, 'frigo');
+  const m = await menuOf(d);
+  assert.equal(m.meals.length, 0);
+  assert.deepEqual(m.outings.map((x) => [x.slot, x.rest]), [['midi', true], ['soir', true]]);
+});

@@ -128,7 +128,7 @@ function todayCard(extra = '') {
   const t = todayMeals();
   if (!t || (!t.rows.length && !extra)) return '';
   const row = (r) => (r.out
-    ? `<a class="item click" href="#/menu"><span class="ico">${I('pin')}</span><span class="grow"><span class="faint small block">${SLOT[r.slot]}</span><b>À l’extérieur</b>${r.out.note ? `<span class="muted small block">${esc(r.out.note)}</span>` : ''}</span></a>`
+    ? `<a class="item click" href="#/menu"><span class="ico">${I('pin')}</span><span class="grow"><span class="faint small block">${SLOT[r.slot]}</span><b>${esc(r.out.rest ? `Restes${r.out.dish ? ` · ${r.out.dish}` : ''}` : 'À l’extérieur')}</b>${r.out.note ? `<span class="muted small block">${esc(r.out.note)}</span>` : ''}</span></a>`
     : `<div class="item"><button class="tm-o" data-a="meal-open" data-id="${r.meal.id}" data-date="${r.meal.date}">${tile(r.meal.dish_name, '', 'tm', r.meal.photo)}<span class="grow"><span class="faint small block">${SLOT[r.slot]} · ${r.meal.persons} pers.</span><b>${esc(r.meal.dish)}</b></span></button>
       ${r.meal.dish_deleted ? '' : `<a class="ib" href="#/plats/${r.meal.dish_id}/cuisine/${r.meal.persons}" aria-label="Cuisiner ${esc(r.meal.dish_name)}" title="Cuisiner">${I('flame')}</a>`}</div>`);
   return box(t.late ? 'Demain au menu' : 'Aujourd’hui au menu', '<a href="#/menu">Menu</a>', t.rows.map(row).join('') + extra, 'today-c');
@@ -236,7 +236,7 @@ function weekPreview() {
   const order = ['pdj', 'midi', 'coll', 'soir'], rank = (x) => { const i = order.indexOf(x); return i < 0 ? 9 : i; };
   return box('Cette semaine au menu', '<a href="#/menu">Menu</a>', days.map((d) => {
     const ms = [...meals.filter((m) => m.date === d).map((m) => ({ slot: m.slot, html: esc(m.dish) })),
-      ...(week.outings || []).filter((o) => o.date === d).map((o) => ({ slot: o.slot, html: `${I('pin', 's')} À l’extérieur${o.note ? ` · ${esc(o.note)}` : ''}` }))].sort((a, b) => rank(a.slot) - rank(b.slot));
+      ...(week.outings || []).filter((o) => o.date === d).map((o) => ({ slot: o.slot, html: `${I(o.rest ? 'repeat' : 'pin', 's')} ${esc(o.rest ? `Restes${o.dish ? ` · ${o.dish}` : ''}` : 'À l’extérieur')}${o.note ? ` · ${esc(o.note)}` : ''}` }))].sort((a, b) => rank(a.slot) - rank(b.slot));
     return `<div class="item"><span class="muted small" style="width:78px;flex:none">${esc(fmtDate(d, { weekday: 'short', day: 'numeric' }))}</span><span class="grow small">${ms.map((m) => `<span class="faint">${SLOT[m.slot]}</span> ${m.html}`).join(' · ') || '<span class="faint">—</span>'}</span></div>`; }).join(''));
 }
 on('click', 'sugg-sheet', () => sheet(`<h3>Suggestions à valider</h3><p class="muted small">Proposées par les membres du foyer.</p>${suggestionsHtml()}`));
@@ -285,13 +285,12 @@ function itemRow(i, l, o = {}) {
   const check = o.shop && open && !i.suggestion
     ? `<button class="chk${i.status === 'bought' ? ' on' : ''}" data-a="item-check" data-id="${i.id}" aria-label="Acheté">${I('check')}</button>` : '';
   const priced = open && !i.deleted;
-  const price = priced && !i.suggestion && dated ? (i.prices[i.at_store_id] != null ? eur(i.prices[i.at_store_id] * i.qty) : '<span class="muted">?</span>') : '';
   const right = i.suggestion && open
     ? (mgr ? `<button class="ib" data-a="sugg-no" data-id="${i.id}" aria-label="Refuser">${I('x')}</button><button class="btn sm" data-a="sugg-ok" data-id="${i.id}" aria-label="Accepter">${I('check', 's')}</button>`
       : mine ? `<button class="ib" data-a="item-del" data-id="${i.id}" aria-label="Retirer">${I('x')}</button>` : '')
     : o.shop && open && mgr && i.status === 'todo' && !isTemp(i.id) ? ''
     : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click" data-a="item-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid != null ? esc(eur(i.paid)) : `${I('plus', 's')} prix`}</button>`
-    : priced && dated && !o.shop ? `<span class="px">${price ? `<span class="price small">${price}</span>` : ''}${storeButton(i)}</span>` : '';
+    : '';
   const tap = open && !i.suggestion;
   const swipe = o.shop && open && mgr && i.status === 'todo' && !i.suggestion && !isTemp(i.id);
   const html = `<div class="item line1${i.suggestion ? ' pending' : ''}${i.status === 'bought' && open ? ' done' : ''}${i.deleted ? ' gone' : ''}" id="it${i.id}">${check}
@@ -587,7 +586,9 @@ on('click', 'store-cycle', async (el) => {
   const ids = activeStores().map((s) => s.id);
   const next = ids[(ids.indexOf(i.at_store_id) + 1) % ids.length];
   // Revenir sur le magasin conseille = retour au conseil (plus de choix manuel).
-  itemUpdate(i, { store_id: next === i.best_store_id ? null : next });
+  const inSheet = !!el.closest('.sheet');
+  await itemUpdate(i, { store_id: next === i.best_store_id ? null : next });
+  if (inSheet) document.querySelector(`[data-a=item][data-id="${i.id}"]`)?.click(); // la fiche se rouvre a jour
 });
 on('click', 'assign', async (el) => {
   const l = await attempt(() => post(hp(`/lists/${current.id}/assign`), { store_id: el.dataset.sid ? Number(el.dataset.sid) : null }));
@@ -781,6 +782,7 @@ on('click', 'item', async (el) => {
   const p = S.products.find((x) => x.id === i.product_id) || {};
   sheet(`<h3>${esc(i.name)}</h3><p class="muted">${esc(catName(i.category_id))} · ${esc(i.unit)}</p>
     ${i.suggestion ? `<p class="muted">Suggéré par ${esc(i.suggested_by_name || '?')}</p>` : ''}
+    ${current.type === 'dated' && current.status !== 'closed' && !i.suggestion && i.at_store_id ? `<div class="row line"><span class="grow"><b>Magasin</b><span class="muted block">${i.prices && i.prices[i.at_store_id] != null ? `≈ ${eur(i.prices[i.at_store_id] * i.qty)}` : 'prix inconnu'} · touchez pour changer</span></span>${storeButton(i)}</div>` : ''}
     ${i.prices ? `<p class="muted small">${priceHint(i)}</p>` : ''}${i.promos && i.promos.length ? `<div class="pills">${promoPills(i)}</div>` : ''}
     <div class="row"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="${qtyText(i.qty)}"><button class="btn sm sec2" data-a="qty" data-d="1">＋</button></div>
     <label class="muted" style="display:block;margin-top:8px">Note</label><input class="txt" name="note" value="${esc(i.note || '')}" placeholder="ex. bio, grand format">
