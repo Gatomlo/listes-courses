@@ -181,6 +181,8 @@ function panelHtml() {
       <li>En bas : Accueil, Listes, ＋ (ajout rapide : article, repas, envie, plat, promo, ticket), Menu, Plats. L’ancien onglet Plus devient le bouton ☰ en haut à droite : un menu qui descend avec Produits, Magasins, Promos, Foyer, import, installation.</li>
       <li>Accueil : repas du jour, prochaine liste et « À prévoir » d’un coup d’œil. Onglet Listes : « À prévoir » et la prochaine liste en grand ; les autres listes (2 ou 3 par an) et l’historique restent repliés.</li>
       <li>Liste : barre d’ajout en bas, filtre par magasin collant, caddie replié, suggestions en ligne.</li>
+      <li>Mode courses : « Où faites-vous les courses ? » ; tous les articles restants dans l’ordre du magasin, ceux conseillés ailleurs avec une mention, filtre « Aussi afficher », magasin d’achat choisi au cochage, « Terminer chez X » (continuer ailleurs, reporter, indisponibles), tickets à saisir plus tard.</li>
+      <li>Budget : coût par personne des plats (vignette, fiche, filtre « Prix / pers. »), budget estimé du menu, tag Économique automatique selon le palier des réglages.</li>
       <li>Panneaux qui montent du bas (dialogues sur PC), titres qui se replient au défilement.</li>
       <li>Menu en agenda (téléphone) ou grille semaine (PC), envies en carrousel.</li>
       <li>Plats en mosaïque ; fiche à onglets Ingrédients / Recette / Composition / Historique ; mode cuisine plein écran.</li>

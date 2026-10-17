@@ -8,7 +8,7 @@ const eur = (c) => (c == null ? '—' : (c / 100).toFixed(2).replace('.', ',') +
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-const HOUSE = { name: 'Foyer Phoenix', rhythm: 7, threshold: 500, records: 5, menuDays: 14, startDow: 'lundi', cost2: false };
+const HOUSE = { name: 'Foyer Phoenix', rhythm: 7, threshold: 500, records: 5, menuDays: 14, startDow: 'lundi', cost2: false, eco: 150 };
 const HOUSES = [{ name: 'Foyer Phoenix', role: 'Gestionnaire' }, { name: 'Chalet des Ardennes', role: 'Membre' }];
 const MEMBERS = [
   { id: 'th', n: 'Thomas', mail: 'thomas@exemple.be', role: 'manager', me: true, c: '#1b7647' },

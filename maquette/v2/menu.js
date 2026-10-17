@@ -1,3 +1,43 @@
+// ---------- Budget : coût par personne ----------
+// Prix de l'emballage = moyenne la plus basse des magasins actifs ; quantités en emballages
+// fractionnaires ; produits de base exclus ; produit sans prix = coût partiel (« dès »).
+const baseQ = (q, u) => ({ g: [q, 'g'], kg: [q * 1000, 'g'], ml: [q, 'ml'], cl: [q * 10, 'ml'], l: [q * 1000, 'ml'], pc: [q, 'pc'], cc: [q * 5, 'ml'], cs: [q * 15, 'ml'] }[u]);
+const pkgSize = (p) => {
+  const t = p.u; let m = t.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|cl|ml|l)\b/i);
+  if (m) { const n = Number(m[1].replace(',', '.')); return baseQ(n, m[2].toLowerCase()); }
+  if (t === 'kg') return [1000, 'g'];
+  if (/litre/.test(t)) return [1000, 'ml'];
+  m = t.match(/de (\d+)/); if (m) return [Number(m[1]), 'pc'];
+  return /pièce|botte/.test(t) ? [1, 'pc'] : null;
+};
+const refPrice = (pid) => { const xs = activeStores().map((s) => P[pid].avg[s]).filter((x) => x != null); return xs.length ? Math.min(...xs) : null; };
+const ingPk = ([pid, q, u]) => { if (q == null) return 1; if (!u) return q; const sz = pkgSize(P[pid]), b = baseQ(q, u); return sz && b && (b[1] === sz[1] || (b[1] !== 'pc' && sz[1] !== 'pc')) ? b[0] / sz[0] : 1; };
+const costOfIngs = (ings, f = 1) => ings.filter(([pid]) => !P[pid].base).reduce((r, g) => { const pr = refPrice(g[0]); if (pr == null) r.missing++; else r.c += ingPk(g) * pr * f; r.n++; return r; }, { c: 0, missing: 0, n: 0 });
+const ingCostOf = (g) => { if (P[g[0]].base) return null; const pr = refPrice(g[0]); return pr == null ? null : Math.round(ingPk(g) * pr); };
+// Cout d'un plat (portions du plat) : ingredients propres + composants au prorata, variantes par defaut.
+function dishCost(k) {
+  const d = DISHES[k];
+  const own = [...d.ings, ...(d.groups || []).flatMap((g) => g.o[0][1])];
+  let r = costOfIngs(own);
+  (d.parts || []).forEach(([p, por]) => { const dd = DISHES[p], x = costOfIngs([...dd.ings, ...(dd.groups || []).flatMap((g) => g.o[0][1])], por / dd.p); r = { c: r.c + x.c, missing: r.missing + x.missing, n: r.n + x.n }; });
+  return { pp: r.n - r.missing > 0 ? Math.round(r.c / d.p) : null, partial: r.missing > 0, missing: r.missing };
+}
+const ppShort = (k) => { const c = dishCost(k); return c.pp == null ? '' : `${c.partial ? 'dès ' : '≈ '}${eur(c.pp)}`; };
+// Tag « Économique » : automatique, coût complet sous le palier des réglages (HOUSE.eco, centimes par personne).
+const isEco = (k) => { const c = dishCost(k); return !!HOUSE.eco && c.pp != null && !c.partial && c.pp < HOUSE.eco; };
+const tagsOf = (k) => [...DISHES[k].tags, ...(isEco(k) ? ['économique'] : [])];
+// Cout d'un repas : personnes, variantes choisies, recettes ecartees, ingredients en reserve exclus.
+function mealCost(m) {
+  const d = DISHES[m.dish], opts = m.opts || {}, sk = m.skip || [], rs = m.res || [];
+  const f = m.p / d.p;
+  let r = costOfIngs([...d.ings, ...(d.groups || []).flatMap((g) => (g.o.find((o) => o[0] === opts[g.g]) || g.o[0])[1])].filter(([pid]) => !rs.includes(pid)), f);
+  (d.parts || []).filter(([p]) => !sk.includes(p)).forEach(([p, por]) => { const dd = DISHES[p], x = costOfIngs(dd.ings.filter(([pid]) => !rs.includes(pid)), f * por / dd.p); r = { c: r.c + x.c, missing: r.missing + x.missing, n: r.n + x.n }; });
+  return { cost: r.n - r.missing > 0 ? Math.round(r.c) : null, partial: r.missing > 0 };
+}
+const menuCost = () => { let total = 0, unknown = 0, partial = false, persons = 0; MEALS.filter((m) => !m.sugg).forEach((m) => { const c = mealCost(m); if (c.cost == null) unknown++; else { total += c.cost; persons += m.p; } if (c.partial) partial = true; }); return { total, unknown, partial: partial || unknown > 0, persons }; };
+const PRICES = [['2', '≤ 2 €'], ['3', '≤ 3 €'], ['4', '≤ 4 €'], ['5', '≤ 5 €'], ['over', '> 5 €'], ['unk', 'Sans prix']];
+const priceOk = (k, f) => { if (!f) return true; const { pp } = dishCost(k); return f === 'unk' ? pp == null : f === 'over' ? pp != null && pp > 500 : pp != null && pp <= Number(f) * 100; };
+
 // Le Cabas · maquette v2 : onglets Menu (agenda / grille, repas, envies, export, affichage) et Plats.
 S.slots = { midi: true, soir: true };
 const hue = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
@@ -19,12 +59,13 @@ VIEWS.menu = () => {
   const grid = weeks.map((w) => `<div class="wgrid"><span></span>${w.map((d) => `<span class="h${d === TODAY ? ' today' : ''}">${fmtD(d)}${shopDays().includes(d) ? ` ${I('cart', 's')}` : ''}</span>`).join('')}
     ${slotsOn().map((s) => `<span class="sl">${SLOTS[s]}</span>${w.map((d) => `<div class="cell">${at(d, s).map(mealBtn).join('') || ghost(d, s).replace(` ${SLOTS[s]}`, '')}</div>`).join('')}`).join('')}</div>`).join('');
   const wishes = WISHES.map((w) => { const d = DISHES[w.dish]; return `<div class="card wish">${tile(w.dish, '', w.status === 'pending' ? `<span class="pill warn">à valider</span>` : '')}
-    <b>${d.draft ? I('edit', 's') + ' ' : ''}${d.n}</b><span class="sub">${w.by === 'Thomas' ? 'Votre envie' : 'Envie de ' + w.by}</span>
+    <b>${d.draft ? I('edit', 's') + ' ' : ''}${d.n}</b><span class="sub">${w.by === 'Thomas' ? 'Votre envie' : 'Envie de ' + w.by}${ppShort(w.dish) ? ` · ${ppShort(w.dish)} / pers.` : ''}</span>
     <div class="btn-row icons">${isM() && w.status === 'pending' ? bI('check', 'Valider l’envie', `data-a="wish-ok" data-id="${w.id}"`, 'sec sm') : ''}${bI('calendar', 'Mettre au menu', `data-a="wish-plan" data-id="${w.id}"`, 'sm')}</div></div>`; }).join('');
   return {
     title: 'Menu', sub: `${fmtD(MENU.start, { day: 'numeric', month: 'short' })} → ${fmtD(MENU.end, { day: 'numeric', month: 'short' })} · ${MENU.saved ? 'menu fixé' : 'période proposée'}`, large: true,
     actions: `<button class="ib" data-a="menu-share" aria-label="Partager">${I('share')}</button><button class="ib" data-a="menu-more" aria-label="Options">${I('sliders')}</button>`,
     body: `<div class="between" style="margin-bottom:6px"><button class="btn sm sec" data-a="menu-nav" data-d="-1">${I('back', 's')} Précédent</button><span class="small muted">14 jours</span><button class="btn sm sec" data-a="menu-nav" data-d="1">Suivant ${I('chev', 's')}</button></div>
+      ${(() => { const c = menuCost(); return c.persons ? `<div class="card hstack" style="margin:6px 0 10px;gap:12px"><span class="ico acc">${I('tag')}</span><span class="grow"><b>Budget estimé : ${c.partial ? 'dès ' : '≈ '}${eur(c.total)}</b><span class="sub" style="display:block">≈ ${eur(Math.round(c.total / c.persons))} par personne et par repas${c.partial ? ` · estimation partielle${c.unknown ? ` (${plural(c.unknown, 'repas')} sans prix)` : ''}` : ''}</span></span></div>` : ''; })()}
       <div class="agenda">${agenda}</div>${grid}
       <p class="sub" style="margin:8px 2px">Les repas alimentent la liste de leur période : un repas en ${I('cart', 's')} jour de courses tombe dans cette liste. Appui long sur un repas pour le déplacer.</p>
       <div class="sh"><span>Envies de plats</span><button data-a="wish-add">＋ Proposer</button></div>
@@ -55,14 +96,14 @@ let pm = null;
 A['meal-add'] = (el) => { pm = { date: el.dataset.date, slot: el.dataset.slot, p: 4, opts: {}, skip: [], res: [], q: '', tag: '' }; live(pickHtml); };
 function pickHtml() {
   const n = norm(pm.q), wished = WISHES.map((w) => w.dish);
-  const ks = Object.keys(DISHES).filter((k) => (!n || norm(DISHES[k].n).includes(n)) && (!pm.tag || DISHES[k].tags.includes(pm.tag)))
+  const ks = Object.keys(DISHES).filter((k) => (!n || norm(DISHES[k].n).includes(n)) && (!pm.tag || tagsOf(k).includes(pm.tag)))
     .sort((a, b) => wished.includes(b) - wished.includes(a) || (DISHES[a].last || '0').localeCompare(DISHES[b].last || '0'));
-  const tags = [...new Set(Object.values(DISHES).flatMap((d) => d.tags))].sort();
+  const tags = [...new Set(Object.keys(DISHES).flatMap(tagsOf))].sort();
   return `<h3>${fmtD(pm.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[pm.slot]}</h3>
     <div class="search" style="margin:10px 0 8px">${I('search')}<input class="in" id="pick-q" placeholder="Rechercher un plat…" value="${esc(pm.q)}" data-in="pick-q" autocomplete="off"></div>
     <div class="chips" style="margin-bottom:8px">${tags.map((t) => `<button class="chip ${pm.tag === t ? 'on' : ''}" data-a="pick-tag" data-t="${t}">#${t}</button>`).join('')}</div>
     <div class="group">${ks.map((k) => { const d = DISHES[k]; return `<button class="row tap" data-a="pick-dish" data-k="${k}"><span class="avatar" style="--c:hsl(${hue(d.n)} 40% 45%)">${d.n[0]}</span>
-      <span class="grow"><b>${wished.includes(k) ? I('bulb', 's') + ' ' : ''}${d.n}</b><span class="sub" style="display:block">${d.parts ? `${I('puzzle', 's')} ${d.parts.map(([p]) => DISHES[p].n).join(', ')}` : d.last ? `dernière fois il y a ${daysAgo(d.last)} j` : 'jamais servi'}</span></span>${I('chev', 's chev')}</button>`; }).join('')}
+      <span class="grow"><b>${wished.includes(k) ? I('bulb', 's') + ' ' : ''}${d.n}</b><span class="sub" style="display:block">${d.parts ? `${I('puzzle', 's')} ${d.parts.map(([p]) => DISHES[p].n).join(', ')}` : d.last ? `dernière fois il y a ${daysAgo(d.last)} j` : 'jamais servi'}</span></span>${ppShort(k) ? `<span class="num small">${ppShort(k)} / pers.</span>` : ''}${I('chev', 's chev')}</button>`; }).join('')}
     ${isM() && pm.q ? `<button class="row tap" data-a="dish-new" style="color:var(--accent)"><span class="ico acc">${I('plus')}</span><b class="grow">Nouveau plat « ${esc(pm.q)} »</b></button>` : ''}</div>`;
 }
 IN['pick-q'] = (el) => { pm.q = el.value; refresh(); const i = $('pick-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
@@ -106,7 +147,8 @@ A['meal-open'] = (el) => {
   if (!m) return;
   const d = DISHES[m.dish];
   sheet(`<h3>${dishLabel(m)}</h3><p class="lead">${fmtD(m.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[m.slot]} · ${m.p} personnes${m.sugg ? ` · suggéré par ${m.sugg}` : ''}</p>
-    ${tile(m.dish, '', d.tags.map((t) => `<span class="pill">#${t}</span>`).join(''))}
+    ${tile(m.dish, '', tagsOf(m.dish).map((t) => `<span class="pill">#${t}</span>`).join(''))}
+    ${(() => { const c = mealCost(m); return c.cost != null ? `<div class="between" style="margin:10px 2px 0"><span class="muted">Coût estimé${c.partial ? ' (partiel)' : ''}</span><span><b class="num">${c.partial ? 'dès ' : '≈ '}${eur(c.cost)}</b> <span class="sub">· ${eur(Math.round(c.cost / m.p))} / pers.</span></span></div>` : ''; })()}
     ${d.parts ? `<div class="sh"><span>Recettes</span></div><div class="group">${d.parts.map(([p]) => `<button class="row tap" data-a="go" data-v="dish" data-id="${p}"><span class="ico plum">${I('puzzle')}</span><span class="grow ${m.skip.includes(p) ? 'faint' : ''}" ${m.skip.includes(p) ? 'style="text-decoration:line-through"' : ''}><b>${DISHES[p].n}</b>${m.skip.includes(p) ? ' · pas cette fois' : ''}</span>${I('chev', 's chev')}</button>`).join('')}</div>` : ''}
     <div class="btn-row" style="margin-top:14px">${bI('book', d.parts ? 'Voir les recettes' : 'Voir la recette', `data-a="go" data-v="cook" data-id="${m.dish}" data-p="${m.p}"`, '')}${isM() && !m.sugg ? `${bI('sliders', 'Personnes, recettes…', `data-a="meal-edit" data-id="${m.id}"`)}${bI('repeat', 'Changer de plat', `data-a="meal-edit" data-id="${m.id}"`)}${bI('edit', 'Modifier le plat', `data-a="go" data-v="dish" data-id="${m.dish}"`)}${bI('trash', 'Retirer du menu', `data-a="meal-del" data-id="${m.id}"`, 'danger')}` : ''}</div>
     ${isM() && !m.sugg ? `<div class="sh"><span>Déplacer</span></div><div class="hstack"><input class="in" type="date" value="${m.date}" style="flex:1;min-width:0"><select class="in" style="width:120px">${Object.entries(SLOTS).map(([k, v]) => `<option ${k === m.slot ? 'selected' : ''}>${v}</option>`).join('')}</select><button class="btn sec sm" data-a="meal-move" data-id="${m.id}">${I('move', 's')}</button></div><p class="sub">Vers un créneau occupé : les deux repas échangent leur place.</p>` : ''}
@@ -150,23 +192,25 @@ VIEWS.dishes = () => {
   const f = S.q.df || 'all', tg = S.q.dt || '', n = norm(S.q.dq);
   const ks = Object.keys(DISHES).filter((k) => { const d = DISHES[k];
     return (!n || norm(d.n).includes(n) || d.ings.some(([pid]) => norm(P[pid].n).includes(n)) || (d.parts || []).some(([p]) => norm(DISHES[p].n).includes(n)))
-      && (!tg || d.tags.includes(tg)) && (f === 'all' || (f === 'recipe' && hasRecipe(d)) || (f === 'parts' && d.parts) || (f === 'planned' && nextOf(k)) || (f === 'memo' && !d.ings.length && !d.parts) || (f === 'draft' && d.draft)); })
+      && (!tg || tagsOf(k).includes(tg)) && priceOk(k, S.q.dp) && (f === 'all' || (f === 'recipe' && hasRecipe(d)) || (f === 'parts' && d.parts) || (f === 'planned' && nextOf(k)) || (f === 'memo' && !d.ings.length && !d.parts) || (f === 'draft' && d.draft)); })
     .sort((a, b) => DISHES[a].n.localeCompare(DISHES[b].n, 'fr'));
-  const tags = [...new Set(Object.values(DISHES).flatMap((d) => d.tags))].sort();
+  const tags = [...new Set(Object.keys(DISHES).flatMap(tagsOf))].sort();
   return {
     title: 'Plats', sub: `${plural(Object.keys(DISHES).length, 'plat')} du foyer`, large: true,
     actions: isM() ? `<button class="ib" data-a="dish-new" aria-label="Nouveau plat">${I('plus')}</button>` : '',
     body: `<div class="search" style="margin-bottom:10px">${I('search')}<input class="in" id="dq" placeholder="Plat, ingrédient, recette…" value="${esc(S.q.dq || '')}" data-in="dq"></div>
       <div class="chips">${DFILTERS.map(([k, t]) => `<button class="chip ${f === k ? 'on' : ''}" data-a="df" data-f="${k}">${t}</button>`).join('')}</div>
       <div class="chips" style="margin:6px -16px 14px">${tags.map((t) => `<button class="chip ${tg === t ? 'on' : ''}" data-a="dt" data-t="${t}" style="height:30px;font-size:12.5px">#${t}</button>`).join('')}</div>
+      <div class="chips" style="margin:0 -16px 14px"><span class="muted small" style="align-self:center;padding-left:16px;white-space:nowrap">Prix / pers.</span>${PRICES.map(([k, t]) => `<button class="chip ${S.q.dp === k ? 'on' : ''}" data-a="dp" data-k="${k}" style="height:30px;font-size:12.5px">${t}</button>`).join('')}</div>
       <div class="dgrid">${ks.map((k) => { const d = DISHES[k], nx = nextOf(k);
-        return `<button class="dcard" data-a="go" data-v="dish" data-id="${k}">${tile(k, '', `${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts.length}</span>` : ''}${hasRecipe(d) ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`)}
+        return `<button class="dcard" data-a="go" data-v="dish" data-id="${k}">${tile(k, '', `${ppShort(k) ? `<span class="pill">${ppShort(k)}</span>` : ''}${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts.length}</span>` : ''}${hasRecipe(d) ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`)}
           <div><h4>${d.n}</h4><div class="sub">${nx ? `<span style="color:var(--accent);font-weight:600">prévu ${fmtD(nx, { weekday: 'short', day: 'numeric' })}</span>` : d.last ? `il y a ${daysAgo(d.last)} j` : 'jamais servi'}</div></div></button>`; }).join('')}</div>
       ${!ks.length ? `<div class="empty">Aucun plat trouvé.${isM() && S.q.dq ? `<br><button class="btn" style="margin-top:10px" data-a="dish-new">Créer « ${esc(S.q.dq)} »</button>` : ''}</div>` : ''}`,
   };
 };
 IN.dq = (el) => { S.q.dq = el.value; render(); const i = $('dq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
 A.df = (el) => { S.q.df = el.dataset.f; render(); };
+A.dp = (el) => { S.q.dp = S.q.dp === el.dataset.k ? '' : el.dataset.k; render(); };
 A.dt = (el) => { S.q.dt = S.q.dt === el.dataset.t ? '' : el.dataset.t; render(); };
 A['dish-new'] = () => { closeSheet(); const k = 'n' + Date.now(); DISHES[k] = { n: (pm && pm.q) || S.q.dq || 'Nouveau plat', p: 4, tags: [], ings: [], isNew: true }; go('dish', { id: k, edit: true }); };
 
@@ -178,7 +222,7 @@ VIEWS.dish = (t) => {
   const canEdit = isM() || (d.draft === 'Thomas');
   const used = Object.keys(DISHES).filter((x) => (DISHES[x].parts || []).some(([p]) => p === k));
   const tabs = [['ing', 'Ingrédients'], ['rec', 'Recette'], ...(used.length ? [] : [['parts', 'Composition']]), ['hist', 'Historique']];
-  const ingRow = (g, del) => `<div class="ing"><span class="grow">${P[g[0]].n}${P[g[0]].base ? ' <span class="pill">de base</span>' : ''}</span><span class="q">${ingText(g)}</span>${del && t.edit ? `<button class="ib" data-a="noop" aria-label="Retirer">${I('x', 's')}</button>` : ''}</div>`;
+  const ingRow = (g, del) => `<div class="ing"><span class="grow">${P[g[0]].n}${P[g[0]].base ? ' <span class="pill">de base</span>' : ''}</span><span class="q">${ingText(g)}</span>${!t.edit && ingCostOf(g) != null ? `<span class="sub" style="min-width:52px;text-align:right">≈ ${eur(ingCostOf(g))}</span>` : ''}${del && t.edit ? `<button class="ib" data-a="noop" aria-label="Retirer">${I('x', 's')}</button>` : ''}</div>`;
   const body = {
     ing: `<div class="card">${d.ings.map((g) => ingRow(g, true)).join('') || `<p class="muted" style="margin:6px 0">${d.parts ? 'Rien en plus des recettes.' : 'Aucun ingrédient : simple rappel dans la liste.'}</p>`}
         ${t.edit ? `<div class="search" style="margin-top:8px">${I('plus')}<input class="in" placeholder="Ajouter un ingrédient (produit)…" style="background:var(--raised);box-shadow:none"></div>` : ''}</div>
@@ -198,11 +242,11 @@ VIEWS.dish = (t) => {
     title: d.n, sub: '',
     actions: canEdit ? (t.edit ? `<button class="btn sm" data-a="dish-save" data-id="${k}">${d.draft && isM() ? 'Valider' : 'Enregistrer'}</button>` : `<button class="ib" data-a="dish-edit" data-id="${k}" aria-label="Modifier">${I('edit')}</button><button class="ib" data-a="dish-menu" data-id="${k}" aria-label="Actions">${I('more')}</button>`) : '',
     body: `${d.draft ? `<div class="banner">${I('edit')}<span class="grow">Proposé par ${d.draft} · à valider par un gestionnaire</span></div>` : ''}
-      <div class="cols"><div>${tile(k, 'dhero', `${d.parts ? `<span class="pill">${I('puzzle', 's')} plat composé</span>` : ''}${d.tags.map((x) => `<span class="pill">#${x}</span>`).join('')}`)}
+      <div class="cols"><div>${tile(k, 'dhero', `${d.parts ? `<span class="pill">${I('puzzle', 's')} plat composé</span>` : ''}${tagsOf(k).map((x) => `<span class="pill">#${x}</span>`).join('')}`)}
       ${t.edit ? `<div class="stack" style="margin-top:14px"><label class="field"><span>Nom</span><input class="in" value="${esc(d.n)}" data-ch="dish-name" data-id="${k}"></label>
         <div class="grid2"><label class="field"><span>Portions</span><input class="in" type="number" value="${d.p}"></label><label class="field"><span>Temps</span><input class="in" value="${d.t || ''}" placeholder="45 min"></label></div>
-        <label class="field"><span>Tags</span><input class="in" value="${d.tags.join(', ')}" placeholder="rapide, végé, hiver…"></label></div>`
-      : `<h1 class="mid" style="font-size:26px;margin:14px 2px 4px">${d.n}</h1><div class="hstack small muted" style="margin:0 2px 4px">${I('people', 's')} ${d.p} pers.${d.t ? ` · ${I('clock', 's')} ${d.t}` : ''}${used.length ? ` · dans ${used.map((x) => `<button style="color:var(--plum);font-weight:650" data-a="go" data-v="dish" data-id="${x}">${DISHES[x].n}</button>`).join(', ')}` : ''}</div>`}
+        <label class="field"><span>Tags</span><input class="in" value="${d.tags.join(', ')}" placeholder="rapide, végé, hiver…"><span class="sub">« Économique » est automatique : coût par personne sous le palier des réglages${isEco(k) ? ' (ce plat l’a)' : ''}.</span></label></div>`
+      : `<h1 class="mid" style="font-size:26px;margin:14px 2px 4px">${d.n}</h1><div class="hstack small muted" style="margin:0 2px 4px">${I('people', 's')} ${d.p} pers.${dishCost(k).pp != null ? ` · <b>${ppShort(k)} / pers.</b>${dishCost(k).partial ? ` (${plural(dishCost(k).missing, 'ingrédient')} sans prix)` : ''}` : ''}${d.t ? ` · ${I('clock', 's')} ${d.t}` : ''}${used.length ? ` · dans ${used.map((x) => `<button style="color:var(--plum);font-weight:650" data-a="go" data-v="dish" data-id="${x}">${DISHES[x].n}</button>`).join(', ')}` : ''}</div>`}
       </div><div>
       <div class="seg" style="margin:14px 0 12px">${tabs.map(([x, n]) => `<button class="${tabK === x ? 'on' : ''}" data-a="dtab" data-id="${k}" data-k="${x}">${n}</button>`).join('')}</div>
       ${body}</div></div>`,
