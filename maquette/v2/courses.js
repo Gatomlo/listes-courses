@@ -72,7 +72,7 @@ const todoBlock = () => {
   return html ? `<div class="sh"><span>À faire</span></div><div class="group">${html}</div>` : '';
 };
 // Repas du jour et du lendemain avec une preparation a l'avance (champ « à faire à l'avance » du plat).
-const aheadRows = () => [0, 1].flatMap((n) => MEALS.filter((m) => m.date === addDays(TODAY, n) && !m.sugg).map((m) => {
+const aheadRows = () => [0, 1].flatMap((n) => MEALS.filter((m) => m.date === addDays(TODAY, n) && !m.sugg && m.dish).map((m) => {
   const ds = [m.dish, ...(DISHES[m.dish].parts || []).filter(([p]) => !(m.skip || []).includes(p)).map(([p]) => p)].filter((k) => DISHES[k].ahead);
   return ds.map((k) => `<div class="row"><span class="ico warn">${I('clock')}</span><span class="grow"><b>À préparer à l’avance</b><span class="sub" style="display:block">${n ? 'pour demain' : 'pour ce soir'} · ${DISHES[k].n} : ${DISHES[k].ahead}</span></span></div>`).join('');
 })).join('');

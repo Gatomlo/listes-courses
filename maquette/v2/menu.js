@@ -44,7 +44,7 @@ const priceOk = (k, f) => { if (!f) return true; const { pp } = dishCost(k); ret
 S.slots = { midi: true, soir: true };
 const hue = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 const tile = (k, cls = '', pills = '') => { const d = DISHES[k]; return `<div class="tile ${cls}" style="--h:${hue(d.n)}"><span class="mono">${d.n[0]}</span><div class="tb">${pills}</div></div>`; };
-const dishLabel = (m) => { const d = DISHES[m.dish], v = Object.values(m.opts || {}); return m.rest ? `Restes · ${d.n}` : v.length ? `${d.n} · ${v.join(', ')}` : d.n; };
+const dishLabel = (m) => { const d = DISHES[m.dish], v = Object.values(m.opts || {}); return m.rest ? `Restes${d ? ' · ' + d.n : m.note ? ' · ' + m.note : ''}` : v.length ? `${d.n} · ${v.join(', ')}` : d.n; };
 // Repas à l'extérieur (case sans plat, note facultative) et restes (repas sans achat, hors budget et hors listes).
 const OUTINGS = [{ id: 1, date: '2026-10-19', slot: 'midi', note: 'chez Marie' }];
 const outAt = (d, s) => OUTINGS.find((o) => o.date === d && o.slot === s);
@@ -161,9 +161,12 @@ const restSources = () => MEALS.filter((m) => !m.sugg && !m.rest && m.date < pm.
 const restHtml = () => `<h3>${I('repeat', 's')} Restes</h3><p class="lead">${fmtD(pm.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[pm.slot]}. Aucun achat : le repas ne compte ni dans la liste ni dans le budget.</p>
   <div class="group"><div class="row"><span class="grow">Personnes</span><span class="stepper"><button data-a="rest-p" data-d="-1" aria-label="Moins">${I('minus')}</button><b>${S.q.restP}</b><button data-a="rest-p" data-d="1" aria-label="Plus">${I('plus')}</button></span></div></div>
   <div class="sh"><span>Restes de…</span></div>
+  <div class="group"><div class="row"><span class="grow"><input class="in" id="rest-note" placeholder="Restes variés, frigo… (facultatif)" data-enter="rest-ok" data-id="none"></span><button class="btn sm" data-a="rest-ok" data-id="none">Sans plat précis</button></div></div>
   <div class="group">${restSources().map((m) => `<button class="row tap" data-a="rest-ok" data-id="${m.id}"><span class="grow"><b>${DISHES[m.dish].n}</b><span class="sub" style="display:block">${fmtD(m.date, { weekday: 'long', day: 'numeric' })} · ${SLOTS[m.slot]} · ${m.p} pers.</span></span>${I('chev', 's chev')}</button>`).join('') || '<p class="empty">Aucun repas des 6 derniers jours.</p>'}</div>`;
 A['rest-p'] = (el) => { S.q.restP = Math.max(1, S.q.restP + Number(el.dataset.d)); refresh(); };
-A['rest-ok'] = (el) => { const src = MEALS.find((m) => m.id === Number(el.dataset.id)); dropSlot(pm.date, pm.slot); MEALS.push(meal(pm.date, pm.slot, src.dish, S.q.restP, { rest: true })); closeSheet(); toast(`Restes · ${DISHES[src.dish].n} ajouté`); render(); };
+A['rest-ok'] = (el) => {
+  const src = el.dataset.id === 'none' ? null : MEALS.find((m) => m.id === Number(el.dataset.id)), note = src ? '' : (document.getElementById('rest-note')?.value || '').trim();
+  dropSlot(pm.date, pm.slot); MEALS.push(meal(pm.date, pm.slot, src ? src.dish : null, S.q.restP, { rest: true, note })); closeSheet(); toast(src ? `Restes · ${DISHES[src.dish].n} ajouté` : 'Restes ajoutés'); render(); };
 A['pm-save'] = () => {
   if (!needNet()) return;
   if (pm.id) { Object.assign(MEALS.find((m) => m.id === pm.id), { dish: pm.dish, p: pm.p, opts: pm.opts, skip: pm.skip }); closeSheet(); toast('Repas mis à jour · liste recalculée'); render(); return; }
@@ -180,7 +183,7 @@ A['meal-open'] = (el) => {
   const d = DISHES[m.dish];
   if (m.rest) { sheet(`<h3>${I('repeat', 's')} ${dishLabel(m)}</h3><p class="lead">${fmtD(m.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[m.slot]} · ${m.p} personnes</p>
     <p class="sub">Restes d’un repas déjà cuisiné : aucun achat, ce repas n’alimente pas la liste et n’entre pas dans le budget.</p>
-    <div class="btn-row" style="margin-top:14px">${bI('book', 'Fiche du plat', `data-a="go" data-v="dish" data-id="${m.dish}"`, 'sec')}${isM() ? bI('trash', 'Retirer', `data-a="meal-del" data-id="${m.id}"`, 'sec danger-t') : ''}</div>`); return; }
+    <div class="btn-row" style="margin-top:14px">${m.dish ? bI('book', 'Fiche du plat', `data-a="go" data-v="dish" data-id="${m.dish}"`, 'sec') : ''}${isM() ? bI('trash', 'Retirer', `data-a="meal-del" data-id="${m.id}"`, 'sec danger-t') : ''}</div>`); return; }
   sheet(`<h3>${dishLabel(m)}</h3><p class="lead">${fmtD(m.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[m.slot]} · ${m.p} personnes${m.sugg ? ` · suggéré par ${m.sugg}` : ''}</p>
     ${tile(m.dish, '', tagsOf(m.dish).map((t) => `<span class="pill">#${t}</span>`).join(''))}
     ${(() => { const c = mealCost(m); return c.cost != null ? `<div class="between" style="margin:10px 2px 0"><span class="muted">Coût estimé${c.partial ? ' (partiel)' : ''}</span><span><b class="num">${c.partial ? 'dès ' : '≈ '}${eur(c.cost)}</b> <span class="sub">· ${eur(Math.round(c.cost / m.p))} / pers.</span></span></div>` : ''; })()}
@@ -221,7 +224,7 @@ VIEWS.display = () => ({
 
 // ---------- Plats ----------
 const DFILTERS = [['all', 'Tous'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'Suggestions']];
-const nextOf = (k) => MEALS.filter((m) => !m.sugg && m.date >= TODAY && (m.dish === k || (DISHES[m.dish].parts || []).some(([p]) => p === k && !m.skip.includes(p)))).map((m) => m.date).sort()[0];
+const nextOf = (k) => MEALS.filter((m) => !m.sugg && m.date >= TODAY && (m.dish === k || ((DISHES[m.dish] || {}).parts || []).some(([p]) => p === k && !m.skip.includes(p)))).map((m) => m.date).sort()[0];
 const hasRecipe = (d) => !!(d.url || d.steps || d.notes);
 VIEWS.dishes = () => {
   const f = S.q.df || 'all', tg = S.q.dt || '', n = norm(S.q.dq);
@@ -279,7 +282,7 @@ VIEWS.dish = (t) => {
       <div class="group">${(d.parts || []).map(([p, por]) => `<div class="row"><span class="ico plum">${I('puzzle')}</span><button class="grow" style="text-align:left" data-a="go" data-v="dish" data-id="${p}"><b>${DISHES[p].n}</b><span class="sub" style="display:block">${por} portions sur ${DISHES[p].p} · ${hasRecipe(DISHES[p]) ? 'recette' : 'à compléter'}</span></button>${t.edit ? `<span class="stepper"><button data-a="noop">${I('minus', 's')}</button><b>${por}</b><button data-a="noop">${I('plus', 's')}</button></span>` : I('chev', 's chev')}</div>`).join('') || '<p class="empty">Plat simple : aucune recette rattachée.</p>'}</div>
       ${t.edit || isM() ? `<button class="btn sec full" style="margin-top:10px" data-a="part-add" data-id="${k}">${I('plus')} Ajouter une recette</button>` : ''}`,
     hist: `<div class="grid2"><div class="card"><div class="big num">${d.times || 0}</div><div class="sub">fois servi</div></div><div class="card"><div class="big num">${d.last ? daysAgo(d.last) + ' j' : '—'}</div><div class="sub">depuis la dernière</div></div></div>
-      <div class="sh"><span>À venir</span></div><div class="group">${MEALS.filter((m) => m.date >= TODAY && (m.dish === k || (DISHES[m.dish].parts || []).some(([p]) => p === k))).map((m) => `<button class="row tap" data-a="meal-open" data-id="${m.id}"><span class="grow"><b>${fmtD(m.date)}</b> · ${SLOTS[m.slot]} · ${m.p} pers.${m.dish !== k ? ` <span class="pill plum">${I('puzzle', 's')} ${DISHES[m.dish].n}</span>` : ''}</span>${I('chev', 's chev')}</button>`).join('') || '<p class="empty">Pas prévu au menu.</p>'}</div>
+      <div class="sh"><span>À venir</span></div><div class="group">${MEALS.filter((m) => m.date >= TODAY && (m.dish === k || ((DISHES[m.dish] || {}).parts || []).some(([p]) => p === k))).map((m) => `<button class="row tap" data-a="meal-open" data-id="${m.id}"><span class="grow"><b>${fmtD(m.date)}</b> · ${SLOTS[m.slot]} · ${m.p} pers.${m.dish !== k ? ` <span class="pill plum">${I('puzzle', 's')} ${DISHES[m.dish].n}</span>` : ''}</span>${I('chev', 's chev')}</button>`).join('') || '<p class="empty">Pas prévu au menu.</p>'}</div>
       <div class="sh"><span>5 dernières fois</span></div><div class="group">${[...Array(Math.min(d.times || 0, 5))].map((_, j) => `<div class="row"><span class="grow">${fmtD(addDays(d.last, -j * 23), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span><span class="sub">Soir · 4 pers.</span></div>`).join('') || '<p class="empty">Jamais servi.</p>'}</div>`,
   }[tabK];
   return {
