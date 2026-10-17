@@ -27,32 +27,58 @@ const heroCard = (cur) => {
 const noNext = () => `<div class="card"><div class="mid">Pas de prochaine liste</div><p class="sub" style="margin:4px 0 12px">Elle reprend les récurrents et « À prévoir ».</p>${isM() ? `<button class="btn" data-a="new-list">${I('plus')} Créer la prochaine liste</button>` : ''}</div>`;
 const backlogCard = () => {
   const ap = listById('ap');
-  return `<button class="card tap" style="width:100%;text-align:left" data-a="go" data-v="list" data-id="ap">
+  return `<div class="card"><button class="tap" style="width:100%;text-align:left" data-a="go" data-v="list" data-id="ap">
       <div class="between"><b>${plural(ap.items.length, 'article')} en attente</b>${I('chev', 's chev')}</div>
-      <div class="hstack" style="margin-top:8px">${ap.items.map((i) => `<span class="pill">${P[i.pid].n}</span>`).join('') || '<span class="muted">Rien en attente</span>'}</div>
-      <div class="sub" style="margin-top:8px">Articles sans date : à importer dans une prochaine liste.</div></button>`;
+      <div class="hstack" style="margin-top:8px">${ap.items.map((i) => `<span class="pill">${P[i.pid].n}</span>`).join('') || '<span class="muted">Rien en attente</span>'}</div></button>
+    <div class="search" style="margin-top:10px">${I('plus')}<input class="in" id="ap-q" placeholder="Ajouter à « À prévoir »…" data-enter="ap-quick" autocomplete="off"></div></div>`;
 };
+// Ajout rapide dans « À prévoir » depuis l'accueil : produit connu = ajoute (ou cumule), sinon propose de le creer.
+A['ap-quick'] = (el) => {
+  const q = norm(el.value).trim();
+  if (!q) return;
+  const ap = listById('ap'), p = Object.values(P).find((x) => norm(x.n) === q) || Object.values(P).find((x) => norm(x.n).includes(q));
+  if (!p) { S.q.addL = 'ap'; S.q.addQ = el.value.trim(); A['prod-new'](); return; }
+  const ex = ap.items.find((i) => i.pid === p.id);
+  if (ex) ex.q += 1; else ap.items.push(it(p.id, 1));
+  queued(); render(); toast(`${p.n} ajouté à « À prévoir »`);
+};
+// « À faire » : tout ce qui attend une action, en un seul bloc (absent quand il n'y a rien).
+const todoBlock = () => {
+  const rows = [];
+  const tix = LISTS.flatMap(ticketsDue);
+  const nSugg = LISTS.flatMap((l) => l.items.filter((i) => i.sugg)).length + MEALS.filter((m) => m.sugg).length;
+  const wishes = WISHES.filter((w) => w.status === 'pending');
+  let html = ticketRows(tix);
+  if (isM() && nSugg) html += `<button class="row tap" data-a="sugg-sheet"><span class="ico warn">${I('bulb')}</span><span class="grow"><b>${plural(nSugg, 'suggestion')} à valider</b><span class="sub" style="display:block">de ${[...new Set([...LISTS.flatMap((l) => l.items.filter((i) => i.sugg).map((i) => i.sugg)), ...MEALS.filter((m) => m.sugg).map((m) => m.sugg)])].join(', ')}</span></span>${I('chev', 's chev')}</button>`;
+  if (isM() && wishes.length) html += `<button class="row tap" data-a="tab" data-t="menu"><span class="ico warn">${I('bulb')}</span><span class="grow"><b>${plural(wishes.length, 'envie')} de plat à valider</b><span class="sub" style="display:block">dans le menu</span></span>${I('chev', 's chev')}</button>`;
+  return html ? `<div class="sh"><span>À faire</span></div><div class="group">${html}</div>` : '';
+};
+// Repas du jour et du lendemain avec une preparation a l'avance (champ « à faire à l'avance » du plat).
+const aheadRows = () => [0, 1].flatMap((n) => MEALS.filter((m) => m.date === addDays(TODAY, n) && !m.sugg).map((m) => {
+  const ds = [m.dish, ...(DISHES[m.dish].parts || []).filter(([p]) => !(m.skip || []).includes(p)).map(([p]) => p)].filter((k) => DISHES[k].ahead);
+  return ds.map((k) => `<div class="row"><span class="ico warn">${I('clock')}</span><span class="grow"><b>À préparer à l’avance</b><span class="sub" style="display:block">${n ? 'pour demain' : 'pour ce soir'} · ${DISHES[k].n} : ${DISHES[k].ahead}</span></span></div>`).join('');
+})).join('');
 VIEWS.home = () => {
-  const cur = dated()[0], meals = dayMeals();
-  const sugg = LISTS.flatMap((l) => l.items.filter((i) => i.sugg).map((i) => ({ ...i, l })));
-  const promos = PROMOS.filter((p) => p.until >= TODAY);
+  const cur = dated()[0], meals = dayMeals(), ahead = aheadRows();
+  // Promos : seulement celles qui concernent des produits deja dans vos listes.
+  const wanted = new Set([...dated().flatMap((l) => counted(l).map((i) => i.pid)), ...listById('ap').items.map((i) => i.pid)]);
+  const promos = PROMOS.filter((p) => p.until >= TODAY && wanted.has(p.pid));
   return {
     title: 'Accueil', sub: `${HOUSE.name} · ${fmtD(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}`, large: true,
-    body: `${ticketsBox(LISTS.flatMap(ticketsDue))}${sugg.length && isM() ? `<button class="banner" data-a="sugg-sheet" style="width:100%">${I('bulb')}<span class="grow" style="text-align:left">${plural(sugg.length, 'suggestion')} de ${[...new Set(sugg.map((s) => s.sugg))].join(', ')} à valider</span>${I('chev', 's')}</button>` : ''}
+    body: `${todoBlock()}
       <div class="home-grid"><div>
-      ${meals.length ? `<div class="sh"><span>Aujourd’hui au menu</span><button data-a="tab" data-t="menu">Menu</button></div>
-        <div class="group">${meals.map((m) => `<button class="row tap" data-a="meal-open" data-id="${m.id}"><span class="ico">${I('bowl')}</span><span class="grow"><span class="sub" style="display:block">${SLOTS[m.slot]} · ${m.p} pers.</span><b>${DISHES[m.dish].n}</b></span>${I('chev', 's chev')}</button>`).join('')}</div>` : ''}
-      <div class="sh"><span>Prochaine liste</span></div>
-      ${cur ? heroCard(cur).replace('<span class="sub">Prochaine liste</span>', '<span class="sub">Courses</span>') : noNext()}
+      ${meals.length || ahead ? `<div class="sh"><span>Aujourd’hui au menu</span><button data-a="tab" data-t="menu">Menu</button></div>
+        <div class="group">${meals.map((m) => `<button class="row tap" data-a="meal-open" data-id="${m.id}"><span class="ico">${I('bowl')}</span><span class="grow"><span class="sub" style="display:block">${SLOTS[m.slot]} · ${m.p} pers.</span><b>${DISHES[m.dish].n}</b></span>${I('chev', 's chev')}</button>`).join('')}${ahead}</div>` : ''}
       <div class="sh"><span>À prévoir</span><button data-a="go" data-v="list" data-id="ap">Voir</button></div>
       ${backlogCard()}
       </div><div>
-      <div class="sh"><span>Promos en cours</span><button data-a="go" data-v="promos">Toutes</button></div>
+      <div class="sh"><span>Prochaine liste</span></div>
+      ${cur ? heroCard(cur).replace('<span class="sub">Prochaine liste</span>', '<span class="sub">Courses</span>') : noNext()}
+      ${promos.length ? `<div class="sh"><span>Promos sur vos listes</span><button data-a="promo-add">Signaler</button></div>
       <div class="hscroll">${promos.map((p) => `<button class="card tap" style="width:180px;text-align:left" data-a="go" data-v="product" data-id="${p.pid}">
         ${sp(p.st)}<div class="b" style="margin:8px 0 2px">${P[p.pid].n}</div>
         <div class="hstack"><span class="mid num" style="color:var(--warn)">${eur(p.price)}</span><s class="faint small num">${eur(P[p.pid].avg[p.st])}</s></div>
-        <div class="sub">jusqu’au ${fmtD(p.until, { day: 'numeric', month: 'short' })}</div></button>`).join('')}
-        <button class="card tap" style="width:140px;display:grid;place-items:center;gap:6px;color:var(--accent)" data-a="promo-add">${I('tag', 'l')}<b class="small">Signaler une promo</b></button></div>
+        <div class="sub">jusqu’au ${fmtD(p.until, { day: 'numeric', month: 'short' })}</div></button>`).join('')}</div>` : ''}
       </div></div>`,
   };
 };
@@ -306,9 +332,10 @@ const ticketsDue = (l) => {
   return ss.filter((s) => { const t = (l.trips || {})[s] || {}; return !t.ticket && !t.skip && (t.fin || l.status === 'closed'); })
     .map((s) => ({ l, s, n: l.items.filter((i) => !i.sugg && i.done && boughtAt(i) === s).length }));
 };
-const ticketsBox = (xs) => (xs.length ? `<div class="sh"><span>Tickets à saisir</span></div><div class="group">${xs.map(({ l, s, n }) => `<div class="row">${dotS(s)}<span class="grow"><b>${STORES[s].n}</b><span class="sub" style="display:block">${plural(n, 'article')} · courses du ${fmtD(l.date, { day: 'numeric', month: 'long' })}</span></span>
+const ticketRows = (xs) => xs.map(({ l, s, n }) => `<div class="row">${dotS(s)}<span class="grow"><b>Ticket ${STORES[s].n}</b><span class="sub" style="display:block">${plural(n, 'article')} · courses du ${fmtD(l.date, { day: 'numeric', month: 'long' })}</span></span>
   <button class="ib" data-a="ticket-skip" data-id="${l.id}" data-st="${s}" aria-label="Pas de ticket">${I('x')}</button>
-  <button class="btn sm" data-a="ticket-scan" data-id="${l.id}" data-st="${s}" aria-label="Scanner le ticket ${STORES[s].n}">${I('camera')}</button></div>`).join('')}</div>` : '');
+  <button class="btn sm" data-a="ticket-scan" data-id="${l.id}" data-st="${s}" aria-label="Scanner le ticket ${STORES[s].n}">${I('camera')}</button></div>`).join('');
+const ticketsBox = (xs) => (xs.length ? `<div class="sh"><span>Tickets à saisir</span></div><div class="group">${ticketRows(xs)}</div>` : '');
 A['ticket-scan'] = (el) => { S.q.scanStep = null; go('scan', { id: el.dataset.id, st: el.dataset.st }); };
 A['ticket-skip'] = (el) => { tripOf(listById(el.dataset.id), el.dataset.st).skip = true; toast('Ticket écarté'); render(); };
 // Donnees d'exemple : une liste cloturee avec un ticket encore a saisir.

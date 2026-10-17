@@ -53,8 +53,15 @@ function budgetCard() {
   if (!c || !menu.meals.some((m) => !m.suggestion)) return '';
   const persons = ms.reduce((n, m) => n + m.persons, 0);
   const note = c.partial ? ` · estimation partielle${c.unknown ? ` (${c.unknown} repas sans prix)` : ' (des ingrédients sans prix)'}` : '';
-  return `<div class="card row" style="margin:8px 0;gap:10px"><span class="ico leaf">${I('tag')}</span><span class="grow"><b>Budget estimé : ${c.partial ? 'dès ' : '≈ '}${eur(c.total)}</b>
-    <span class="muted small block">${persons ? `≈ ${eur(Math.round(c.total / persons))} par personne et par repas` : ''}${note}</span></span></div>`;
+  // Sous-totaux par semaine (tranches de 7 jours depuis le debut de la periode) : chaque repas compte pour ses personnes.
+  const weeks = [];
+  for (const m of ms) {
+    const k = Math.floor((Date.parse(m.date) - Date.parse(menu.from)) / 86400000 / 7);
+    weeks[k] = (weeks[k] || 0) + m.cost;
+  }
+  const wk = weeks.length > 1 ? `<div class="small" style="margin-top:8px;display:grid;gap:2px">${weeks.map((t, k) => (t == null ? '' : `<div class="row"><span class="grow muted">Semaine du ${esc(fmtDate(addDays(menu.from, 7 * k), { day: 'numeric', month: 'short' }))}</span><b class="price">${eur(t)}</b></div>`)).join('')}</div>` : '';
+  return `<div class="card" style="margin:8px 0"><div class="row" style="gap:10px"><span class="ico leaf">${I('tag')}</span><span class="grow"><b>Budget estimé : ${c.partial ? 'dès ' : '≈ '}${eur(c.total)}</b>
+    <span class="muted small block">${persons ? `≈ ${eur(Math.round(c.total / persons))} par personne et par repas` : ''}${note}</span></span></div>${wk}</div>`;
 }
 export function menuView() {
   const days = []; for (let d = menu.from; d <= menu.to; d = addDays(d, 1)) days.push(d);

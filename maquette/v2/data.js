@@ -172,7 +172,7 @@ const DISHES = {
     steps: ['Cuire pommes de terre et légume ensemble.', 'Écraser grossièrement avec le beurre.', 'Servir avec la viande poêlée.'] },
   las: { n: 'Lasagnes', p: 6, t: '1 h 30', tags: ['four'], times: 5, last: '2026-09-02', url: 'https://www.exemple-recettes.be/lasagnes',
     ings: [['hac', 2], ['con', 2], ['moz', 2], ['gru', 1]], steps: ['Préparer la bolognaise.', 'Monter les couches.', 'Cuire 40 min à 180 °C.'] },
-  cur: { n: 'Curry de pois chiches', p: 4, t: '30 min', tags: ['végé', 'rapide'], times: 7, last: '2026-09-28',
+  cur: { n: 'Curry de pois chiches', p: 4, t: '30 min', tags: ['végé', 'rapide'], times: 7, last: '2026-09-28', ahead: 'sortir le riz et couper l’oignon en fin d’après-midi',
     ings: [['poi', 2], ['coc', 1], ['oig', 1, 'pc'], ['riz', 300, 'g']], steps: ['Faire revenir l’oignon et les épices.', 'Ajouter pois chiches et lait de coco, mijoter 15 min.', 'Servir avec le riz.'] },
   sou: { n: 'Soupe de potiron', p: 4, t: '40 min', tags: ['végé', 'hiver'], times: 3, last: '2025-11-30',
     ings: [['pot', 1], ['oig', 1, 'pc'], ['beu', 20, 'g']], steps: ['Couper le potiron.', 'Cuire 25 min avec l’oignon.', 'Mixer.'] },

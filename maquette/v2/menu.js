@@ -34,7 +34,8 @@ function mealCost(m) {
   (d.parts || []).filter(([p]) => !sk.includes(p)).forEach(([p, por]) => { const dd = DISHES[p], x = costOfIngs(dd.ings.filter(([pid]) => !rs.includes(pid)), f * por / dd.p); r = { c: r.c + x.c, missing: r.missing + x.missing, n: r.n + x.n }; });
   return { cost: r.n - r.missing > 0 ? Math.round(r.c) : null, partial: r.missing > 0 };
 }
-const menuCost = () => { let total = 0, unknown = 0, partial = false, persons = 0; MEALS.filter((m) => !m.sugg).forEach((m) => { const c = mealCost(m); if (c.cost == null) unknown++; else { total += c.cost; persons += m.p; } if (c.partial) partial = true; }); return { total, unknown, partial: partial || unknown > 0, persons }; };
+// Total du menu : chaque repas compte pour ses personnes ; sous-totaux par semaine (tranches de 7 jours depuis le debut).
+const menuCost = () => { let total = 0, unknown = 0, partial = false, persons = 0; const weeks = []; MEALS.filter((m) => !m.sugg).forEach((m) => { const c = mealCost(m); if (c.cost == null) unknown++; else { total += c.cost; persons += m.p; const k = Math.floor(dayDiff(MENU.start, m.date) / 7); weeks[k] = (weeks[k] || 0) + c.cost; } if (c.partial) partial = true; }); return { total, unknown, partial: partial || unknown > 0, persons, weeks }; };
 const PRICES = [['2', '≤ 2 €'], ['3', '≤ 3 €'], ['4', '≤ 4 €'], ['5', '≤ 5 €'], ['over', '> 5 €'], ['unk', 'Sans prix']];
 const priceOk = (k, f) => { if (!f) return true; const { pp } = dishCost(k); return f === 'unk' ? pp == null : f === 'over' ? pp != null && pp > 500 : pp != null && pp <= Number(f) * 100; };
 
@@ -65,7 +66,8 @@ VIEWS.menu = () => {
     title: 'Menu', sub: `${fmtD(MENU.start, { day: 'numeric', month: 'short' })} → ${fmtD(MENU.end, { day: 'numeric', month: 'short' })} · ${MENU.saved ? 'menu fixé' : 'période proposée'}`, large: true,
     actions: `<button class="ib" data-a="menu-share" aria-label="Partager">${I('share')}</button><button class="ib" data-a="menu-more" aria-label="Options">${I('sliders')}</button>`,
     body: `<div class="between" style="margin-bottom:6px"><button class="btn sm sec" data-a="menu-nav" data-d="-1">${I('back', 's')} Précédent</button><span class="small muted">14 jours</span><button class="btn sm sec" data-a="menu-nav" data-d="1">Suivant ${I('chev', 's')}</button></div>
-      ${(() => { const c = menuCost(); return c.persons ? `<div class="card hstack" style="margin:6px 0 10px;gap:12px"><span class="ico acc">${I('tag')}</span><span class="grow"><b>Budget estimé : ${c.partial ? 'dès ' : '≈ '}${eur(c.total)}</b><span class="sub" style="display:block">≈ ${eur(Math.round(c.total / c.persons))} par personne et par repas${c.partial ? ` · estimation partielle${c.unknown ? ` (${plural(c.unknown, 'repas')} sans prix)` : ''}` : ''}</span></span></div>` : ''; })()}
+      ${(() => { const c = menuCost(); return c.persons ? `<div class="card hstack" style="margin:6px 0 10px;gap:12px"><span class="ico acc">${I('tag')}</span><span class="grow"><b>Budget estimé : ${c.partial ? 'dès ' : '≈ '}${eur(c.total)}</b><span class="sub" style="display:block">≈ ${eur(Math.round(c.total / c.persons))} par personne et par repas${c.partial ? ` · estimation partielle${c.unknown ? ` (${plural(c.unknown, 'repas')} sans prix)` : ''}` : ''}</span></span></div>
+        ${c.weeks.length > 1 ? `<div class="small" style="margin:6px 2px 10px">${c.weeks.map((t, k) => (t == null ? '' : `<div class="between"><span class="muted">Semaine du ${fmtD(addDays(MENU.start, 7 * k), { day: 'numeric', month: 'short' })}</span><b class="num">${eur(t)}</b></div>`)).join('')}</div>` : ''}` : ''; })()}
       <div class="agenda">${agenda}</div>${grid}
       <p class="sub" style="margin:8px 2px">Les repas alimentent la liste de leur période : un repas en ${I('cart', 's')} jour de courses tombe dans cette liste. Appui long sur un repas pour le déplacer.</p>
       <div class="sh"><span>Envies de plats</span><button data-a="wish-add">＋ Proposer</button></div>
