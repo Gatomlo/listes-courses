@@ -18,6 +18,7 @@ const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 
 let summary = null;   // GET /lists
 let promos = [];      // GET /promos (accueil)
+let habits = [];       // « peut-etre a racheter »
 let backlogList = null; // contenu de « À prévoir » (accueil)
 let nextList = null, week = null; // PC : apercu de la prochaine liste ; repas des jours a venir (7 sur PC, 2 sur telephone)
 let current = null;   // liste affichee (GET /lists/:id)
@@ -26,7 +27,7 @@ export async function loadSummary() {
   [summary, promos] = await Promise.all([get(hp('/lists')), get(hp('/promos')).catch(() => promos)]);
   // PC : la place permet d'afficher le contenu de la prochaine liste et le menu de la semaine.
   const n = summary.upcoming.find((l) => !overdue(l));
-  backlogList = await get(hp(`/lists/${summary.backlog.id}`)).catch(() => backlogList);
+  [backlogList, habits] = await Promise.all([get(hp(`/lists/${summary.backlog.id}`)).catch(() => backlogList), get(hp('/habits')).catch(() => habits)]);
   [nextList, week] = await Promise.all([n && isPc() ? get(hp(`/lists/${n.id}`)).catch(() => null) : null,
     get(hp(`/menu?from=${localDay()}&days=${isPc() ? 7 : 2}`)).catch(() => null)]);
 }
@@ -167,8 +168,15 @@ function aheadRows() {
 function backlogBox() {
   const b = summary.backlog, items = backlogList ? backlogList.items.filter((i) => !i.suggestion && i.status !== 'bought') : [];
   return box('À prévoir', `<a href="#/listes/${b.id}">Voir</a>`, `${items.length ? `<div class="pills">${items.slice(0, 14).map((i) => `<span class="pill">${esc(i.name)}${i.qty !== 1 ? ` × ${qtyText(i.qty)}` : ''}</span>`).join('')}${items.length > 14 ? `<span class="pill">+${items.length - 14}</span>` : ''}</div>` : `<p class="muted small" style="margin:0">Rien pour l’instant.</p>`}
-    <div class="row" style="margin-top:10px"><input class="txt grow" id="ap-q" placeholder="Ajouter : lait, 2 beurre, œufs…" autocomplete="off" data-enter="ap-add"><button class="btn sm" data-a="ap-add" aria-label="Ajouter">${I('plus', 's')}</button></div>`, 'backlog-c');
+    <div class="row" style="margin-top:10px"><input class="txt grow" id="ap-q" placeholder="Ajouter : lait, 2 beurre, œufs…" autocomplete="off" data-enter="ap-add"><button class="btn sm" data-a="ap-add" aria-label="Ajouter">${I('plus', 's')}</button></div>
+    ${habits.length ? `<div class="muted small" style="margin:12px 2px 6px">Peut-être à racheter</div><div class="pills">${habits.map((x) => `<button class="pill click" data-a="habit-add" data-pid="${x.product_id}" title="Acheté tous les ${x.every_days} jours environ, dernière fois le ${esc(fmtDate(x.last_date))}">${I('plus', 's')} ${esc(x.name)}</button>`).join('')}</div>` : ''}`, 'backlog-c');
 }
+on('click', 'habit-add', async (el) => {
+  const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'item.add', list_id: summary.backlog.id, product_id: Number(el.dataset.pid), qty: 1 })]));
+  if (r === undefined) return;
+  toast(isManager() ? 'Ajouté à « À prévoir »' : 'Suggestion envoyée au gestionnaire');
+  await loadSummary(); render();
+});
 on('click', 'ap-add', async () => {
   const i = document.getElementById('ap-q');
   if (!i || !i.value.trim()) return;
