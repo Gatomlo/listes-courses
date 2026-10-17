@@ -77,11 +77,11 @@ function render(dir) {
   const view = $('view'), prev = $('scroll');
   const keep = !dir && prev && prev.dataset.v === t.v ? prev.scrollTop : 0;
   const sub = S.stack.length > 1;
-  view.innerHTML = `<header class="bar${sub ? ' sub' : ''}" id="bar">
+  view.innerHTML = `<header class="bar${sub ? ' sub' : v.large ? ' root' : ''}" id="bar">
       <div class="side">${sub ? `<button class="ib" data-a="back" aria-label="Retour">${I('back')}</button>` : ''}</div>
       <div class="t">${v.title}</div><div class="side r">${v.actions || ''}${sub ? '' : `<button class="ib" data-a="gsearch" aria-label="Rechercher">${I('search')}</button><button class="ib menu-b" data-a="menu" aria-label="Menu : produits, magasins, foyer…">${I('menu')}</button>`}</div></header>
     <div class="scroll${dir ? ' anim-' + dir : ''}${v.cls ? ' ' + v.cls : ''}" id="scroll" data-v="${t.v}">
-      ${v.large ? `<h1 class="ltitle">${v.title}</h1>${v.sub ? `<p class="lsub root">${v.sub}</p>` : ''}` : v.sub ? `<p class="lsub">${v.sub}</p>` : ''}
+      ${v.large ? (v.sub ? `<p class="lsub root">${v.sub}</p>` : '') : v.sub ? `<p class="lsub">${v.sub}</p>` : ''}
       ${!S.online ? `<div class="banner off">${I('wifioff')}<span class="grow">Hors-ligne${S.queue ? ` · ${plural(S.queue, 'modification')} en attente` : ''}</span><span class="xs">envoi au retour du réseau</span></div>` : ''}
       ${v.body}</div>
     ${v.dock ? `<div class="dock">${v.dock}</div>` : ''}`;
@@ -124,7 +124,7 @@ function toast(msg, undo, act) {
   const t = document.createElement('div');
   t.className = 'toast';
   t.innerHTML = `<span>${msg}</span>${undo ? '<button data-a="undo">Annuler</button>' : ''}${act ? `<span class="tact">${act.label}</span>` : ''}`;
-  if (act) { t.classList.add('act'); t.dataset.a = act.a; t.dataset.id = act.id; }
+  if (act) { t.classList.add('act'); t.dataset.a = act.a; t.dataset.id = act.id; Object.entries(act.data || {}).forEach(([k, v]) => { t.dataset[k] = v; }); }
   $('layer').appendChild(t);
   A.undo = () => { t.remove(); undo && undo(); };
   clearTimeout(toastT);
@@ -189,6 +189,7 @@ function panelHtml() {
       <li>Courses : écran allumé, ajout de plusieurs articles d’un coup (virgules ou dictée), « peut-être à racheter », parcours du magasin appris, vibration au cochage et « Annuler ».</li>
       <li>Menu : glisser une envie sur un créneau libre (appui long sur téléphone) ; un créneau peut être « à l’extérieur » ou « restes » (aucun achat).</li>
       <li>Recherche globale (loupe en haut) : produits, plats et listes.</li>
+      <li>Interface épurée : titres compacts, mode courses avec barre de progression fine, balayage pour retirer, dernier magasin mémorisé, fin de courses directe quand tout est pris, accueil réduit à « aujourd’hui », listes groupées par magasin, un seul bouton de filtres dans Plats, budget du menu replié.</li>
       <li>Panneaux qui montent du bas (dialogues sur PC), titres qui se replient au défilement.</li>
       <li>Menu en agenda (téléphone) ou grille semaine (PC), envies en carrousel.</li>
       <li>Plats en mosaïque ; fiche à onglets Ingrédients / Recette / Composition / Historique ; mode cuisine plein écran.</li>

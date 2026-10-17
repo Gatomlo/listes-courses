@@ -32,6 +32,10 @@ const heroCard = (cur) => {
       <div class="btn-row" style="margin-top:14px">${bI('basket', 'Ouvrir la liste', `data-a="go" data-v="list" data-id="${cur.id}"`)}${bI('plus', 'Ajouter un article', `data-a="qa" data-k="item"`)}${bI('cart', 'Mode courses', `data-a="shop-pick" data-id="${cur.id}"`, '')}</div>
     </div>`;
 };
+// Accueil : la prochaine liste en une ligne (le detail est dans l'onglet Listes).
+const nextRow = (cur) => { const sc = scenarios(cur), n = counted(cur).length, done = counted(cur).filter((i) => i.done).length;
+  return `<div class="card"><div class="between" style="gap:10px"><button class="grow" style="text-align:left" data-a="go" data-v="list" data-id="${cur.id}"><b>${listName(cur)}</b><span class="sub" style="display:block">${done ? `${done}/${n} dans le caddie` : plural(n, 'article')} · ≈ ${eur(sc.split ? sc.plan.total : sc.all[0].total)}${sc.split ? ' · 2 magasins' : ''}</span></button>
+    <button class="btn sm" data-a="shop-pick" data-id="${cur.id}" aria-label="Mode courses">${I('cart')} Courses</button></div>${done ? `<div class="prog" style="margin-top:10px"><i style="width:${Math.round((done / n) * 100)}%"></i></div>` : ''}</div>`; };
 const noNext = () => `<div class="card"><div class="mid">Pas de prochaine liste</div><p class="sub" style="margin:4px 0 12px">Elle reprend les récurrents et « À prévoir ».</p>${isM() ? `<button class="btn" data-a="new-list">${I('plus')} Créer la prochaine liste</button>` : ''}</div>`;
 const backlogCard = () => {
   const ap = listById('ap');
@@ -68,9 +72,6 @@ const aheadRows = () => [0, 1].flatMap((n) => MEALS.filter((m) => m.date === add
 })).join('');
 VIEWS.home = () => {
   const cur = dated()[0], meals = dayMeals(), ahead = aheadRows();
-  // Promos : seulement celles qui concernent des produits deja dans vos listes.
-  const wanted = new Set([...dated().flatMap((l) => counted(l).map((i) => i.pid)), ...listById('ap').items.map((i) => i.pid)]);
-  const promos = PROMOS.filter((p) => p.until >= TODAY && wanted.has(p.pid));
   return {
     title: 'Accueil', sub: `${HOUSE.name} · ${fmtD(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}`, large: true,
     body: `${todoBlock()}
@@ -80,13 +81,8 @@ VIEWS.home = () => {
       <div class="sh"><span>À prévoir</span><button data-a="go" data-v="list" data-id="ap">Voir</button></div>
       ${backlogCard()}
       </div><div>
-      <div class="sh"><span>Prochaine liste</span></div>
-      ${cur ? heroCard(cur).replace('<span class="sub">Prochaine liste</span>', '<span class="sub">Courses</span>') : noNext()}
-      ${promos.length ? `<div class="sh"><span>Promos sur vos listes</span><button data-a="promo-add">Signaler</button></div>
-      <div class="hscroll">${promos.map((p) => `<button class="card tap" style="width:180px;text-align:left" data-a="go" data-v="product" data-id="${p.pid}">
-        ${sp(p.st)}<div class="b" style="margin:8px 0 2px">${P[p.pid].n}</div>
-        <div class="hstack"><span class="mid num" style="color:var(--warn)">${eur(p.price)}</span><s class="faint small num">${eur(P[p.pid].avg[p.st])}</s></div>
-        <div class="sub">jusqu’au ${fmtD(p.until, { day: 'numeric', month: 'short' })}</div></button>`).join('')}</div>` : ''}
+      <div class="sh"><span>Prochaines courses</span></div>
+      ${cur ? nextRow(cur) : noNext()}
       </div></div>`,
   };
 };
@@ -152,12 +148,13 @@ VIEWS.list = (t) => {
   const l = listById(t.id), ro = l.status === 'closed';
   const f = S.q['ls' + l.id] || 'all';
   const sc = l.type === 'dated' ? scenarios(l) : null;
+  const grouped = l.type === 'dated' && !ro;
   const items = l.items.filter((i) => f === 'all' || storeOf(i) === f);
   const order = f === 'all' ? Object.keys(CATS) : ORDER[f];
   const todo = items.filter((i) => !i.done && !i.unav), cart = items.filter((i) => i.done), unav = items.filter((i) => i.unav);
   const byCat = order.map((c) => [c, todo.filter((i) => P[i.pid].cat === c)]).filter(([, xs]) => xs.length);
   const meals = l.type === 'dated' ? MEALS.filter((m) => !m.sugg && !m.rest && m.date >= l.date && m.date < (LISTS.filter((x) => x.type === 'dated' && x.date > l.date).map((x) => x.date).sort()[0] || addDays(l.date, HOUSE.rhythm))) : [];
-  const segs = l.type === 'dated' ? `<div class="chips" style="position:sticky;top:0;z-index:1;background:var(--bg);padding-block:6px">
+  const segs = false ? `<div class="chips" style="position:sticky;top:0;z-index:1;background:var(--bg);padding-block:6px">
       <button class="chip ${f === 'all' ? 'on' : ''}" data-a="lfilter" data-id="${l.id}" data-f="all">Tous <span class="n">${l.items.length}</span></button>
       ${activeStores().map((s) => `<button class="chip ${f === s ? 'on' : ''}" data-a="lfilter" data-id="${l.id}" data-f="${s}">${dotS(s)} ${STORES[s].n} <span class="n">${l.items.filter((i) => storeOf(i) === s).length}</span></button>`).join('')}</div>` : '';
   const scen = sc && !ro ? `<button class="card tap" style="width:100%;text-align:left;margin-bottom:6px" data-a="scen" data-id="${l.id}">
@@ -170,7 +167,9 @@ VIEWS.list = (t) => {
     sub: l.type === 'backlog' ? 'Articles sans date, à importer dans une liste' : `${STATUS[l.status][0]} · ${plural(counted(l).length, 'article')}${ro ? ' · lecture seule' : ''}`,
     actions: `<button class="ib" data-a="list-menu" data-id="${l.id}" aria-label="Actions">${I('more')}</button>`,
     body: `${ticketsBox(ticketsDue(l))}${presence}<div class="cols"><div>${segs}
-      ${byCat.map(([c, xs]) => rayonBlock(c, xs, f === 'all' ? null : f, (i) => itemRow(i, l, ro))).join('')}
+      ${grouped ? activeStores().map((s) => { const mine = todo.filter((i) => storeOf(i) === s); if (!mine.length) return ''; const tot = mine.reduce((n, i) => n + (price(i.pid, s) ?? 0) * qtyOf(i), 0), unk = mine.filter((i) => price(i.pid, s) == null).length;
+        return `<div class="storehead">${dotS(s)}<b>${STORES[s].n}</b><span class="muted">${plural(mine.length, 'article')}</span><span class="tot num">≈ ${eur(tot)}${unk ? '+' : ''}</span></div>` + ORDER[s].map((cc) => [cc, mine.filter((i) => P[i.pid].cat === cc)]).filter(([, xs]) => xs.length).map(([cc, xs]) => rayonBlock(cc, xs, s, (i) => itemRow(i, l, ro))).join(''); }).join('')
+      : byCat.map(([c, xs]) => rayonBlock(c, xs, f === 'all' ? null : f, (i) => itemRow(i, l, ro))).join('')}
       ${!todo.length && !cart.length ? `<div class="empty">${I('basket', 'l')}<p>Rien à acheter${f === 'all' ? '' : ' dans ce magasin'}.</p></div>` : ''}
       ${unav.length ? `<div class="rayon">Indisponibles<span class="n">${unav.length}</span></div><div class="group">${unav.map((i) => itemRow(i, l, ro)).join('')}</div>` : ''}
       ${cart.length ? `<button class="rayon" style="width:100%" data-a="cart-toggle" data-id="${l.id}">${I('cart', 's')} Dans le caddie<span class="n">${cart.length} ${I(S.q['cart' + l.id] ? 'up' : 'down', 's')}</span></button>
@@ -195,7 +194,8 @@ function itemRow(i, l, ro) {
     i.sugg ? `<span style="color:var(--warn)">${I('bulb', 's')} suggéré par ${i.sugg}</span>` : '',
     i.unav ? `<span>${I('ban', 's')} indisponible</span>` : '',
   ].join('');
-  const right = l.type === 'backlog' ? '' : `<span class="px"><b class="num small" ${promo ? 'style="color:var(--warn)"' : ''}>${eur(pr == null ? null : pr * qtyOf(i))}</b><button class="sp" style="--c:${STORES[st].c};--cs:${STORES[st].cs}" data-a="store-pick" data-id="${i.id}">${STORES[st].n}${i.st ? ' ✓' : ''}</button></span>`;
+  // Pas de prix ni de magasin sur chaque ligne : le magasin est le groupe, le prix est dans la fiche.
+  const right = l.type === 'backlog' || (l.type === 'dated' && !ro) ? (promo ? '<span class="pill warn">promo</span>' : '') : `<span class="px"><b class="num small" ${promo ? 'style="color:var(--warn)"' : ''}>${eur(pr == null ? null : pr * qtyOf(i))}</b></span>`;
   const ck = i.sugg && isM() ? `<button class="ib solid" style="color:var(--accent)" data-a="sugg-ok-row" data-id="${i.id}" aria-label="Accepter">${I('check')}</button>`
     : `<button class="ck ${i.done ? 'on' : ''}" data-a="check" data-id="${i.id}" ${ro || i.sugg ? 'disabled' : ''} aria-label="Acheté">${I('check')}</button>`;
   return `<div class="item ${i.done ? 'done' : ''} ${i.sugg ? 'sugg' : ''} ${i.unav ? 'unav' : ''}" id="it${i.id}">${ck}
@@ -352,12 +352,15 @@ A['ticket-skip'] = (el) => { tripOf(listById(el.dataset.id), el.dataset.st).skip
 
 A['shop-pick'] = (el) => {
   const l = listById(el.dataset.id), sw = el.dataset.sw, ex = el.dataset.ex || '';
+  // Dernier magasin utilise : « Partir faire les courses » y va directement (changement par l'icone magasin de l'en-tete).
+  const last = S.q.lastShop;
+  if (!sw && !ex && last && (last === 'all' || (STORES[last] && STORES[last].active))) { A['shop-go']({ dataset: { id: l.id, st: last, sw: '' } }); return; }
   const todo = counted(l).filter((i) => !i.done);
   sheet(`<h3>Où faites-vous les courses ?</h3><p class="lead">Tous les articles restants sont affichés ; ceux conseillés ailleurs portent une mention. Fonctionne hors-ligne.</p>
     <div class="group">${activeStores().filter((s) => s !== ex).map((s) => { const n = todo.filter((i) => storeOf(i) === s).length; return `<button class="row tap" data-a="shop-go" data-id="${l.id}" data-st="${s}" data-sw="${sw || ''}">${dotS(s)}<span class="grow"><b>${STORES[s].n}</b><span class="sub" style="display:block">${plural(todo.length, 'article')} à prendre · dont ${n} conseillé${n > 1 ? 's' : ''} ici</span></span>${I('arrowR')}</button>`; }).join('')}
     ${ex ? '' : `<button class="row tap" data-a="shop-go" data-id="${l.id}" data-st="all" data-sw="${sw || ''}"><span class="ico acc">${I('cart')}</span><span class="grow"><b>Plusieurs magasins</b><span class="sub" style="display:block">Chaque article chez son magasin conseillé · magasin choisi au cochage</span></span>${I('arrowR')}</button>`}</div>`);
 };
-A['shop-go'] = (el) => { closeSheet(); (el.dataset.sw ? replace : go)('shop', { id: el.dataset.id, st: el.dataset.st }); };
+A['shop-go'] = (el) => { S.q.lastShop = el.dataset.st; closeSheet(); (el.dataset.sw ? replace : go)('shop', { id: el.dataset.id, st: el.dataset.st }); };
 const shopOthers = (l, st) => activeStores().filter((s) => s !== st && counted(l).some((i) => !i.done && storeOf(i) === s));
 const shopFilterHtml = () => {
   const { id, st } = S.q.sf, l = listById(id), hid = S.q['shf' + id] || [];
@@ -375,19 +378,16 @@ VIEWS.shop = (t) => {
   const mine = real.filter((i) => st === 'all' || (i.done ? boughtAt(i) === st : storeOf(i) === st || !hidden.includes(storeOf(i))));
   const todo = mine.filter((i) => !i.done), cart = mine.filter((i) => i.done);
   const pct = mine.length ? Math.round((cart.length / mine.length) * 100) : 0;
+  const est = mine.reduce((n, i) => n + (price(i.pid, st === 'all' ? storeOf(i) : st) ?? price(i.pid, storeOf(i)) ?? 0) * qtyOf(i), 0);
   const others = st === 'all' ? [] : activeStores().filter((s) => s !== st && real.some((i) => !i.done && storeOf(i) === s));
   const order = st === 'all' ? Object.keys(CATS) : [...ORDER[st], ...Object.keys(CATS).filter((c) => !ORDER[st].includes(c))];
   const badge = (i) => (st === 'all' ? sp(storeOf(i)) : storeOf(i) !== st ? sp(storeOf(i), 'conseillé chez ' + STORES[storeOf(i)].n) : '');
   return {
     title: shopName(st), cls: 'shop', noTabs: true,
     actions: activeStores().length > 1 ? `<button class="ib" data-a="shop-pick" data-id="${l.id}" data-sw="1" aria-label="Changer de magasin">${I('store')}</button>` : '',
-    body: `<div class="card" style="--c:${col};margin-bottom:6px;overflow:hidden;padding:0"><div class="shopbar"></div><div style="padding:14px 16px">
-      <div class="between"><span class="mid">${cart.length} / ${mine.length}</span><span class="muted small">${listName(l)}</span></div>
-      <div class="prog" style="margin-top:10px"><i style="width:${pct}%;background:${col}"></i></div>
-      <div class="hstack small muted" style="margin-top:10px">${avatar(MEMBERS[1], 's')} Léa est aussi sur cette liste</div>
-      <div class="hstack small muted" style="margin-top:6px">${I('eye', 's')} Écran allumé pendant les courses</div></div></div>
+    body: `<div class="shopbar2" style="--c:${col}"><span class="mid num">${cart.length}/${mine.length}</span><div class="prog"><i style="width:${pct}%"></i></div><b class="num small">≈ ${eur(est)}</b><span title="Léa est aussi sur cette liste">${avatar(MEMBERS[1], 's')}</span></div>
       ${others.length ? `<button class="fbar" data-a="shop-filters" data-id="${l.id}" data-st="${st}"><span class="dots">${others.filter((s) => !hidden.includes(s)).slice(0, 4).map(dotS).join('')}</span><span class="grow">${!hidden.length ? 'Articles des autres magasins affichés' : others.some((s) => !hidden.includes(s)) ? `${others.filter((s) => !hidden.includes(s)).length} autre(s) magasin(s) affiché(s) · ${real.filter((i) => !i.done && hidden.includes(storeOf(i)) && storeOf(i) !== st).length} masqué(s)` : `Seulement ce magasin · ${real.filter((i) => !i.done && hidden.includes(storeOf(i)) && storeOf(i) !== st).length} masqué(s)`}</span>${I('down', 's')}</button>` : ''}
-      ${order.map((c) => [c, todo.filter((i) => P[i.pid].cat === c)]).filter(([, xs]) => xs.length).map(([c, xs]) => rayonBlock(c, xs, st === 'all' ? null : st, (i) => `<div class="item"><button class="ck" data-a="shop-check" data-id="${i.id}" aria-label="Dans le caddie">${I('check')}</button><button class="grow" style="text-align:left" data-a="shop-check" data-id="${i.id}"><div class="nm">${P[i.pid].n}</div><div class="meta"><span>${qtyText(i)}</span>${i.note ? `<span>${esc(i.note)}</span>` : ''}${i.need ? `<span>${i.need}</span>` : ''}${badge(i) ? `<span>${badge(i)}</span>` : ''}</div></button>${isM() ? `<button class="ib" data-a="shop-del" data-id="${i.id}" aria-label="Retirer de la liste">${I('x', 's')}</button>` : ''}</div>`)).join('')}
+      ${order.map((c) => [c, todo.filter((i) => P[i.pid].cat === c)]).filter(([, xs]) => xs.length).map(([c, xs]) => rayonBlock(c, xs, st === 'all' ? null : st, (i) => `<div class="${isM() ? 'swipe' : ''}">${isM() ? `<button class="swipe-del" data-a="shop-del" data-id="${i.id}" aria-label="Retirer de la liste">${I('trash', 's')} Retirer</button>` : ''}<div class="item" data-swipe><button class="ck" data-a="shop-check" data-id="${i.id}" aria-label="Dans le caddie">${I('check')}</button><button class="grow" style="text-align:left" data-a="shop-check" data-id="${i.id}"><div class="nm">${P[i.pid].n}</div><div class="meta"><span>${qtyText(i)}</span>${i.note ? `<span>${esc(i.note)}</span>` : ''}${i.need ? `<span>${i.need}</span>` : ''}${badge(i) ? `<span>${badge(i)}</span>` : ''}</div></button></div></div>`)).join('')}
       ${!todo.length ? `<div class="empty">${I('check', 'l')}<p><b>Tout est dans le caddie.</b></p></div>` : ''}
       ${cart.length ? `<div class="rayon">${I('cart', 's')} Dans le caddie<span class="n">${cart.length}</span></div><div class="group">${cart.map((i) => `<div class="item done"><button class="ck on" data-a="shop-uncheck" data-id="${i.id}" aria-label="Retirer du caddie">${I('check')}</button><div class="grow"><div class="nm">${P[i.pid].n}</div></div>${st === 'all' ? sp(boughtAt(i)) : ''}<button class="pill" data-a="shop-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid ? eur(i.paid) : `${I('plus', 's')} prix`}</button></div>`).join('')}</div>` : ''}`,
     dock: `<div class="btn-row">${bI('plus', isM() ? 'Ajouter un oubli' : 'Suggérer un article', `data-a="add-sheet" data-id="${l.id}"`)}<button class="btn" style="flex:3;background:${col}" data-a="shop-end" data-id="${l.id}" data-st="${st}">${st === 'all' ? 'Terminer les courses' : 'Terminer chez ' + STORES[st].n}</button></div>`,
@@ -424,6 +424,8 @@ A['shop-uncheck'] = (el) => { const { i } = findItem(el.dataset.id), bt = i.bt; 
 A['shop-end'] = (el) => {
   const st = el.dataset.st, l = listById(el.dataset.id), real = counted(l);
   const left = real.filter((i) => !i.done), here = real.filter((i) => i.done && (st === 'all' || boughtAt(i) === st));
+  // Tout est pris : pas de fenetre, le passage se termine ; le ticket se scanne depuis la notification.
+  if (!left.length) { S.q.end = { id: l.id, st }; S.q.fate = ''; A['end-go']({ dataset: { direct: '1' } }); return; }
   const elsewhere = st === 'all' ? [] : activeStores().filter((s) => s !== st);
   S.q.end = { id: l.id, st };
   S.q.fate = !left.length ? '' : elsewhere.length && (left.some((i) => storeOf(i) !== st) || !isM()) ? 'continue' : isM() ? 'report' : 'continue';
@@ -447,8 +449,9 @@ A['end-go'] = (el) => {
   queued(); closeSheet();
   if (el.dataset.scan && stores.length) { S.q.scanStep = null; replace('scan', { id, st: stores[0] }); return; }
   if (fate === 'continue') { A['shop-pick']({ dataset: { id, sw: '1', ex: st } }); return; }
-  if (fate === 'report' || (empty && isM())) { A['close-list']({ dataset: { id } }); return; }
-  back(); toast(stores.length ? 'Passage terminé · ticket à saisir' : 'Courses terminées');
+  if (fate === 'report' || (empty && isM() && !el.dataset.direct)) { A['close-list']({ dataset: { id } }); return; }
+  back();
+  toast(stores.length ? 'Passage terminé · ticket à saisir' : 'Courses terminées', null, stores.length ? { label: 'Scanner le ticket', a: 'ticket-scan', id, data: { st: stores[0] } } : null);
 };
 
 // ---------- Ticket ----------

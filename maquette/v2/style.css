@@ -414,3 +414,22 @@ ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;
 .subrayon .n{margin-left:auto;color:var(--faint);font-weight:600}
 .sub-row{padding-left:30px;min-height:44px;background:color-mix(in srgb,var(--raised) 60%,transparent)}
 .subord{margin:0 0 6px 28px;border-left:2px solid var(--line)}
+
+/* Epuration : titres compacts, barre de progression fine, balayage, groupes par magasin */
+.bar.root .side:first-child{display:none}
+.bar.root .t{opacity:1;text-align:left;font-size:21px}
+.lsub.root{margin:0 2px 10px;font-size:13px}
+.shopbar2{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:10px;margin:0 -2px 8px;padding:8px 4px;background:var(--bg)}
+.shopbar2 .prog{flex:1;margin:0}
+.shopbar2 .prog i{background:var(--c)}
+.swipe{position:relative;overflow:hidden;border-top:1px solid var(--line)}
+.swipe .swipe-del{position:absolute;right:0;top:0;bottom:0;width:96px;background:var(--danger);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px}
+.swipe>.item{position:relative;background:var(--surface);touch-action:pan-y;transition:transform .18s;border-top:0}
+.swipe>.item.dragging{transition:none}
+.storehead{display:flex;align-items:center;gap:8px;margin:14px 2px 2px;font-size:13px}
+.storehead b{font-size:14px}
+.storehead .tot{margin-left:auto;font-weight:700}
+.budget-btn{width:100%;text-align:left}
+.search .ib{position:absolute;right:3px;top:3px}
+.search .ib svg{position:static}
+.search:has(.ib) .in{padding-right:46px}
