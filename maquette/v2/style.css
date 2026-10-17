@@ -238,7 +238,8 @@ select.in{appearance:none;background-image:linear-gradient(45deg,transparent 50%
 /* Mode courses */
 .shop .item{min-height:54px;padding:8px 16px}
 .shop .item .nm{font-size:16px}
-.toast button{margin-left:12px}
+.toast.act{display:flex;align-items:center;justify-content:space-between;gap:12px;width:min(520px,calc(100% - 24px));box-sizing:border-box;cursor:pointer;pointer-events:auto}
+.toast .tact{border-radius:9px;background:rgb(255 255 255 / .16);font-weight:700;padding:5px 11px;white-space:nowrap}
 .shop .ck{width:34px;height:34px}
 .shopbar{height:6px;background:var(--c)}
 

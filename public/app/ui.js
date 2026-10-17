@@ -82,16 +82,20 @@ export function confirmSheet({ title, text, ok = 'Confirmer', danger = false }) 
 
 // ---------- Message ----------
 let toastTimer;
-// action facultative : { label, a, id } -> bouton data-a (ex. « ＋ prix » apres avoir coche un article).
+// action facultative : { label, a, id } -> toute la notification est cliquable (largeur de l'ecran) et
+// declenche l'action data-a (ex. « ＋ prix » apres avoir coche un article).
 export function toast(msg, isError = false, action = null) {
   let el = document.querySelector('.toast');
   if (!el) { el = document.createElement('div'); el.className = 'toast'; document.body.appendChild(el); }
   el.textContent = msg;
+  delete el.dataset.a; delete el.dataset.id;
+  el.classList.toggle('act', !!action);
   if (action) {
-    const b = document.createElement('button');
+    el.dataset.a = action.a;
+    if (action.id != null) el.dataset.id = action.id;
+    const b = document.createElement('span');
+    b.className = 'tact';
     b.textContent = action.label;
-    b.dataset.a = action.a;
-    if (action.id != null) b.dataset.id = action.id;
     el.appendChild(b);
   }
   el.classList.toggle('err', isError);

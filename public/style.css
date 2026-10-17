@@ -230,7 +230,8 @@ button.st{cursor:pointer;flex:none}
 .shop .item{min-height:52px;padding:6px 0}
 .shop .item .nm,.shop .item.line1 .nm .t{font-size:16px}
 .shop .chk{width:30px;height:30px}
-.toast button{margin-left:12px;border:0;background:rgb(255 255 255 / .16);color:inherit;font:inherit;font-weight:700;border-radius:9px;padding:4px 10px;cursor:pointer}
+.toast.act{display:flex;align-items:center;justify-content:space-between;gap:12px;width:min(560px,calc(100% - 24px));box-sizing:border-box;padding:14px 16px;cursor:pointer}
+.toast .tact{border-radius:9px;background:rgb(255 255 255 / .16);font-weight:700;padding:5px 11px;white-space:nowrap}
 .shopbar{height:6px;background:var(--c)}
 .txt.big{font-size:26px;text-align:center;font-weight:700}
 

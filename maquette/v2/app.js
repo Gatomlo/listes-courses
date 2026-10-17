@@ -121,7 +121,8 @@ function toast(msg, undo, act) {
   document.querySelector('.toast')?.remove();
   const t = document.createElement('div');
   t.className = 'toast';
-  t.innerHTML = `<span>${msg}</span>${undo ? '<button data-a="undo">Annuler</button>' : ''}${act ? `<button data-a="${act.a}" data-id="${act.id}">${act.label}</button>` : ''}`;
+  t.innerHTML = `<span>${msg}</span>${undo ? '<button data-a="undo">Annuler</button>' : ''}${act ? `<span class="tact">${act.label}</span>` : ''}`;
+  if (act) { t.classList.add('act'); t.dataset.a = act.a; t.dataset.id = act.id; }
   $('layer').appendChild(t);
   A.undo = () => { t.remove(); undo && undo(); };
   clearTimeout(toastT);
