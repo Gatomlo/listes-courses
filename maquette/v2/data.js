@@ -119,6 +119,8 @@ const LISTS = [
     it('hac', 0, { mq: 1, from: ['Chili sin carne'] }), it('con', 0, { mq: 2, from: ['Chili sin carne'] }), it('riz', 1),
     it('lai', 6), it('ban', 2), it('pat', 0, { mq: 1, from: ['Pâtes au pesto'] }), it('pes', 0, { mq: 1, from: ['Pâtes au pesto'] }), it('eau', 2),
   ] },
+  // Liste restee ouverte apres les courses (tout est pris) : rappel de cloture.
+  { id: 'l09', type: 'dated', date: '2026-10-09', status: 'cours', items: [it('lai', 6, { done: true }), it('pat', 2, { done: true }), it('tom', 1, { done: true })] },
   { id: 'l06', type: 'dated', date: '2026-10-06', status: 'closed', items: [
     it('lai', 6, { done: true }), it('ban', 2, { done: true }), it('pat', 2, { done: true }), it('pou', 1, { done: true }),
     it('vai', 1, { unav: true }), it('eau', 2, { done: true }), it('beu', 1, { done: true }), it('tom', 1, { done: true }),

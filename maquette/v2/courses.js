@@ -2,10 +2,16 @@
 const listName = (l) => (l.type === 'backlog' ? 'À prévoir' : fmtD(l.date, { weekday: 'long', day: 'numeric', month: 'long' }));
 const STATUS = { prep: ['En préparation', ''], cours: ['En cours', 'acc'], closed: ['Clôturée', ''] };
 const statusPill = (l) => (l.type === 'backlog' ? '' : `<span class="pill ${STATUS[l.status][1]}">${STATUS[l.status][0]}</span>`);
-const dated = () => LISTS.filter((l) => l.type === 'dated' && l.status !== 'closed').sort((a, b) => a.date.localeCompare(b.date));
+// Listes a venir ou en cours ; une liste ouverte dont la date est passee depuis plus d'un jour releve du rappel de cloture.
+const overdue = (l) => l.type === 'dated' && l.status !== 'closed' && l.date < addDays(TODAY, -1);
+const dated = () => LISTS.filter((l) => l.type === 'dated' && l.status !== 'closed' && !overdue(l)).sort((a, b) => a.date.localeCompare(b.date));
 const nextDate = () => addDays(LISTS.filter((l) => l.type === 'dated').map((l) => l.date).sort().pop(), HOUSE.rhythm);
 const qtyText = (i) => `${qtyOf(i)} × ${P[i.pid].u}`;
 
+// Rappel de cloture (gestionnaire) : liste « en cours » dont tout est pris, ou liste restee ouverte apres sa date.
+const closeDue = () => (isM() ? LISTS.filter((l) => l.type === 'dated' && l.status !== 'closed').map((l) => { const real = counted(l), left = real.filter((i) => !i.done).length, allDone = l.status === 'cours' && real.length > 0 && !left;
+  return allDone || overdue(l) ? { l, left, allDone } : null; }).filter(Boolean) : []);
+const closeRows = () => closeDue().map(({ l, left, allDone }) => `<button class="row tap" data-a="close-list" data-id="${l.id}"><span class="ico acc">${I('check')}</span><span class="grow"><b>Clôturer les courses du ${fmtD(l.date, { day: 'numeric', month: 'long' })}</b><span class="sub" style="display:block">${allDone ? 'Tout est pris' : `date passée${left ? ` · ${plural(left, 'article')} non pris` : ''}`}</span></span>${I('chev', 's chev')}</button>`).join('');
 // Un rayon et ses articles ; si le rayon a des sous-rayons, un intitulé par sous-rayon (ordre du magasin).
 const rayonBlock = (cat, xs, st, row) => {
   const gs = SUBS[cat] ? bySub(cat, xs, st) : [['', xs]];
@@ -60,7 +66,7 @@ const todoBlock = () => {
   const tix = LISTS.flatMap(ticketsDue);
   const nSugg = LISTS.flatMap((l) => l.items.filter((i) => i.sugg)).length + MEALS.filter((m) => m.sugg).length;
   const wishes = WISHES.filter((w) => w.status === 'pending');
-  let html = ticketRows(tix);
+  let html = closeRows() + ticketRows(tix);
   if (isM() && nSugg) html += `<button class="row tap" data-a="sugg-sheet"><span class="ico warn">${I('bulb')}</span><span class="grow"><b>${plural(nSugg, 'suggestion')} à valider</b><span class="sub" style="display:block">de ${[...new Set([...LISTS.flatMap((l) => l.items.filter((i) => i.sugg).map((i) => i.sugg)), ...MEALS.filter((m) => m.sugg).map((m) => m.sugg)])].join(', ')}</span></span>${I('chev', 's chev')}</button>`;
   if (isM() && wishes.length) html += `<button class="row tap" data-a="tab" data-t="menu"><span class="ico warn">${I('bulb')}</span><span class="grow"><b>${plural(wishes.length, 'envie')} de plat à valider</b><span class="sub" style="display:block">dans le menu</span></span>${I('chev', 's chev')}</button>`;
   return html ? `<div class="sh"><span>À faire</span></div><div class="group">${html}</div>` : '';
@@ -166,7 +172,7 @@ VIEWS.list = (t) => {
     title: l.type === 'backlog' ? 'À prévoir' : fmtD(l.date, { weekday: 'short', day: 'numeric', month: 'long' }),
     sub: l.type === 'backlog' ? 'Articles sans date, à importer dans une liste' : `${STATUS[l.status][0]} · ${plural(counted(l).length, 'article')}${ro ? ' · lecture seule' : ''}`,
     actions: `<button class="ib" data-a="list-menu" data-id="${l.id}" aria-label="Actions">${I('more')}</button>`,
-    body: `${ticketsBox(ticketsDue(l))}${presence}<div class="cols"><div>${segs}
+    body: `${closeDue().some((x) => x.l === l) ? `<button class="banner" style="width:100%" data-a="close-list" data-id="${l.id}">${I('check')}<span class="grow" style="text-align:left">${counted(l).every((i) => i.done) ? 'Tout est pris : clôturer la liste ?' : 'Courses passées : clôturer la liste ?'}</span>${I('chev', 's')}</button>` : ''}${ticketsBox(ticketsDue(l))}${presence}<div class="cols"><div>${segs}
       ${grouped ? activeStores().map((s) => { const mine = todo.filter((i) => storeOf(i) === s); if (!mine.length) return ''; const tot = mine.reduce((n, i) => n + (price(i.pid, s) ?? 0) * qtyOf(i), 0), unk = mine.filter((i) => price(i.pid, s) == null).length;
         return `<div class="storehead">${dotS(s)}<b>${STORES[s].n}</b><span class="muted">${plural(mine.length, 'article')}</span><span class="tot num">≈ ${eur(tot)}${unk ? '+' : ''}</span></div>` + ORDER[s].map((cc) => [cc, mine.filter((i) => P[i.pid].cat === cc)]).filter(([, xs]) => xs.length).map(([cc, xs]) => rayonBlock(cc, xs, s, (i) => itemRow(i, l, ro))).join(''); }).join('')
       : byCat.map(([c, xs]) => rayonBlock(c, xs, f === 'all' ? null : f, (i) => itemRow(i, l, ro))).join('')}
@@ -246,7 +252,7 @@ A['del-list'] = (el) => confirmSheet('Supprimer la liste ?', 'Les articles manue
 A['close-list'] = (el) => {
   const l = listById(el.dataset.id), left = counted(l).filter((i) => !i.done);
   S.q.carry = S.q.carry || {};
-  live(() => `<h3>Clôturer la liste</h3><p class="lead">${plural(left.length, 'article')} non acheté${left.length > 1 ? 's' : ''} : choisir où ${left.length > 1 ? 'ils vont' : 'il va'}.</p>
+  live(() => `<h3>Clôturer la liste</h3><p class="lead">${left.length ? `${plural(left.length, 'article')} non acheté${left.length > 1 ? 's' : ''} : choisir où ${left.length > 1 ? 'ils vont' : 'il va'}.` : 'Tout a été acheté : la liste passe dans l’historique.'}</p>
     <div class="seg" style="margin-bottom:12px">${[['next', 'Liste suivante'], ['ap', 'À prévoir'], ['drop', 'Abandon']].map(([k, t]) => `<button class="${(S.q.carryAll || 'next') === k ? 'on' : ''}" data-a="carry-all" data-k="${k}">${t}</button>`).join('')}</div>
     <div class="group">${left.map((i) => `<div class="row"><span class="grow">${P[i.pid].n}</span><select class="in" style="width:150px;height:38px" aria-label="Destination"><option>Liste suivante</option><option ${S.q.carryAll === 'ap' ? 'selected' : ''}>À prévoir</option><option ${S.q.carryAll === 'drop' ? 'selected' : ''}>Abandon</option></select></div>`).join('')}</div>
     <p class="sub" style="margin-top:10px">Les suggestions encore en attente sont abandonnées.</p>
