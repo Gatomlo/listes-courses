@@ -583,3 +583,6 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 .swipe .swipe-del{position:absolute;right:0;top:0;bottom:0;width:96px;background:var(--danger,#b3261e);color:#fff;font-weight:700;border:0;display:flex;align-items:center;justify-content:center;gap:6px}
 .swipe>.item{position:relative;background:var(--bg);touch-action:pan-y;transition:transform .18s}
 .swipe>.item.dragging{transition:none}
+
+.ib.rec{background:var(--danger,#b3261e);color:#fff;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.6}}

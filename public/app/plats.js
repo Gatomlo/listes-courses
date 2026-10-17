@@ -791,14 +791,15 @@ document.addEventListener('touchend', (e) => {
 // Ecran allume tant que le mode cuisine est ouvert et visible (si le navigateur le
 // permet) ; le navigateur relache le verrou quand l'app passe en arriere-plan.
 let wakeLock = null, wakeBusy = false;
-async function syncWake() {
-  const want = location.hash.includes('/cuisine') && document.visibilityState === 'visible';
+export const isAwake = () => !!wakeLock;
+export async function syncWake() {
+  const want = /\/(cuisine|magasin\/)/.test(location.hash) && document.visibilityState === 'visible';
   if (want && !wakeLock && !wakeBusy && 'wakeLock' in navigator) {
     wakeBusy = true;
     try {
       wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; if (location.hash.includes('/cuisine')) render(); });
-      if (location.hash.includes('/cuisine')) render();
+      wakeLock.addEventListener('release', () => { wakeLock = null; if (/\/(cuisine|magasin\/)/.test(location.hash)) render(); });
+      if (/\/(cuisine|magasin\/)/.test(location.hash)) render();
     } catch { /* refuse (economie d'energie, page non securisee) : veille normale */ }
     wakeBusy = false;
   } else if (!want && wakeLock) { const w = wakeLock; wakeLock = null; w.release().catch(() => {}); }

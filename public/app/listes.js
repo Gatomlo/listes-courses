@@ -4,10 +4,10 @@ import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, for
 import { get, post, put, patch, del, attempt, sync, newOp, setCached, net } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
 import { unitOptions, catOptions, contField } from './catalogue.js';
-import { SLOT, tile } from './plats.js';
+import { SLOT, tile, isAwake, syncWake } from './plats.js';
 import { startScan } from './scan.js';
 import { I, btnI } from './icons.js';
-import { multiAdd } from './multi.js';
+import { multiAdd, micButton } from './multi.js';
 
 const STATUS = { prep: 'En préparation', shopping: 'En courses', closed: 'Clôturée' };
 const longDate = (d) => fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -168,7 +168,7 @@ function aheadRows() {
 function backlogBox() {
   const b = summary.backlog, items = backlogList ? backlogList.items.filter((i) => !i.suggestion && i.status !== 'bought') : [];
   return box('À prévoir', `<a href="#/listes/${b.id}">Voir</a>`, `${items.length ? `<div class="pills">${items.slice(0, 14).map((i) => `<span class="pill">${esc(i.name)}${i.qty !== 1 ? ` × ${qtyText(i.qty)}` : ''}</span>`).join('')}${items.length > 14 ? `<span class="pill">+${items.length - 14}</span>` : ''}</div>` : `<p class="muted small" style="margin:0">Rien pour l’instant.</p>`}
-    <div class="row" style="margin-top:10px"><input class="txt grow" id="ap-q" placeholder="Ajouter : lait, 2 beurre, œufs…" autocomplete="off" data-enter="ap-add"><button class="btn sm" data-a="ap-add" aria-label="Ajouter">${I('plus', 's')}</button></div>
+    <div class="row" style="margin-top:10px"><input class="txt grow" id="ap-q" placeholder="Ajouter : lait, 2 beurre, œufs…" autocomplete="off" data-enter="ap-add">${micButton('ap-q')}<button class="btn sm" data-a="ap-add" aria-label="Ajouter">${I('plus', 's')}</button></div>
     ${habits.length ? `<div class="muted small" style="margin:12px 2px 6px">Peut-être à racheter</div><div class="pills">${habits.map((x) => `<button class="pill click" data-a="habit-add" data-pid="${x.product_id}" title="Acheté tous les ${x.every_days} jours environ, dernière fois le ${esc(fmtDate(x.last_date))}">${I('plus', 's')} ${esc(x.name)}</button>`).join('')}</div>` : ''}`, 'backlog-c');
 }
 on('click', 'habit-add', async (el) => {
@@ -488,6 +488,7 @@ on('click', 'shop-filter-all', (el) => {
 
 export function storeListView(sid) {
   if (!current) return { title: 'Chargement…', body: '' };
+  setTimeout(syncWake); // ecran allume pendant les courses (si le navigateur le permet)
   const l = current, all = sid === 'tous', s = all ? { id: 'tous', name: 'Plusieurs magasins', color: 'var(--leaf)', categoryOrder: categoryOrder() } : storeById(Number(sid));
   if (!s) return { title: 'Magasin', back: `#/listes/${l.id}`, body: '<p class="muted">Magasin inactif.</p>' };
   const real = l.items.filter((i) => !i.suggestion);
@@ -511,7 +512,7 @@ export function storeListView(sid) {
     <span class="grow">${!hidden.length ? 'Articles des autres magasins affichés' : shown.length ? `${shown.length} autre${shown.length > 1 ? 's' : ''} magasin${shown.length > 1 ? 's' : ''} affiché${shown.length > 1 ? 's' : ''} · ${hiddenN} masqué${hiddenN > 1 ? 's' : ''}` : `Seulement ce magasin · ${hiddenN} masqué${hiddenN > 1 ? 's' : ''}`}</span>${I('down', 's')}</button>` : '';
   const endLbl = all ? 'Terminer les courses' : `Terminer chez ${s.name}`;
   return {
-    title: s.name, back: `#/listes/${l.id}`, noNav: true, sub: `Courses du ${shortTitle(l)}`,
+    title: s.name, back: `#/listes/${l.id}`, noNav: true, sub: `Courses du ${shortTitle(l)}${isAwake() ? ' · écran allumé' : ''}`,
     right: stores.length > 1 ? `<button class="ib" data-a="shop-switch" aria-label="Changer de magasin" title="Changer de magasin">${I('store')}</button>` : '',
     body: `<div class="shop">
       <div class="shopbar2" style="--c:${esc(s.color)}"><b>${done.length}/${items.length}</b><div class="prog"><i style="width:${pct}%"></i></div><span class="price muted small">≈ ${eur(total)}</span>
@@ -675,10 +676,11 @@ function matches(q) {
   return S.products.filter((p) => norm(p.name).includes(n)).sort((a, b) => norm(a.name).indexOf(n) - norm(b.name).indexOf(n)).slice(0, 6);
 }
 on('click', 'add-open', () => sheet(`<h3>${isManager() ? 'Ajouter un article' : 'Suggérer un article'}</h3>
-  <div class="addbox"><input class="txt" id="add-q" autocomplete="off" autofocus placeholder="Rechercher ou créer un produit…" data-in="add-q" data-enter="add-first"><div id="add-ac"></div></div>
+  <div class="addbox"><div class="row"><input class="txt grow" id="add-q" autocomplete="off" autofocus placeholder="Rechercher un produit ou en saisir plusieurs : lait, 2 beurre…" data-in="add-q" data-enter="add-first">${micButton('add-q')}</div><div id="add-ac"></div></div>
   <div class="row" style="margin-top:10px"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1" aria-label="Moins">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="1"><button class="btn sm sec2" data-a="qty" data-d="1" aria-label="Plus">＋</button></div>`));
 on('input', 'add-q', (el) => {
-  const q = el.value.trim(), ms = matches(q);
+  const q = el.value.trim(), ms = q.includes(',') ? [] : matches(q);
+  if (q.includes(',')) { const n = q.split(',').filter((x) => x.trim()).length; document.getElementById('add-ac').innerHTML = `<div class="ac"><button data-a="add-first"><b>Ajouter ${n} article${n > 1 ? 's' : ''}</b></button></div>`; return; }
   document.getElementById('add-ac').innerHTML = q ? `<div class="ac">${ms.map((p) => `<button data-a="add-item" data-id="${p.id}"><span class="grow">${esc(p.name)}</span><span class="muted">${esc(catName(p.category_id))}</span></button>`).join('')}
     ${ms.some((p) => norm(p.name) === norm(q)) ? '' : `<button data-a="add-new"><b>＋ Créer « ${esc(q)} » dans les produits</b></button>`}</div>` : '';
 });
@@ -704,6 +706,8 @@ async function addItem(product_id, qty = wantedQty()) {
 on('click', 'add-item', (el) => addItem(Number(el.dataset.id)));
 on('click', 'add-first', () => {
   const q = document.getElementById('add-q').value.trim();
+  // Plusieurs articles d'un coup (virgules) : apercu puis ajout.
+  if (q.includes(',')) { closeSheet(); multiAdd(current.id, q, () => refreshList()); return; }
   const ms = matches(q);
   if (ms.length) addItem(ms[0].id); else if (q) document.querySelector('[data-a=add-new]')?.click();
 });
@@ -744,6 +748,7 @@ on('click', 'item-check', async (el) => {
   // Magasin ou on est (mode « plusieurs magasins » : celui de l'article, modifiable au prix).
   const here = S.route[2] === 'tous' ? i.at_store_id : Number(S.route[2]);
   // Un seul appui : l'article est dans le caddie. Le prix paye reste facultatif : bouton « ＋ prix » sur la ligne.
+  if (navigator.vibrate) navigator.vibrate(buying ? 15 : [10, 40, 10]);
   await itemUpdate(i, buying ? { status: 'bought', bought_store_id: here } : { status: 'todo' });
   if (!buying) delete i.paid;
   else if (S.route[0] === 'magasin') toast(`${i.name} dans le caddie`, false, { label: '＋ prix', a: 'item-price', id: i.id });

@@ -49,3 +49,19 @@ async function commit() {
   if (after) await after();
 }
 on('click', 'multi-ok', () => commit());
+
+// Dictee (navigateurs qui savent : Chrome, Android, Safari recent) : le texte entendu remplit le champ ;
+// « lait et beurre » devient « lait, beurre ».
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+export const micButton = (target) => (SR ? `<button class="ib" type="button" data-a="mic" data-target="${target}" aria-label="Dicter" title="Dicter">${'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/></svg>'}</button>` : '');
+on('click', 'mic', (el) => {
+  const input = document.getElementById(el.dataset.target);
+  if (!SR || !input) return;
+  const r = new SR();
+  r.lang = 'fr-FR'; r.interimResults = false;
+  el.classList.add('rec');
+  r.onresult = (e) => { const t = e.results[0][0].transcript.replace(/\s+et\s+/gi, ', '); input.value = input.value ? `${input.value}, ${t}` : t; input.dispatchEvent(new Event('input', { bubbles: true })); };
+  r.onend = () => el.classList.remove('rec');
+  r.onerror = () => el.classList.remove('rec');
+  try { r.start(); } catch { el.classList.remove('rec'); }
+});
