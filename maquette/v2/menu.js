@@ -28,6 +28,7 @@ const isEco = (k) => { const c = dishCost(k); return !!HOUSE.eco && c.pp != null
 const tagsOf = (k) => [...DISHES[k].tags, ...(isEco(k) ? ['économique'] : [])];
 // Cout d'un repas : personnes, variantes choisies, recettes ecartees, ingredients en reserve exclus.
 function mealCost(m) {
+  if (m.rest) return { cost: 0, partial: false };
   const d = DISHES[m.dish], opts = m.opts || {}, sk = m.skip || [], rs = m.res || [];
   const f = m.p / d.p;
   let r = costOfIngs([...d.ings, ...(d.groups || []).flatMap((g) => (g.o.find((o) => o[0] === opts[g.g]) || g.o[0])[1])].filter(([pid]) => !rs.includes(pid)), f);
@@ -35,7 +36,7 @@ function mealCost(m) {
   return { cost: r.n - r.missing > 0 ? Math.round(r.c) : null, partial: r.missing > 0 };
 }
 // Total du menu : chaque repas compte pour ses personnes ; sous-totaux par semaine (tranches de 7 jours depuis le debut).
-const menuCost = () => { let total = 0, unknown = 0, partial = false, persons = 0; const weeks = []; MEALS.filter((m) => !m.sugg).forEach((m) => { const c = mealCost(m); if (c.cost == null) unknown++; else { total += c.cost; persons += m.p; const k = Math.floor(dayDiff(MENU.start, m.date) / 7); weeks[k] = (weeks[k] || 0) + c.cost; } if (c.partial) partial = true; }); return { total, unknown, partial: partial || unknown > 0, persons, weeks }; };
+const menuCost = () => { let total = 0, unknown = 0, partial = false, persons = 0; const weeks = []; MEALS.filter((m) => !m.sugg && !m.rest).forEach((m) => { const c = mealCost(m); if (c.cost == null) unknown++; else { total += c.cost; persons += m.p; const k = Math.floor(dayDiff(MENU.start, m.date) / 7); weeks[k] = (weeks[k] || 0) + c.cost; } if (c.partial) partial = true; }); return { total, unknown, partial: partial || unknown > 0, persons, weeks }; };
 const PRICES = [['2', '≤ 2 €'], ['3', '≤ 3 €'], ['4', '≤ 4 €'], ['5', '≤ 5 €'], ['over', '> 5 €'], ['unk', 'Sans prix']];
 const priceOk = (k, f) => { if (!f) return true; const { pp } = dishCost(k); return f === 'unk' ? pp == null : f === 'over' ? pp != null && pp > 500 : pp != null && pp <= Number(f) * 100; };
 
@@ -43,7 +44,11 @@ const priceOk = (k, f) => { if (!f) return true; const { pp } = dishCost(k); ret
 S.slots = { midi: true, soir: true };
 const hue = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 const tile = (k, cls = '', pills = '') => { const d = DISHES[k]; return `<div class="tile ${cls}" style="--h:${hue(d.n)}"><span class="mono">${d.n[0]}</span><div class="tb">${pills}</div></div>`; };
-const dishLabel = (m) => { const d = DISHES[m.dish], v = Object.values(m.opts || {}); return v.length ? `${d.n} · ${v.join(', ')}` : d.n; };
+const dishLabel = (m) => { const d = DISHES[m.dish], v = Object.values(m.opts || {}); return m.rest ? `Restes · ${d.n}` : v.length ? `${d.n} · ${v.join(', ')}` : d.n; };
+// Repas à l'extérieur (case sans plat, note facultative) et restes (repas sans achat, hors budget et hors listes).
+const OUTINGS = [{ id: 1, date: '2026-10-19', slot: 'midi', note: 'chez Marie' }];
+const outAt = (d, s) => OUTINGS.find((o) => o.date === d && o.slot === s);
+MEALS.push(meal('2026-10-17', 'midi', 'las', 2, { rest: true }));
 const daysAgo = (iso) => dayDiff(iso, TODAY);
 const shopDays = () => LISTS.filter((l) => l.type === 'dated').map((l) => l.date);
 const slotsOn = () => Object.keys(SLOTS).filter((s) => S.slots[s]);
@@ -52,14 +57,15 @@ const slotsOn = () => Object.keys(SLOTS).filter((s) => S.slots[s]);
 VIEWS.menu = () => {
   const days = [...Array(dayDiff(MENU.start, MENU.end) + 1)].map((_, k) => addDays(MENU.start, k));
   const at = (d, s) => MEALS.filter((m) => m.date === d && m.slot === s);
-  const mealBtn = (m) => `<button class="meal${m.sugg ? ' pending' : ''}" data-a="meal-open" data-id="${m.id}"><span class="nm">${DISHES[m.dish].parts ? I('puzzle', 's') + ' ' : ''}${dishLabel(m)}</span>${m.sugg ? `<span class="pill warn">${m.sugg}</span>` : m.p !== 4 ? `<span class="pill">${m.p} p.</span>` : ''}</button>`;
+  const mealBtn = (m) => `<button class="meal${m.sugg ? ' pending' : ''}${m.rest ? ' rest' : ''}" data-a="meal-open" data-id="${m.id}"><span class="nm">${m.rest ? I('repeat', 's') + ' ' : DISHES[m.dish].parts ? I('puzzle', 's') + ' ' : ''}${dishLabel(m)}</span>${m.sugg ? `<span class="pill warn">${m.sugg}</span>` : m.p !== 4 ? `<span class="pill">${m.p} p.</span>` : ''}</button>`;
+  const outBtn = (o) => `<button class="meal out" data-a="out-open" data-id="${o.id}"><span class="nm">${I('pin', 's')} ${o.note ? esc(o.note) : 'À l’extérieur'}</span></button>`;
   const ghost = (d, s) => `<button class="meal ghost" data-a="meal-add" data-date="${d}" data-slot="${s}">${I('plus', 's')} ${SLOTS[s]}</button>`;
   const agenda = days.map((d) => `<div class="day${d === TODAY ? ' today' : ''}${d < TODAY ? ' past' : ''}"><div class="dn"><small>${fmtD(d, { weekday: 'short' }).replace('.', '')}</small><b>${dt(d).getUTCDate()}</b></div>
-    <div class="slots">${shopDays().includes(d) ? `<span class="shopday">${I('cart', 's')} Courses</span>` : ''}${slotsOn().map((s) => { const ms = at(d, s); return ms.length ? ms.map((m) => mealBtn(m).replace('<span class="nm">', `<span class="sl">${SLOTS[s]}</span><span class="nm">`)).join('') : ghost(d, s); }).join('')}</div></div>`).join('');
+    <div class="slots">${shopDays().includes(d) ? `<span class="shopday">${I('cart', 's')} Courses</span>` : ''}${slotsOn().map((s) => { const ms = at(d, s); const o = outAt(d, s); if (o) return outBtn(o).replace('<span class="nm">', `<span class="sl">${SLOTS[s]}</span><span class="nm">`); return ms.length ? ms.map((m) => mealBtn(m).replace('<span class="nm">', `<span class="sl">${SLOTS[s]}</span><span class="nm">`)).join('') : ghost(d, s); }).join('')}</div></div>`).join('');
   const weeks = [days.slice(0, 7), days.slice(7, 14)].filter((w) => w.length);
   const grid = weeks.map((w) => `<div class="wgrid"><span></span>${w.map((d) => `<span class="h${d === TODAY ? ' today' : ''}">${fmtD(d)}${shopDays().includes(d) ? ` ${I('cart', 's')}` : ''}</span>`).join('')}
-    ${slotsOn().map((s) => `<span class="sl">${SLOTS[s]}</span>${w.map((d) => `<div class="cell">${at(d, s).map(mealBtn).join('') || ghost(d, s).replace(` ${SLOTS[s]}`, '')}</div>`).join('')}`).join('')}</div>`).join('');
-  const wishes = WISHES.map((w) => { const d = DISHES[w.dish]; return `<div class="card wish">${tile(w.dish, '', w.status === 'pending' ? `<span class="pill warn">à valider</span>` : '')}
+    ${slotsOn().map((s) => `<span class="sl">${SLOTS[s]}</span>${w.map((d) => `<div class="cell">${outAt(d, s) ? outBtn(outAt(d, s)) : at(d, s).map(mealBtn).join('') || ghost(d, s).replace(` ${SLOTS[s]}`, '')}</div>`).join('')}`).join('')}</div>`).join('');
+  const wishes = WISHES.map((w) => { const d = DISHES[w.dish]; return `<div class="card wish" data-wish="${w.id}">${tile(w.dish, '', w.status === 'pending' ? `<span class="pill warn">à valider</span>` : '')}
     <b>${d.draft ? I('edit', 's') + ' ' : ''}${d.n}</b><span class="sub">${w.by === 'Thomas' ? 'Votre envie' : 'Envie de ' + w.by}${ppShort(w.dish) ? ` · ${ppShort(w.dish)} / pers.` : ''}</span>
     <div class="btn-row icons">${isM() && w.status === 'pending' ? bI('check', 'Valider l’envie', `data-a="wish-ok" data-id="${w.id}"`, 'sec sm') : ''}${bI('calendar', 'Mettre au menu', `data-a="wish-plan" data-id="${w.id}"`, 'sm')}</div></div>`; }).join('');
   return {
@@ -71,6 +77,7 @@ VIEWS.menu = () => {
       <div class="agenda">${agenda}</div>${grid}
       <p class="sub" style="margin:8px 2px">Les repas alimentent la liste de leur période : un repas en ${I('cart', 's')} jour de courses tombe dans cette liste. Appui long sur un repas pour le déplacer.</p>
       <div class="sh"><span>Envies de plats</span><button data-a="wish-add">＋ Proposer</button></div>
+      ${isM() ? '<p class="sub" style="margin:-4px 2px 8px">Glissez une envie sur un créneau libre du menu (appui long sur téléphone).</p>' : ''}
       <div class="hscroll wishes">${wishes}</div>
       <div class="sh"><span>Remarques</span></div>
       ${isM() ? `<textarea class="in" rows="3" placeholder="Remarques sur ce menu (imprimées avec l’export)" data-ch="menu-note">${esc(MENU.note)}</textarea>` : `<div class="card">${esc(MENU.note) || '<span class="muted">Aucune remarque</span>'}</div>`}`,
@@ -106,7 +113,9 @@ function pickHtml() {
     <div class="chips" style="margin-bottom:8px">${tags.map((t) => `<button class="chip ${pm.tag === t ? 'on' : ''}" data-a="pick-tag" data-t="${t}">#${t}</button>`).join('')}</div>
     <div class="group">${ks.map((k) => { const d = DISHES[k]; return `<button class="row tap" data-a="pick-dish" data-k="${k}"><span class="avatar" style="--c:hsl(${hue(d.n)} 40% 45%)">${d.n[0]}</span>
       <span class="grow"><b>${wished.includes(k) ? I('bulb', 's') + ' ' : ''}${d.n}</b><span class="sub" style="display:block">${d.parts ? `${I('puzzle', 's')} ${d.parts.map(([p]) => DISHES[p].n).join(', ')}` : d.last ? `dernière fois il y a ${daysAgo(d.last)} j` : 'jamais servi'}</span></span>${ppShort(k) ? `<span class="num small">${ppShort(k)} / pers.</span>` : ''}${I('chev', 's chev')}</button>`; }).join('')}
-    ${isM() && pm.q ? `<button class="row tap" data-a="dish-new" style="color:var(--accent)"><span class="ico acc">${I('plus')}</span><b class="grow">Nouveau plat « ${esc(pm.q)} »</b></button>` : ''}</div>`;
+    ${isM() && pm.q ? `<button class="row tap" data-a="dish-new" style="color:var(--accent)"><span class="ico acc">${I('plus')}</span><b class="grow">Nouveau plat « ${esc(pm.q)} »</b></button>` : ''}</div>
+    ${isM() ? `<div class="group" style="margin-top:12px"><button class="row tap" data-a="out-set"><span class="ico">${I('pin')}</span><span class="grow"><b>Repas à l’extérieur</b><span class="sub" style="display:block">Restaurant, invités… : aucun achat</span></span>${I('chev', 's chev')}</button>
+      <button class="row tap" data-a="rest-set"><span class="ico">${I('repeat')}</span><span class="grow"><b>Restes</b><span class="sub" style="display:block">Un repas déjà cuisiné : aucun achat, hors budget</span></span>${I('chev', 's chev')}</button></div>` : ''}`;
 }
 IN['pick-q'] = (el) => { pm.q = el.value; refresh(); const i = $('pick-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
 A['pick-tag'] = (el) => { pm.tag = pm.tag === el.dataset.t ? '' : el.dataset.t; refresh(); };
@@ -134,6 +143,24 @@ A['pm-opt'] = (el) => { pm.opts[el.dataset.g] = el.dataset.o; refresh(); };
 A['pm-part'] = (el) => { const k = el.dataset.k; pm.skip = pm.skip.includes(k) ? pm.skip.filter((x) => x !== k) : [...pm.skip, k]; refresh(); };
 A['pm-res'] = (el) => { const k = el.dataset.pid; pm.res = pm.res.includes(k) ? pm.res.filter((x) => x !== k) : [...pm.res, k]; refresh(); };
 A['pm-back'] = () => live(pickHtml);
+// Repas à l'extérieur : remplace les repas du créneau ; note facultative.
+const dropSlot = (d, s) => { for (let k = MEALS.length - 1; k >= 0; k--) if (MEALS[k].date === d && MEALS[k].slot === s) MEALS.splice(k, 1); const k = OUTINGS.findIndex((o) => o.date === d && o.slot === s); if (k >= 0) OUTINGS.splice(k, 1); };
+A['out-set'] = () => sheet(`<h3>${I('pin', 's')} Repas à l’extérieur</h3><p class="lead">${fmtD(pm.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[pm.slot]}. Aucun achat pour ce repas.</p>
+  <label class="field"><span>Où ? (facultatif)</span><input class="in" id="out-note" placeholder="chez Marie, restaurant…" data-enter="out-ok"></label>
+  <div class="foot"><button class="btn sec" data-a="close">Annuler</button><button class="btn" data-a="out-ok">Enregistrer</button></div>`);
+A['out-ok'] = () => { const note = ($('out-note') || {}).value || ''; dropSlot(pm.date, pm.slot); OUTINGS.push({ id: Date.now(), date: pm.date, slot: pm.slot, note: note.trim() }); closeSheet(); toast('Repas à l’extérieur ajouté'); render(); };
+A['out-open'] = (el) => { const o = OUTINGS.find((x) => x.id === Number(el.dataset.id)); sheet(`<h3>${I('pin', 's')} Repas à l’extérieur</h3><p class="lead">${fmtD(o.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[o.slot]}${o.note ? ' · ' + esc(o.note) : ''}</p>
+  <div class="foot"><button class="btn danger" data-a="out-del" data-id="${o.id}">Retirer</button><button class="btn" data-a="close">Fermer</button></div>`); };
+A['out-del'] = (el) => { OUTINGS.splice(OUTINGS.findIndex((o) => o.id === Number(el.dataset.id)), 1); closeSheet(); toast('Créneau libéré'); render(); };
+// Restes : repas de reste d'un plat deja prevu les jours d'avant ; aucun achat, hors budget et hors listes.
+A['rest-set'] = () => { S.q.restP = S.q.restP || 2; live(restHtml); };
+const restSources = () => MEALS.filter((m) => !m.sugg && !m.rest && m.date < pm.date && dayDiff(m.date, pm.date) <= 6).sort((a, b) => b.date.localeCompare(a.date) || a.slot.localeCompare(b.slot));
+const restHtml = () => `<h3>${I('repeat', 's')} Restes</h3><p class="lead">${fmtD(pm.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[pm.slot]}. Aucun achat : le repas ne compte ni dans la liste ni dans le budget.</p>
+  <div class="group"><div class="row"><span class="grow">Personnes</span><span class="stepper"><button data-a="rest-p" data-d="-1" aria-label="Moins">${I('minus')}</button><b>${S.q.restP}</b><button data-a="rest-p" data-d="1" aria-label="Plus">${I('plus')}</button></span></div></div>
+  <div class="sh"><span>Restes de…</span></div>
+  <div class="group">${restSources().map((m) => `<button class="row tap" data-a="rest-ok" data-id="${m.id}"><span class="grow"><b>${DISHES[m.dish].n}</b><span class="sub" style="display:block">${fmtD(m.date, { weekday: 'long', day: 'numeric' })} · ${SLOTS[m.slot]} · ${m.p} pers.</span></span>${I('chev', 's chev')}</button>`).join('') || '<p class="empty">Aucun repas des 6 derniers jours.</p>'}</div>`;
+A['rest-p'] = (el) => { S.q.restP = Math.max(1, S.q.restP + Number(el.dataset.d)); refresh(); };
+A['rest-ok'] = (el) => { const src = MEALS.find((m) => m.id === Number(el.dataset.id)); dropSlot(pm.date, pm.slot); MEALS.push(meal(pm.date, pm.slot, src.dish, S.q.restP, { rest: true })); closeSheet(); toast(`Restes · ${DISHES[src.dish].n} ajouté`); render(); };
 A['pm-save'] = () => {
   if (!needNet()) return;
   if (pm.id) { Object.assign(MEALS.find((m) => m.id === pm.id), { dish: pm.dish, p: pm.p, opts: pm.opts, skip: pm.skip }); closeSheet(); toast('Repas mis à jour · liste recalculée'); render(); return; }
@@ -148,6 +175,9 @@ A['meal-open'] = (el) => {
   const m = MEALS.find((x) => x.id === Number(el.dataset.id));
   if (!m) return;
   const d = DISHES[m.dish];
+  if (m.rest) { sheet(`<h3>${I('repeat', 's')} ${dishLabel(m)}</h3><p class="lead">${fmtD(m.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[m.slot]} · ${m.p} personnes</p>
+    <p class="sub">Restes d’un repas déjà cuisiné : aucun achat, ce repas n’alimente pas la liste et n’entre pas dans le budget.</p>
+    <div class="btn-row" style="margin-top:14px">${bI('book', 'Fiche du plat', `data-a="go" data-v="dish" data-id="${m.dish}"`, 'sec')}${isM() ? bI('trash', 'Retirer', `data-a="meal-del" data-id="${m.id}"`, 'sec danger-t') : ''}</div>`); return; }
   sheet(`<h3>${dishLabel(m)}</h3><p class="lead">${fmtD(m.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[m.slot]} · ${m.p} personnes${m.sugg ? ` · suggéré par ${m.sugg}` : ''}</p>
     ${tile(m.dish, '', tagsOf(m.dish).map((t) => `<span class="pill">#${t}</span>`).join(''))}
     ${(() => { const c = mealCost(m); return c.cost != null ? `<div class="between" style="margin:10px 2px 0"><span class="muted">Coût estimé${c.partial ? ' (partiel)' : ''}</span><span><b class="num">${c.partial ? 'dès ' : '≈ '}${eur(c.cost)}</b> <span class="sub">· ${eur(Math.round(c.cost / m.p))} / pers.</span></span></div>` : ''; })()}

@@ -398,3 +398,12 @@ ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;
 /* Mode courses : controle compact des autres magasins */
 .fbar{display:flex;align-items:center;gap:10px;width:100%;min-height:40px;margin:2px 0 8px;padding:0 12px;border-radius:12px;border:1.5px solid var(--line);color:var(--muted);font-size:13px;font-weight:600;text-align:left}
 .fbar .dots{display:flex;gap:3px}
+
+/* Repas a l'exterieur, restes, glisser une envie */
+.meal.out{background:transparent;box-shadow:none;border:1.5px dashed var(--faint);color:var(--muted);font-style:italic}
+.meal.rest{background:var(--raised);box-shadow:none;color:var(--muted)}
+.meal.rest .nm{font-weight:600}
+.meal.ghost.drop-on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.drag-ghost{position:fixed;z-index:50;pointer-events:none;padding:10px 14px;border-radius:14px;background:var(--ink);color:var(--bg);font-weight:650;font-size:14px;box-shadow:var(--shadow);transform:translate(-50%,-120%)}
+.card.wish{touch-action:pan-x;cursor:grab;user-select:none}
+.gs-res .row .ico{flex:none}

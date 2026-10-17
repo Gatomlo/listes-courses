@@ -1,6 +1,8 @@
 // Le Cabas · maquette v2 : cadre (navigation par pile, onglets, panneaux, toasts, icônes).
 const PATHS = {
   home: 'M3 11l9-8 9 8M5 9.5V20h5v-6h4v6h5V9.5',
+  pin: 'M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10zM12 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+  mic: 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v4',
   menu: 'M4 7h16M4 12h16M4 17h16',
   basket: 'M3 9h18l-1.6 9.2a2 2 0 0 1-2 1.8H6.6a2 2 0 0 1-2-1.8L3 9zM8 9l3-5M16 9l-3-5M9 13v3M15 13v3',
   calendar: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
@@ -77,7 +79,7 @@ function render(dir) {
   const sub = S.stack.length > 1;
   view.innerHTML = `<header class="bar${sub ? ' sub' : ''}" id="bar">
       <div class="side">${sub ? `<button class="ib" data-a="back" aria-label="Retour">${I('back')}</button>` : ''}</div>
-      <div class="t">${v.title}</div><div class="side r">${v.actions || ''}${sub ? '' : `<button class="ib menu-b" data-a="menu" aria-label="Menu : produits, magasins, foyer…">${I('menu')}</button>`}</div></header>
+      <div class="t">${v.title}</div><div class="side r">${v.actions || ''}${sub ? '' : `<button class="ib" data-a="gsearch" aria-label="Rechercher">${I('search')}</button><button class="ib menu-b" data-a="menu" aria-label="Menu : produits, magasins, foyer…">${I('menu')}</button>`}</div></header>
     <div class="scroll${dir ? ' anim-' + dir : ''}${v.cls ? ' ' + v.cls : ''}" id="scroll" data-v="${t.v}">
       ${v.large ? `<h1 class="ltitle">${v.title}</h1>${v.sub ? `<p class="lsub root">${v.sub}</p>` : ''}` : v.sub ? `<p class="lsub">${v.sub}</p>` : ''}
       ${!S.online ? `<div class="banner off">${I('wifioff')}<span class="grow">Hors-ligne${S.queue ? ` · ${plural(S.queue, 'modification')} en attente` : ''}</span><span class="xs">envoi au retour du réseau</span></div>` : ''}
@@ -158,7 +160,7 @@ A.noop = () => toast('Dans l’app : action réelle');
 
 // ---------- Panneau de maquette ----------
 const JUMPS = [
-  ['Accueil', () => tab('home')], ['Listes (À prévoir + prochaine)', () => tab('lists')], ['Menu du haut (☰ : ex-Plus)', () => A.menu()], ['Liste en cours', () => { tab('lists'); go('list', { id: 'l13' }); }],
+  ['Accueil', () => tab('home')], ['Listes (À prévoir + prochaine)', () => tab('lists')], ['Menu du haut (☰ : ex-Plus)', () => A.menu()], ['Recherche globale', () => A.gsearch()], ['Liste en cours', () => { tab('lists'); go('list', { id: 'l13' }); }],
   ['Mode courses', () => { tab('lists'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'co' }); }],
   ['Mode courses (tout)', () => { tab('lists'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'all' }); }],
   ['Scan du ticket', () => { tab('lists'); go('scan', { id: 'l13', st: 'co' }); }],
@@ -184,6 +186,9 @@ function panelHtml() {
       <li>Liste : barre d’ajout en bas, filtre par magasin collant, caddie replié, suggestions en ligne.</li>
       <li>Mode courses : « Où faites-vous les courses ? » ; tous les articles restants dans l’ordre du magasin, ceux conseillés ailleurs avec une mention, filtre « Aussi afficher », magasin d’achat choisi au cochage, « Terminer chez X » (continuer ailleurs, reporter, indisponibles), tickets à saisir plus tard.</li>
       <li>Budget : coût par personne des plats (vignette, fiche, filtre « Prix / pers. »), budget estimé du menu, tag Économique automatique selon le palier des réglages.</li>
+      <li>Courses : écran allumé, ajout de plusieurs articles d’un coup (virgules ou dictée), « peut-être à racheter », parcours du magasin appris, vibration au cochage et « Annuler ».</li>
+      <li>Menu : glisser une envie sur un créneau libre (appui long sur téléphone) ; un créneau peut être « à l’extérieur » ou « restes » (aucun achat).</li>
+      <li>Recherche globale (loupe en haut) : produits, plats et listes.</li>
       <li>Panneaux qui montent du bas (dialogues sur PC), titres qui se replient au défilement.</li>
       <li>Menu en agenda (téléphone) ou grille semaine (PC), envies en carrousel.</li>
       <li>Plats en mosaïque ; fiche à onglets Ingrédients / Recette / Composition / Historique ; mode cuisine plein écran.</li>
