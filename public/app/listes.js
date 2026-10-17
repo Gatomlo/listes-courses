@@ -1,7 +1,7 @@
 // Listes : accueil (A prevoir, prochaines courses, historique), detail d'une liste
 // (articles par rayon, ajout, suggestions, fiche article, actions), creation, cloture.
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
-import { get, post, patch, del, attempt, sync, newOp, setCached, net } from './api.js';
+import { get, post, put, patch, del, attempt, sync, newOp, setCached, net } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
 import { unitOptions, catOptions, contField } from './catalogue.js';
 import { SLOT, tile } from './plats.js';
@@ -546,6 +546,23 @@ on('click', 'shop-end', (el) => {
       ${opt('unav', 'Marquer indisponibles', 'Ils seront reportés à la clôture de la liste.')}` : ''}
     <div class="row end wide">${bought.length ? `<button class="btn sec2" data-a="shop-end-go" data-sid="${sid || ''}" data-scan="1">${I('camera', 's')} Scanner le ticket</button>` : ''}<button class="btn" data-a="shop-end-go" data-sid="${sid || ''}">${bought.length ? 'Ticket plus tard' : 'Terminer'}</button></div>`);
 });
+// Parcours appris : ordre dans lequel les rayons ont ete parcourus pendant ce passage.
+async function routeAsk(sid, lid) {
+  if (!sid || !isManager() || !net.online) return;
+  const r = await get(hp(`/stores/${sid}/route?list=${lid}`)).catch(() => null);
+  if (!r || !r.changed) return;
+  const nm = (id) => esc(catName(id));
+  sheet(`<h3>Parcours de ${esc(storeName(sid))}</h3><p class="muted">Vous avez parcouru les rayons dans un autre ordre que celui enregistré. Mettre à jour le parcours du magasin ?</p>
+    <div class="row gap" style="align-items:flex-start"><div class="grow"><div class="muted small">Actuel</div>${r.current.map((id, k) => `<div class="small">${k + 1}. ${nm(id)}</div>`).join('')}</div>
+      <div class="grow"><div class="muted small">Parcouru</div>${r.order.map((id, k) => `<div class="small"${id !== r.current[k] ? ' style="font-weight:700;color:var(--leaf)"' : ''}>${k + 1}. ${nm(id)}</div>`).join('')}</div></div>
+    <div class="row end" style="margin-top:14px"><button class="btn sec2" data-a="close">Plus tard</button><button class="btn" data-a="route-ok" data-sid="${sid}" data-order="${r.order.join(',')}">Mettre à jour</button></div>`);
+}
+on('click', 'route-ok', async (el) => {
+  const sid = Number(el.dataset.sid);
+  const r = await attempt(() => put(hp(`/stores/${sid}/order`), { categoryIds: el.dataset.order.split(',').map(Number) }));
+  if (r === undefined) return;
+  closeSheet(); await loadHouse(); toast('Parcours mis à jour'); render();
+});
 function finishDirect(sid) {
   const l = current, real = l.items.filter((i) => !i.suggestion);
   const stores = [...new Set(real.filter((i) => i.status === 'bought' && (!sid || i.bought_at === sid)).map((i) => i.bought_at).filter(Boolean))];
@@ -559,6 +576,7 @@ function finishDirect(sid) {
     go(`#/listes/${l.id}`);
     toast('Courses terminées', false, { label: 'Scanner le ticket', a: 'scan-start', id: '' });
     const t = document.querySelector('.toast'); if (t) { t.dataset.lid = l.id; t.dataset.sid = stores[0] || ''; }
+    routeAsk(sid, l.id);
   });
 }
 on('click', 'shop-end-go', (el) => {
@@ -583,6 +601,7 @@ on('click', 'shop-end-go', (el) => {
   if (scanNow) { startScan(l.id, sid || stores[0]); return; }
   closeSheet();
   done.then(() => {
+    if (fate !== 'continue') routeAsk(sid, l.id);
     if (fate === 'continue') shopPickSheet(current, sid);
     else if (fate === 'report' || (!left.length && isManager())) closeListSheet();
     else go(`#/listes/${l.id}`);

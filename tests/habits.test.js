@@ -30,3 +30,24 @@ test('habitudes : achats reguliers, delai atteint, pas deja dans une liste', asy
   r = (await thomas.get(`${h}/habits`)).data;
   assert.equal(r.length, 0);
 });
+
+test('parcours appris : ordre des rayons d apres le cochage', async () => {
+  const hh = await household('Parcours');
+  const t = hh.thomas, hx = hh.h;
+  const cats = (await t.get(hx)).data.categories.slice(0, 3);
+  const store = (await t.get(hx)).data.stores[0];
+  // Parcours actuel : rayons 0, 1, 2 ; on coche dans l'ordre 2, 1, 0.
+  await t.put(`${hx}/stores/${store.id}/order`, { categoryIds: cats.map((c) => c.id) });
+  const lid = (await t.post(`${hx}/lists`, { date: day(1) })).data.id;
+  const order = [cats[2], cats[1], cats[0]];
+  for (const [k, c] of order.entries()) for (const j of [0, 1]) {
+    const p = (await t.post(`${hx}/products`, { name: `P${k}${j}`, category_id: c.id })).data;
+    const it = (await t.post(`${hx}/lists/${lid}/items`, { product_id: p.id, qty: 1 })).data;
+    const itemId = (it.items || []).find((x) => x.product_id === p.id).id;
+    await t.patch(`${hx}/items/${itemId}`, { status: 'bought', bought_store_id: store.id });
+    db.prepare('UPDATE list_items SET updated_at = ? WHERE id = ?').run(1000 + k * 10 + j, itemId);
+  }
+  const r = (await t.get(`${hx}/stores/${store.id}/route?list=${lid}`)).data;
+  assert.equal(r.changed, true);
+  assert.deepEqual(r.order, order.map((c) => c.id));
+});
