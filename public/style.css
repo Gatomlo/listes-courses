@@ -589,3 +589,6 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 
 .subh{display:flex;gap:8px;align-items:center;font:700 12px var(--body);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:10px 4px 2px}
 .subh .n{font-weight:400}
+/* Lignes d'articles dans un groupe : marge à gauche et à droite (la règle .line1 la mettait à 0) */
+.group>.item.line1,.group>.swipe>.item.line1,.shop .group>.item,.shop .group>.swipe>.item{padding-left:14px;padding-right:14px}
+.swipe>.item.line1{background:var(--surface)}
