@@ -2,7 +2,7 @@
 // Portee = dossier de l'app (/cabas/ dans la passerelle). L'API n'est jamais mise en
 // cache ici : les donnees hors-ligne sont gerees par l'app (public/app/api.js).
 // Changer VERSION quand la liste des fichiers change.
-const VERSION = 'cabas-v82';
+const VERSION = 'cabas-v83';
 const PHOTOS = 'cabas-photos'; // photos des plats (adresse changee a chaque photo : copie gardee sans risque)
 const FILES = [
   './', 'style.css', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'badge-96.png',

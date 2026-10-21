@@ -195,9 +195,8 @@ input.cb{width:22px;height:22px;flex:none;accent-color:var(--leaf)}
   .item.ing-ed>.grow{flex:1 0 100%}
   .item.ing-ed>select.txt{flex:1 1 90px;width:auto;min-width:90px}
   .item.ing-ed>.ib{margin-left:auto}
-  .item.ing-ed .pill .lbl{display:none}
-  .item.ing-ed .pill{width:34px;height:34px;padding:0;justify-content:center;border-radius:12px}
 }
+.pill.cont{width:34px;height:34px;padding:0;justify-content:center;border-radius:12px;flex:none}
 .item.done .nm{text-decoration:line-through;color:var(--faint)}
 .item.done .px{opacity:.5}
 .item.pending{background:repeating-linear-gradient(-45deg,transparent 0 8px,color-mix(in srgb,var(--carrot) 6%,transparent) 8px 16px)}
