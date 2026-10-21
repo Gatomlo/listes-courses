@@ -272,15 +272,16 @@ export function dishView() {
       ${ed.times > 1 ? `<div class="card grow"><div class="big">${Math.round(daysAgo(ed.first_date) / (ed.times - 1))} j</div><div class="muted small">en moyenne</div></div>` : ''}</div>
       <div class="sec">À venir</div><div class="group">${ed.upcoming.map((m) => mealRow(m)).join('') || '<p class="muted" style="padding:12px 14px;margin:0">Pas encore prévu au menu.</p>'}</div>
       <div class="sec">Historique${ed.times > 5 ? ' · 5 dernières fois' : ''}</div><div class="group">${ed.past.map((m) => mealRow(m)).join('') || '<p class="muted" style="padding:12px 14px;margin:0">Jamais planifié pour l’instant.</p>'}</div>`;
-  const tabs = [['ing', ed.parts.length ? 'Ingrédients' : 'Ingrédients'], ['rec', 'Recette'], ...(ed.used_in.length || (ro && !ed.parts.length) ? [] : [['parts', `Composition${ed.parts.length ? ` · ${ed.parts.length}` : ''}`]]), ...(ed.id ? [['hist', 'Historique']] : [])];
-  const cur = tabs.some(([k]) => k === S.q.dtab) ? S.q.dtab : ed.parts.length ? 'parts' : 'ing';
+  // [clé, libellé, icône, compteur] ; « Général » seulement en édition ; icône seule sur téléphone.
+  const tabs = [...(ro ? [] : [['gen', 'Général', 'sliders']]), ['ing', 'Ingrédients', 'basket'], ['rec', 'Recette', 'book'], ...(ed.used_in.length || (ro && !ed.parts.length) ? [] : [['parts', 'Composition', 'puzzle', ed.parts.length]]), ...(ed.id ? [['hist', 'Historique', 'clock']] : [])];
+  const cur = tabs.some(([k]) => k === S.q.dtab) ? S.q.dtab : !ro && !ed.id ? 'gen' : ed.parts.length ? 'parts' : 'ing';
   const pills = `${ed.parts.length ? `<span class="pill">${I('puzzle', 's')} plat composé</span>` : ''}${ed.tags.map((t) => `<span class="pill">#${esc(t)}</span>`).join('')}`;
   // Lecture : informations en liste (sous les onglets sur telephone, a gauche sur PC).
   const infoRo = `<div class="group" style="margin-top:12px">${[['Portions', `${ed.portions} personne${ed.portions > 1 ? 's' : ''}`], ['Coût', ed.cost_pp == null ? '' : `${ppLabel(ed)}${ed.cost_partial ? ` · ${ed.cost_missing} ingrédient${ed.cost_missing > 1 ? 's' : ''} sans prix` : ''}`], ['Temps', ed.time_text], ['Repas', slotsLabel(ed.slots)],
     ['Types', ed.types.join(', ')], ['Tags', ed.tags.map((t) => `#${t}`).join(' ')]].filter(([, v]) => v)
     .map(([k, v]) => `<div class="item"><span class="muted w6">${k}</span><span class="grow">${esc(v)}</span></div>`).join('')}</div>`;
   const info = ro ? infoRo
-    : `<div class="card form" style="margin-top:12px"><label class="muted small">Nom</label><input class="txt" value="${esc(ed.name)}" data-ch="ed" data-f="name">
+    : `<div class="card form"><label class="muted small">Nom</label><input class="txt" value="${esc(ed.name)}" data-ch="ed" data-f="name">
       <div class="row gap"><label class="grow"><span class="muted small">Portions de référence</span><input class="txt" type="number" min="1" value="${ed.portions}" data-ch="ed" data-f="portions"></label>
       <label class="grow"><span class="muted small">Temps</span><input class="txt" value="${esc(ed.time_text)}" placeholder="ex. 45 min" data-ch="ed" data-f="time_text"></label></div>
       <label class="muted small">Repas possibles <span class="fw4">(génération du menu)</span></label>
@@ -295,8 +296,8 @@ export function dishView() {
   const banner = ed.draft ? `<div class="banner">${I('edit')}<span>Proposé par un membre : ${mgr ? 'enregistrer valide la fiche' : 'à valider par un gestionnaire'}.</span></div>` : '';
   const hero = tile(ed.name || '?', pills, 'hero-t', curPhoto());
   const usedIn = ed.used_in.length ? `<p class="small" style="margin:8px 2px">${I('puzzle', 's')} Recette de ${ed.used_in.map((d) => `<a href="#/plats/${d.id}" style="color:var(--plum);font-weight:650">${esc(d.name)}</a>`).join(', ')}</p>` : '';
-  const tabsHtml = `<div class="seg" style="margin-top:14px">${tabs.map(([k, t]) => `<button class="${cur === k ? 'on' : ''}" data-a="dtab" data-k="${k}">${t}</button>`).join('')}</div>
-      ${{ ing: tabIng, rec: tabRec, parts: tabParts, hist: tabHist }[cur]}`;
+  const tabsHtml = `<div class="seg" style="margin-top:14px">${tabs.map(([k, t, ic, n]) => `<button class="tb ${cur === k ? 'on' : ''}" data-a="dtab" data-k="${k}" aria-label="${t}" title="${t}">${I(ic, 's')}<span class="tl">${t}</span>${n ? `<span class="tn">${n}</span>` : ''}</button>`).join('')}</div>
+      ${{ gen: info, ing: tabIng, rec: tabRec, parts: tabParts, hist: tabHist }[cur]}`;
   return {
     title: ed.id ? ed.name : 'Nouveau plat', back: !ed.id && S.dishReturn ? '#/menu' : '#/plats',
     sub: ed.draft ? 'Proposition à valider par un gestionnaire' : !canEdit ? 'Lecture seule (membre)' : !ro && ed.id ? 'Modification' : '',
@@ -305,7 +306,7 @@ export function dishView() {
     // Telephone en lecture : onglets juste sous la photo, informations en bas.
     body: ro && !isPc() ? `${banner}${hero}${tabsHtml}${usedIn}<div class="sec">Infos</div>${infoRo}`
       : `${banner}<div class="split dish"><div>${hero}
-      ${ro ? '' : `<div class="btn-row" style="margin-top:8px">${btnI('camera', curPhoto() ? 'Changer la photo' : 'Ajouter une photo', 'data-a="dish-photo"')}${curPhoto() ? btnI('trash', 'Retirer la photo', 'data-a="dish-photo-x"', 'sec2 danger-t') : ''}</div>`}${info}
+      ${ro ? '' : `<div class="btn-row" style="margin-top:8px">${btnI('camera', curPhoto() ? 'Changer la photo' : 'Ajouter une photo', 'data-a="dish-photo"')}${curPhoto() ? btnI('trash', 'Retirer la photo', 'data-a="dish-photo-x"', 'sec2 danger-t') : ''}</div>`}${ro ? infoRo : ''}
       ${usedIn}</div><div>${tabsHtml}</div></div>`,
     dock: ed.id ? `<div class="btn-row grow">${btnI('book', 'Cuisiner', `href="#/plats/${ed.id}/cuisine"`, 'sec2', 'a')}${ed.wish_id ? btnI('bulb', 'Retirer des envies', `data-a="dish-unwish"`, 'sec2') : btnI('bulb', 'Ajouter aux envies', `data-a="dish-wish"`, 'sec2')}${btnI('calendar', mgr ? 'Ajouter au menu' : 'Suggérer au menu', `data-a="plan-dish" data-id="${ed.id}"`, '')}</div>` : null,
   };
