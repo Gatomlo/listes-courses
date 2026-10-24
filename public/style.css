@@ -603,3 +603,7 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 .group>.item.line1,.group>.swipe>.item.line1,.shop .group>.item,.shop .group>.swipe>.item{padding-left:14px;padding-right:14px}
 .swipe>.item.line1{background:var(--surface)}
 .pick-btn{text-align:left;width:100%;cursor:pointer}
+.pick-ov{position:fixed;inset:0;z-index:30;background:rgb(8 12 8 / .42);display:flex;align-items:flex-end;animation:fade .2s}
+.pick-ov .sheet{max-height:80vh}
+@media (min-width:900px){.pick-ov{align-items:center;justify-content:center}.pick-ov .sheet{width:420px;border-radius:24px}}
+select.txt{cursor:pointer}
