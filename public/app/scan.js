@@ -16,8 +16,8 @@ let scan = null; // { listId, storeId, date, status, progress, text, lines: [...
 export function startScan(lid, sid) {
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = 'image/*';
-  input.capture = 'environment';
+  // Sans « capture » : le téléphone propose Appareil photo, Photos et Fichiers (ticket reçu en PDF).
+  input.accept = 'image/*,application/pdf,.pdf';
   input.addEventListener('change', () => {
     if (!input.files[0]) return;
     closeSheet();
@@ -69,20 +69,73 @@ function loadTesseract() {
   return tesseract;
 }
 
+const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+
+let pdfjs = null;
+function loadPdfjs() {
+  if (pdfjs) return pdfjs;
+  pdfjs = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = abs('vendor/pdfjs/pdf.min.js');
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = abs('vendor/pdfjs/pdf.worker.min.js'); resolve(window.pdfjsLib); };
+    s.onerror = () => { pdfjs = null; reject(new Error('Lecteur de PDF indisponible (ouvrez l’app une fois avec du réseau).')); };
+    document.head.appendChild(s);
+  });
+  return pdfjs;
+}
+
+// PDF : le texte du ticket est lu directement s'il y en a un (cas des tickets reçus par e-mail),
+// sinon les pages sont dessinées puis lues comme une photo.
+async function readPdf(file) {
+  const lib = await loadPdfjs();
+  const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const pages = Math.min(doc.numPages, 6);
+  let text = '';
+  for (let n = 1; n <= pages; n++) {
+    const tc = await (await doc.getPage(n)).getTextContent();
+    const rows = [];
+    for (const it of tc.items) {
+      if (!it.str.trim()) continue;
+      const y = it.transform[5], x = it.transform[4];
+      const row = rows.find((r) => Math.abs(r.y - y) < 3);
+      if (row) row.c.push({ x, t: it.str }); else rows.push({ y, c: [{ x, t: it.str }] });
+    }
+    rows.sort((a, b) => b.y - a.y);
+    text += rows.map((r) => r.c.sort((a, b) => a.x - b.x).map((c) => c.t.trim()).join(' ')).join('\n') + '\n';
+  }
+  if (text.replace(/\s/g, '').length >= 40) { scan.progress = 100; return text; }
+  const canvases = [];
+  for (let n = 1; n <= pages; n++) {
+    const page = await doc.getPage(n);
+    const vp = page.getViewport({ scale: Math.min(3, 1800 / page.getViewport({ scale: 1 }).width) });
+    const c = document.createElement('canvas');
+    c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    canvases.push(c);
+  }
+  return ocr(canvases);
+}
+
+async function ocr(canvases) {
+  const T = await loadTesseract();
+  const worker = await T.createWorker('fra', 1, {
+    workerPath: abs('vendor/tesseract/worker.min.js'),
+    corePath: abs('vendor/tesseract-core'),
+    langPath: abs('vendor/tessdata'),
+    logger: (m) => {
+      if (m.status === 'recognizing text' && scan) { scan.progress = Math.round(m.progress * 100); updateProgress(); }
+    },
+  });
+  let text = '';
+  for (const c of canvases) text += (await worker.recognize(c)).data.text + '\n';
+  await worker.terminate();
+  return text;
+}
+
 async function read(file) {
   try {
-    const [T, canvas] = await Promise.all([loadTesseract(), prepare(file)]);
-    const worker = await T.createWorker('fra', 1, {
-      workerPath: abs('vendor/tesseract/worker.min.js'),
-      corePath: abs('vendor/tesseract-core'),
-      langPath: abs('vendor/tessdata'),
-      logger: (m) => {
-        if (m.status === 'recognizing text' && scan) { scan.progress = Math.round(m.progress * 100); updateProgress(); }
-      },
-    });
-    const { data } = await worker.recognize(canvas);
-    await worker.terminate();
-    await analyse(data.text);
+    const text = isPdf(file) ? await readPdf(file) : await ocr([await prepare(file)]);
+    await analyse(text);
   } catch (e) {
     if (scan) { scan.status = 'error'; scan.error = e.message; render(); }
   }

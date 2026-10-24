@@ -29,6 +29,7 @@ app.use(express.static(PUBLIC_DIR, { index: false, setHeaders: (res) => res.set(
 // bibliotheque, moteur WebAssembly et donnees de langue francaise (paquets npm versionnes).
 const NM = path.join(__dirname, 'node_modules');
 const vendor = (dir) => express.static(path.join(NM, dir), { index: false, maxAge: '30d' });
+app.use('/vendor/pdfjs', vendor('pdfjs-dist/build'));
 app.use('/vendor/tesseract', vendor('tesseract.js/dist'));
 app.use('/vendor/tesseract-core', vendor('tesseract.js-core'));
 app.use('/vendor/tessdata', vendor('@tesseract.js-data/fra/4.0.0_best_int'));
