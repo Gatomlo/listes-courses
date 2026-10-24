@@ -1,7 +1,7 @@
 // Scan du ticket de caisse : photo -> preparation de l'image -> lecture sur le telephone
 // (Tesseract.js, rien n'est envoye a un service tiers) -> lignes rapprochees du
 // catalogue -> validation -> operation receipt.save (fonctionne aussi hors-ligne).
-import { esc, eur, on, acc, sheet, closeSheet, toast, formData, localDay } from './ui.js';
+import { esc, eur, on, acc, sheet, closeSheet, toast, formData, localDay, isPc } from './ui.js';
 import { I } from './icons.js';
 import { get, sync, newOp, attempt } from './api.js';
 import { S, hp, render, go, loadProducts, activeStores, storeById, catName, categoryOrder } from './state.js';
@@ -113,9 +113,16 @@ async function analyse(text) {
 
 // ---------- Ecran de validation ----------
 const price = (n) => (n == null ? '' : n.toFixed(2).replace('.', ','));
-function productOptions(cur) {
-  return `<option value="">— à associer —</option><option value="new">＋ Créer un produit…</option><option value="ignore">Ignorer cette ligne</option>
-    ${[...S.products].sort((a, b) => a.name.localeCompare(b.name)).map((p) => `<option value="${p.id}" ${p.id === cur ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}`;
+const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const pickLabel = (cur) => (cur === 'ignore' ? 'Ignorée' : cur ? (S.products.find((p) => p.id === cur)?.name || '— à associer —') : '— à associer —');
+// Choix d'un produit : panneau avec recherche (la liste complète est trop longue pour un menu déroulant).
+let pickLine = null;
+function pickRows(q) {
+  const n = norm(q).trim();
+  const row = (v, label, cls = '') => `<button class="item click${cls}" data-a="scan-pick-ok" data-v="${v}"><span class="grow">${label}</span></button>`;
+  const items = [...S.products].sort((a, b) => a.name.localeCompare(b.name)).filter((p) => !n || norm(p.name).includes(n));
+  return `${row('new', '＋ Créer un produit…')}${row('ignore', 'Ignorer cette ligne')}${n ? '' : row('', '— à associer —')}
+    ${items.map((p) => row(p.id, esc(p.name))).join('') || '<p class="muted" style="padding:12px 14px;margin:0">Aucun produit.</p>'}`;
 }
 
 export function scanView() {
@@ -144,7 +151,7 @@ export function scanView() {
       <div class="row gap"><input class="txt w5 sm c" value="${esc(String(l.qty).replace('.', ','))}" data-ch="scan-qty" data-i="${i}" aria-label="Quantité"><span class="muted">×</span><input class="txt w5 sm c" value="${price(l.unit)}" data-ch="scan-unit" data-i="${i}" aria-label="Prix unitaire"><span class="muted small">€</span>
       <label class="row small"><input type="checkbox" class="cb" data-ch="scan-promo" data-i="${i}" ${l.promo ? 'checked' : ''}>promo</label></div>
       ${l.create ? `<div class="pill p-carrot">＋ créer « ${esc(l.create.name)} » (${esc(catName(Number(l.create.category_id)))})</div>`
-        : `<select class="txt sm" data-ch="scan-product" data-i="${i}">${productOptions(l.product_id)}</select>`}
+        : `<button class="txt sm pick-btn" data-a="scan-pick" data-i="${i}">${esc(pickLabel(l.product_id))} ▾</button>`}
       <div class="muted small">${l.how === 'alias' ? '<span class="pill p-plum">correspondance mémorisée</span> ' : l.how === 'guess' ? '<span class="pill p-grey">proposé</span> ' : ''}${avg != null ? `moyenne ${eur(avg)}` : ''}${delta && Math.abs(delta) >= 1 ? ` · <b class="${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '+' : ''}${delta} %</b>` : ''}</div>
       </div></div>`;
   }).join('');
@@ -177,10 +184,21 @@ on('change', 'scan-store', (el) => {
     .map((l, i) => ({ ...scan.lines[i], product_id: scan.lines[i].create ? null : (l.product_id ?? scan.lines[i].product_id), how: l.how }));
   render();
 });
-on('change', 'scan-product', (el) => {
-  const l = line(el);
-  if (el.value === 'new') { createSheet(Number(el.dataset.i)); return; }
-  l.product_id = el.value === 'ignore' ? 'ignore' : el.value ? Number(el.value) : null;
+on('click', 'scan-pick', (el) => {
+  pickLine = Number(el.dataset.i);
+  const l = scan.lines[pickLine];
+  sheet(`<h3>Associer à un produit</h3><p class="muted small">Ligne du ticket : « ${esc(l.label)} »</p>
+    <div class="search" style="margin:10px 0">${I('search')}<input class="txt" id="scan-q" placeholder="Rechercher un produit…" data-in="scan-q" autocomplete="off"></div>
+    <div class="group fs-list" id="scan-pick-list">${pickRows('')}</div>`);
+  if (!isPc()) document.getElementById('scan-q')?.focus();
+});
+on('input', 'scan-q', (el) => { document.getElementById('scan-pick-list').innerHTML = pickRows(el.value); });
+on('click', 'scan-pick-ok', (el) => {
+  const i = pickLine, v = el.dataset.v;
+  closeSheet();
+  if (v === 'new') { createSheet(i); return; }
+  const l = scan.lines[i];
+  l.product_id = v === 'ignore' ? 'ignore' : v ? Number(v) : null;
   l.how = null;
   render();
 });

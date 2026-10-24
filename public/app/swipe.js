@@ -1,6 +1,7 @@
 // Mode courses : balayer une ligne vers la gauche la fait glisser, « Retirer » apparait dessous.
 let sw = null;
 document.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.swipe-del')) return; // sinon la ligne se referme sur le bouton avant le clic
   const row = e.target.closest('.swipe > .item[data-swipe]');
   document.querySelectorAll('.swipe > .item.open').forEach((r) => { if (r !== row) { r.style.transform = ''; r.classList.remove('open'); } });
   if (!row) return;
