@@ -3,6 +3,8 @@
 //  - ligne « LIBELLE  1,99 » : 1 article a 1,99 ;
 //  - quantite « 2 x 0,65  1,30 » sur la ligne ou la suivante (libelle seul juste avant) ;
 //  - remise « REMISE -0,50 » / « PROMO » : retiree de l'article precedent, marque promo ;
+//  - ticket Collect&Go / Colruyt (PDF) : « 26700 BONI beurre 250g 2 1.89 3.78 » = n° article, libelle,
+//    quantite, prix unitaire, montant (point decimal) ; remises sur la ligne suivante ;
 //  - totaux, TVA, paiement, en-tetes : ignores.
 
 export function normLabel(s) {
@@ -14,6 +16,7 @@ const SKIP = /\b(total|sous ?total|tva|btw|carte|bancontact|payconiq|maestro|vis
 const PRICE = /(-?\d{1,4}[.,]\d{2})\s*(?:€|eur|[a-d])?\s*$/i;
 const QTY = /^\s*(\d{1,3}(?:[.,]\d{1,3})?)\s*[x*×]\s*(\d{1,4}[.,]\d{2})/i;
 const DISC = /\b(remise|promo|reduc\w*|ristourne|korting|avantage|actie|bon de reduction)\b/;
+const CG = /^(\d{3,7})\s+(.+?)\s+(\d{1,3})\s+(\d{1,4}\.\d{2})\s+(\d{1,4}\.\d{2})$/;
 const num = (s) => Number(String(s).replace(',', '.'));
 const round2 = (n) => Math.round(n * 100) / 100;
 
@@ -30,6 +33,12 @@ export function parseTicket(text) {
         const iso = `${y}-${d[2]}-${d[1]}`;
         if (!Number.isNaN(Date.parse(iso)) && +d[2] <= 12 && +d[1] <= 31) date = iso;
       }
+    }
+    const cg = raw.match(CG);
+    if (cg) {
+      pendingQty = null;
+      items.push({ label: cg[2].trim(), qty: num(cg[3]), unit: num(cg[4]), total: num(cg[5]) });
+      continue;
     }
     if (SKIP.test(low)) continue;
     const q = raw.match(QTY);
@@ -68,7 +77,7 @@ export function parseTicket(text) {
     date,
     items: items.filter((i) => i.total != null).map((i) => {
       const total = round2(i.total - (i.discount || 0));
-      return { label: i.label, qty: i.qty, unit: i.discount ? round2(Math.max(0.01, total / i.qty)) : i.unit, total, promo: !!i.promo };
+      return { label: i.label, qty: i.qty, unit: i.discount && total > 0 ? round2(total / i.qty) : i.unit, total, promo: !!i.promo };
     }),
   };
 }

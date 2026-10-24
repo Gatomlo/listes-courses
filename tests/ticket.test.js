@@ -58,3 +58,23 @@ test('rapprochement : correspondance memorisee, ressemblance, inconnu', async ()
   assert.equal(by['YAOURT NAT X8'].product_id, 5);
   assert.equal(by['CHIPS PAPRIKA 200G'].product_id, null, 'a associer');
 });
+
+test('ticket Collect&Go (PDF) : quantite, prix unitaire, remises sur la ligne suivante', async () => {
+  const { parseTicket } = await load();
+  const t = parseTicket(`ATH (COLRUYT) info@collectandgo.be
+Date: 03/10/2026 18:05
+N° ART. DESCRIPTION QUANT. PRIX UNIT. (EUR) MONTANT (EUR)
+26700 BONI beurre de laiterie doux 250g 2 1.89 3.78
+27403 HERTA KNACKI Original 10pc 1 2.66 2.66
+A000317364-SCP-
+S_0 Réduction B0102838 25% -0.67
+8562 SOIGNON pyramide from.chèvre nature 150g 1 2.99 2.99
+A000317928-SCP-
+S_0 produit gratuit 100% -2.99`);
+  assert.equal(t.date, '2026-10-03');
+  assert.deepEqual(t.items.map((i) => [i.label, i.qty, i.unit, i.total, i.promo]), [
+    ['BONI beurre de laiterie doux 250g', 2, 1.89, 3.78, false],
+    ['HERTA KNACKI Original 10pc', 1, 1.99, 1.99, true],
+    ['SOIGNON pyramide from.chèvre nature 150g', 1, 2.99, 0, true],
+  ]);
+});
