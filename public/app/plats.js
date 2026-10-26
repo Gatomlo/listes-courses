@@ -6,6 +6,7 @@ import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categor
 import { matchLines } from './ticket.mjs';
 import { unitOptions, catOptions, catSubOptions, contField } from './catalogue.js';
 import { I, btnI } from './icons.js';
+import { canListen, listen, MIC } from './multi.js';
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const today = () => localDay();
@@ -18,10 +19,10 @@ const num = (v) => { const n = Number(String(v ?? '').replace(',', '.')); return
 const fmtQ = (q) => String(Math.round(q * 10) / 10).replace('.', ',');
 // Unite d'un ingredient : NULL = emballages du produit, sinon comme lib/units.js (ING_UNITS) ;
 // BASEU = unite de calcul (g et ml equivalents).
-const IUNITS = [['g', 'g'], ['kg', 'kg'], ['ml', 'ml'], ['cl', 'cl'], ['l', 'L'], ['pc', 'pièce'], ['cc', 'CC'], ['cs', 'CS']];
-const BASEU = { g: 'g', kg: 'g', ml: 'ml', cl: 'ml', l: 'ml', pc: 'pc', cc: 'ml', cs: 'ml' };
+const IUNITS = [['g', 'g'], ['kg', 'kg'], ['ml', 'ml'], ['cl', 'cl'], ['l', 'L'], ['pc', 'pièce'], ['tr', 'tranche'], ['cc', 'CC'], ['cs', 'CS']];
+const BASEU = { g: 'g', kg: 'g', ml: 'ml', cl: 'ml', l: 'ml', pc: 'pc', tr: 'pc', cc: 'ml', cs: 'ml' };
 const iunitLabel = (i) => (i.iunit ? IUNITS.find(([k]) => k === i.iunit)[1] : i.unit);
-const amountText = (q, i) => (i.iunit === 'g' && q >= 1000 ? `${fmtQ(q / 1000)} kg` : i.iunit === 'ml' && q >= 1000 ? `${fmtQ(q / 1000)} L` : `${fmtQ(q)} ${iunitLabel(i)}${i.iunit === 'pc' && q > 1 ? 's' : ''}`);
+const amountText = (q, i) => (i.iunit === 'g' && q >= 1000 ? `${fmtQ(q / 1000)} kg` : i.iunit === 'ml' && q >= 1000 ? `${fmtQ(q / 1000)} L` : `${fmtQ(q)} ${iunitLabel(i)}${(i.iunit === 'pc' || i.iunit === 'tr') && q > 1 ? 's' : ''}`);
 // Conversion possible en emballages (meme regle que lib/units.js, g et ml equivalents).
 function convertible(i) {
   if (!i.iunit) return true;
@@ -239,7 +240,7 @@ export function dishView() {
     ${ro ? `<b class="price">${i.qty != null ? esc(amountText(i.qty, i)) : '<span class="muted fw4">selon goût</span>'}</b>${i.cost != null ? `<span class="muted small" style="min-width:46px;text-align:right">≈ ${eur(i.cost)}</span>` : ''}` : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" data-ch="ing-qty" data-t="${t}" data-k="${k}"><select class="txt sm w6" data-ch="ing-unit" data-t="${t}" data-k="${k}" aria-label="Unité">${[['', i.unit], ...IUNITS].map(([v, l]) => `<option value="${v}" ${(i.iunit || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`}
     ${i.is_base || convertible(i) ? '' : mgr ? `<button class="pill p-carrot cont" data-a="ing-cont" data-id="${i.product_id}" aria-label="Contenance ?" title="Indiquer la contenance de l'emballage (ex. 500 g) ou le poids d'une pièce ; en attendant : 1 ${esc(i.unit)}">${I('box', 's')}</button>` : `<span class="pill p-carrot cont" aria-label="Contenance ?" title="Contenance du produit inconnue : 1 ${esc(i.unit)} par recette">${I('box', 's')}</span>`}
     ${ro ? '' : `<button class="ib" data-a="ing-del" data-t="${t}" data-k="${k}" aria-label="Retirer">${I('x', 's')}</button>`}</div>`).join('') || empty;
-  const ingAdd = (t, ph) => (ro ? '' : `<div class="addbox" style="margin:8px 0"><input class="txt" id="ing-q-${t}" autocomplete="off" placeholder="${ph}" data-in="ing-q" data-t="${t}" data-enter="ing-first"><div id="ing-ac-${t}"></div></div>`);
+  const ingAdd = (t, ph) => (ro ? '' : `<div class="addbox" style="margin:8px 0"><div class="row"><input class="txt grow" id="ing-q-${t}" autocomplete="off" placeholder="${ph}" data-in="ing-q" data-t="${t}" data-enter="ing-first">${canListen ? `<button class="ib" type="button" data-a="ing-mic" data-t="${t}" aria-label="Dicter les ingrédients" title="Dicter : « 200 g de farine, 2 tranches de jambon, 3 œufs »">${MIC}</button>` : ''}</div><div id="ing-ac-${t}"></div></div>`);
   const variants = ro ? (!ed.groups.length ? '' : `<div class="sec">Variantes <span class="fw4" style="text-transform:none;letter-spacing:0">un choix par groupe au menu</span></div>
       ${ed.groups.map((g, gk) => `<div class="card"><b>${esc(g.name)}</b>${g.options.map((o, ok) => `<div class="vopt"><div class="small" style="font-weight:650;margin:6px 0 2px">${esc(o.name)}</div>
         ${ingRows(`${gk}-${ok}`, '<p class="muted small" style="margin:2px 0">Pas d’ingrédient propre à cette option.</p>')}</div>`).join('')}</div>`).join('')}`)
@@ -427,6 +428,50 @@ on('input', 'ing-q', (el) => {
 const addIng = (p, qty = p.is_base ? null : 1, note = null, t = ingT, iunit = null) => {
   ingsOf(t).push({ product_id: p.id, name: p.name, unit: p.unit, iunit, is_base: !!p.is_base, qty, note });
 };
+// Dictee d'ingredients : « 200 g de farine, 2 tranches de jambon, 3 œufs » -> une ligne par ingredient.
+const NUMW = { un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9, dix: 10, douze: 12, demi: 0.5, demie: 0.5 };
+const UNITW = [[/^(?:kg|kilos?|kilogrammes?)$/, 'kg', 1], [/^(?:g|gr|grammes?)$/, 'g', 1], [/^(?:ml|millilitres?)$/, 'ml', 1], [/^(?:cl|centilitres?)$/, 'cl', 1], [/^(?:dl|décilitres?)$/, 'cl', 10],
+  [/^(?:l|litres?)$/, 'l', 1], [/^(?:tranches?|tr)$/, 'tr', 1], [/^(?:pi[eè]ces?|pcs?)$/, 'pc', 1], [/^(?:verres?)$/, 'ml', 200], [/^(?:tasses?)$/, 'ml', 250]];
+export function parseIngredients(text) {
+  return String(text || '').split(/[,;\n]+|\s+et\s+/i).map((t) => t.trim()).filter(Boolean).map((t) => {
+    let w = t.split(/\s+/), qty = null, iunit = null;
+    const n = w[0].replace(',', '.').toLowerCase();
+    if (/^\d+(\.\d+)?$/.test(n)) { qty = Number(n); w.shift(); } else if (NUMW[n] != null) { qty = NUMW[n]; w.shift(); }
+    // « 200g » collé
+    const glued = qty == null && t.match(/^(\d+(?:[.,]\d+)?)(kg|g|ml|cl|dl|l)\b\s*(.*)$/i);
+    if (glued) { qty = Number(glued[1].replace(',', '.')); w = [glued[2], ...glued[3].split(/\s+/)]; }
+    const two = w.slice(0, 3).join(' ').toLowerCase().replace(/\./g, '');
+    const sp = two.match(/^(?:c|cuill?[eè]res?) ?à ?(s|soupe|c|caf[eé])\b/);
+    if (sp) { iunit = /^s/.test(sp[1]) ? 'cs' : 'cc'; w = w.slice(sp[0].split(/\s+/).length); }
+    else if (w.length > 1 && qty != null) {
+      const u = UNITW.find(([re]) => re.test(w[0].toLowerCase().replace(/\.$/, '')));
+      if (u) { iunit = u[1]; qty = Math.round(qty * u[2] * 1000) / 1000; w.shift(); }
+    }
+    const name = w.join(' ').replace(/^(?:de |d'|d’|du |des |de la |de l'|de l’)/i, '').trim();
+    return { name, qty, iunit: iunit || (qty != null ? 'pc' : null) };
+  }).filter((e) => e.name);
+}
+async function dictateIngredients(text, t) {
+  const rows = parseIngredients(text);
+  if (!rows.length) { toast('Rien compris, réessayez', true); return; }
+  if (!S.products) await loadProducts();
+  const created = [];
+  for (const r of rows) {
+    const n = norm(r.name);
+    let p = S.products.find((x) => norm(x.name) === n) || S.products.find((x) => norm(x.name).startsWith(n)) || S.products.find((x) => norm(x.name).includes(n));
+    if (!p) {
+      p = await attempt(() => post(hp('/products'), { name: r.name.charAt(0).toUpperCase() + r.name.slice(1), category_id: (S.house.categories[0] || {}).id, unit: 'paquet' }));
+      if (!p) return;
+      S.products.push(p); created.push(p.name);
+    }
+    if (ingsOf(t).some((i) => i.product_id === p.id)) continue;
+    addIng(p, r.qty ?? (p.is_base ? null : 1), null, t, r.qty == null ? null : r.iunit);
+  }
+  if (created.length) loadProducts().catch(() => {});
+  toast(`${rows.length} ingrédient${rows.length > 1 ? 's' : ''} ajouté${rows.length > 1 ? 's' : ''}${created.length ? ` · nouveau${created.length > 1 ? 'x' : ''} produit${created.length > 1 ? 's' : ''} : ${created.join(', ')}` : ''}`);
+  render();
+}
+on('click', 'ing-mic', (el) => { const t = el.dataset.t; el.classList.add('rec'); listen((txt) => dictateIngredients(txt, t), () => el.classList.remove('rec')); });
 on('click', 'ing-add', (el) => { addIng(S.products.find((p) => p.id === Number(el.dataset.id))); render(); ingInput()?.focus(); });
 on('click', 'ing-first', (el) => { ingT = el.dataset.t; const ms = ingMatches(el.value); if (ms.length) { addIng(ms[0]); render(); ingInput()?.focus(); } });
 on('click', 'ing-new', () => {

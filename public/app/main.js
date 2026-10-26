@@ -174,11 +174,24 @@ setRenderer(() => {
 
 // Changement d'ecran : un panneau ouvert se ferme (retour du navigateur compris).
 // Nouvel ecran : en haut ; menu sur telephone : sur aujourd'hui (sous l'en-tete).
-function scrollStart() {
+// Retour (fleche de l'en-tete ou du navigateur) : on retrouve le defilement quitte ; un lien normal ouvre en haut.
+const positions = new Map();
+let curY = 0, curHash = location.hash, freshNav = false;
+window.addEventListener('scroll', () => { curY = window.scrollY; }, { passive: true });
+document.addEventListener('click', (e) => { const a = e.target.closest && e.target.closest('a[href^="#"]'); if (a) freshNav = !a.classList.contains('back'); }, true);
+function scrollStart(saved) {
+  if (saved != null) { window.scrollTo(0, saved); return; }
   const d = S.route?.[0] === 'menu' && !isPc() && document.querySelector('.agenda .day.today');
   window.scrollTo(0, d ? d.getBoundingClientRect().top + window.scrollY - 70 : 0);
 }
-window.addEventListener('hashchange', () => { closeSheet(); route().then(scrollStart); });
+window.addEventListener('hashchange', () => {
+  positions.set(curHash, curY);
+  curHash = location.hash;
+  const saved = freshNav ? undefined : positions.get(curHash);
+  freshNav = false;
+  closeSheet();
+  route().then(() => scrollStart(saved));
+});
 // Passage mobile <-> PC : la mise en page et l'etat des accordeons changent.
 window.matchMedia('(min-width: 900px)').addEventListener('change', () => render());
 

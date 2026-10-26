@@ -53,7 +53,18 @@ on('click', 'multi-ok', () => commit());
 // Dictee (navigateurs qui savent : Chrome, Android, Safari recent) : le texte entendu remplit le champ ;
 // « lait et beurre » devient « lait, beurre ».
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-export const micButton = (target) => (SR ? `<button class="ib" type="button" data-a="mic" data-target="${target}" aria-label="Dicter" title="Dicter">${'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/></svg>'}</button>` : '');
+export const canListen = !!SR;
+export const MIC = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+// Ecoute une phrase : onText(texte), puis onEnd().
+export function listen(onText, onEnd) {
+  if (!SR) { onEnd(); return; }
+  const r = new SR();
+  r.lang = 'fr-FR'; r.interimResults = false;
+  r.onresult = (e) => onText(e.results[0][0].transcript);
+  r.onend = onEnd; r.onerror = onEnd;
+  try { r.start(); } catch { onEnd(); }
+}
+export const micButton = (target) => (SR ? `<button class="ib" type="button" data-a="mic" data-target="${target}" aria-label="Dicter" title="Dicter">${MIC}</button>` : '');
 on('click', 'mic', (el) => {
   const input = document.getElementById(el.dataset.target);
   if (!SR || !input) return;
