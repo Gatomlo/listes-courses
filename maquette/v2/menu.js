@@ -114,13 +114,12 @@ function pickHtml() {
     .sort((a, b) => wished.includes(b) - wished.includes(a) || (DISHES[a].last || '0').localeCompare(DISHES[b].last || '0'));
   const tags = [...new Set(Object.keys(DISHES).flatMap(tagsOf))].sort();
   return `<h3>${fmtD(pm.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[pm.slot]}</h3>
+    ${isM() ? `<div class="grid2" style="margin:10px 0 0"><button class="btn sec" data-a="out-set">${I('pin', 's')} À l’extérieur</button><button class="btn sec" data-a="rest-set">${I('repeat', 's')} Restes</button></div>` : ''}
     <div class="search" style="margin:10px 0 8px">${I('search')}<input class="in" id="pick-q" placeholder="Rechercher un plat…" value="${esc(pm.q)}" data-in="pick-q" autocomplete="off"></div>
     <div class="hstack" style="margin-bottom:8px;gap:6px;flex-wrap:wrap"><button class="chip ${pm.tag ? 'on' : ''}" data-a="pick-tags">${I('tag', 's')} ${pm.tag ? '#' + pm.tag + ' ✕' : `Tags (${tags.length})`}</button>${pm.tag ? '' : `<span class="sub">${ks.length} plat${ks.length > 1 ? 's' : ''}</span>`}</div>
     <div class="group">${ks.map((k) => { const d = DISHES[k]; return `<button class="row tap" data-a="pick-dish" data-k="${k}"><span class="avatar" style="--c:hsl(${hue(d.n)} 40% 45%)">${d.n[0]}</span>
       <span class="grow"><b>${wished.includes(k) ? I('bulb', 's') + ' ' : ''}${d.n}</b><span class="sub" style="display:block">${d.parts ? `${I('puzzle', 's')} ${d.parts.map(([p]) => DISHES[p].n).join(', ')}` : d.last ? `dernière fois il y a ${daysAgo(d.last)} j` : 'jamais servi'}</span></span>${ppShort(k) ? `<span class="num small">${ppShort(k)} / pers.</span>` : ''}${I('chev', 's chev')}</button>`; }).join('')}
-    ${isM() && pm.q ? `<button class="row tap" data-a="dish-new" style="color:var(--accent)"><span class="ico acc">${I('plus')}</span><b class="grow">Nouveau plat « ${esc(pm.q)} »</b></button>` : ''}</div>
-    ${isM() ? `<div class="group" style="margin-top:12px"><button class="row tap" data-a="out-set"><span class="ico">${I('pin')}</span><span class="grow"><b>Repas à l’extérieur</b><span class="sub" style="display:block">Restaurant, invités… : aucun achat</span></span>${I('chev', 's chev')}</button>
-      <button class="row tap" data-a="rest-set"><span class="ico">${I('repeat')}</span><span class="grow"><b>Restes</b><span class="sub" style="display:block">Un repas déjà cuisiné : aucun achat, hors budget</span></span>${I('chev', 's chev')}</button></div>` : ''}`;
+    ${isM() && pm.q ? `<button class="row tap" data-a="dish-new" style="color:var(--accent)"><span class="ico acc">${I('plus')}</span><b class="grow">Nouveau plat « ${esc(pm.q)} »</b></button>` : ''}</div>`;
 }
 IN['pick-q'] = (el) => { pm.q = el.value; refresh(); const i = $('pick-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
 A['pick-tags'] = () => { if (pm.tag) { pm.tag = ''; refresh(); return; } pm.tq = ''; live(tagPickHtml); };
