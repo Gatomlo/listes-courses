@@ -79,7 +79,7 @@ on('change', 'bulk', async (el) => {
   const k = el.dataset.k, v = el.value === 'none' ? null : k === 'is_base' ? el.value === '1' : k === 'rayon' ? el.value : Number(el.value);
   const n = S.q.psel.size;
   const r = await attempt(() => post(hp('/products/bulk'), { ids: [...S.q.psel], set: { [k]: v } }));
-  if (r) { await loadProducts(); toast(`${n} produit${n > 1 ? 's' : ''} modifié${n > 1 ? 's' : ''}`); render(); }
+  if (r) { S.q.psel.clear(); await loadProducts(); toast(`${n} produit${n > 1 ? 's' : ''} modifié${n > 1 ? 's' : ''}`); render(); }
 });
 on('click', 'bulk-del', async () => {
   const n = S.q.psel.size;
