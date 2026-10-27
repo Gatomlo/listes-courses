@@ -4,6 +4,7 @@ import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, for
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder } from './state.js';
 import { matchLines } from './ticket.mjs';
+import { micButton, stopDictation } from './multi.js';
 import { unitOptions, catOptions, catSubOptions, contField } from './catalogue.js';
 import { I, btnI } from './icons.js';
 
@@ -250,7 +251,7 @@ export function dishView() {
         <button class="btn sec2 sm" data-a="opt-add" data-g="${gk}">＋ Option</button></div>`).join('')}
       <button class="btn ghost" data-a="grp-add">${I('plus', 's')} Groupe de variantes</button>
       ${!ed.groups.length ? '<p class="muted small">Ex. Légume : carottes / épinards ; Viande : saucisse / haché. Les ingrédients ci-dessus sont communs à toutes les variantes.</p>' : ''}`;
-  const tabIng = `${ro ? `<p class="muted small" style="margin:0 4px 8px">${I('users', 's')} Pour ${ed.portions} personne${ed.portions > 1 ? 's' : ''}${ed.cost_pp != null ? ` · <b>${esc(ppLabel(ed))}</b>` : ''}${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''}</p>` : ''}<div class="card">${ingRows('c', ed.parts.length ? '<p class="muted">Rien en plus des recettes (ex. pain pita, olives…).</p>' : '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient (produit)…')}${ro || !mgr ? '' : `<button class="btn sec2 full" data-a="rec-paste">${I('upload', 's')} Coller une liste d’ingrédients</button>`}</div>
+  const tabIng = `${ro ? `<p class="muted small" style="margin:0 4px 8px">${I('users', 's')} Pour ${ed.portions} personne${ed.portions > 1 ? 's' : ''}${ed.cost_pp != null ? ` · <b>${esc(ppLabel(ed))}</b>` : ''}${ed.time_text ? ` · ${I('clock', 's')} ${esc(ed.time_text)}` : ''}</p>` : ''}<div class="card">${ingRows('c', ed.parts.length ? '<p class="muted">Rien en plus des recettes (ex. pain pita, olives…).</p>' : '<p class="muted">Aucun ingrédient : le plat sera un simple rappel dans la liste.</p>')}${ingAdd('c', '＋ Ajouter un ingrédient (produit)…')}${ro || !mgr ? '' : `<button class="btn sec2 full" data-a="rec-paste">${I('upload', 's')} Dicter ou coller une liste d’ingrédients</button>`}</div>
     ${ro ? '' : '<p class="muted small" style="margin:0 4px">Quantités facultatives, ajustées au nombre de personnes : en emballages, ou en g, ml, pièces (convertis grâce à la contenance du produit).</p>'}${variants}`;
   const steps = String(ed.steps || '').split('\n').map((x) => x.trim()).filter(Boolean);
   const aheadRo = ed.ahead ? `<div class="card ahead"><div class="row small" style="margin-bottom:4px">${I('bell', 's')}<b>À faire à l’avance</b><span class="muted">· la veille</span></div><div class="pre">${esc(ed.ahead)}</div></div>` : '';
@@ -578,13 +579,15 @@ on('click', 'rec-import', async () => {
 // Repli : ingredients copies depuis la page, une ligne chacun.
 function pasteSheet(why, text = '') {
   sheet(`<h3>Coller les ingrédients</h3>${why ? `<p class="muted small">${esc(why)}</p>` : ''}
-    <p class="muted small">Copiez la liste des ingrédients depuis la page de la recette, une ligne par ingrédient (ex. « 300 g de farine »).</p>
+    <p class="muted small">Dictez ou copiez la liste des ingrédients, une ligne par ingrédient (ex. « 300 g de farine »).</p>
     <textarea class="txt" id="rec-text" rows="8" placeholder="300 g de farine&#10;3 oeufs&#10;60 cl de lait">${esc(text)}</textarea>
+    ${micButton('rec-text', true) ? `<div class="row gap" style="margin-top:6px">${micButton('rec-text', true)}<span class="muted small">Dictée : dites un ingrédient par phrase (« 200 grammes de farine »), marquez une pause entre deux. Retoucher le bouton pour arrêter.</span></div>` : ''}
     <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="rec-paste-ok">Lire les ingrédients</button></div>`);
   setTimeout(() => document.getElementById('rec-text')?.focus());
 }
 on('click', 'rec-paste', () => pasteSheet(''));
 on('click', 'rec-paste-ok', async () => {
+  stopDictation();
   const r = await attempt(() => post(hp('/recipe-import'), { text: document.getElementById('rec-text').value }));
   if (r) await showImport(r);
 });

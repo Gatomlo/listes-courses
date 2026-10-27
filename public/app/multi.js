@@ -53,15 +53,31 @@ on('click', 'multi-ok', () => commit());
 // Dictee (navigateurs qui savent : Chrome, Android, Safari recent) : le texte entendu remplit le champ ;
 // « lait et beurre » devient « lait, beurre ».
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-export const micButton = (target) => (SR ? `<button class="ib" type="button" data-a="mic" data-target="${target}" aria-label="Dicter" title="Dicter">${'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/></svg>'}</button>` : '');
+export const micButton = (target, lines = false) => (SR ? `<button class="ib" type="button" data-a="mic" data-target="${target}"${lines ? ' data-lines="1"' : ''} aria-label="Dicter" title="Dicter">${'<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/></svg>'}</button>` : '');
+export const stopDictation = () => { if (dictation) dictation.stop(); };
+let dictation = null; // dictee continue en cours (ingredients : une ligne par phrase)
 on('click', 'mic', (el) => {
   const input = document.getElementById(el.dataset.target);
   if (!SR || !input) return;
+  if (dictation) { dictation.stop(); return; } // second appui : arret
   const r = new SR();
   r.lang = 'fr-FR'; r.interimResults = false;
+  const lines = !!el.dataset.lines;
+  if (lines) { r.continuous = true; dictation = r; }
   el.classList.add('rec');
-  r.onresult = (e) => { const t = e.results[0][0].transcript.replace(/\s+et\s+/gi, ', '); input.value = input.value ? `${input.value}, ${t}` : t; input.dispatchEvent(new Event('input', { bubbles: true })); };
-  r.onend = () => el.classList.remove('rec');
-  r.onerror = () => el.classList.remove('rec');
-  try { r.start(); } catch { el.classList.remove('rec'); }
+  const done = () => { el.classList.remove('rec'); if (dictation === r) dictation = null; };
+  r.onresult = (e) => {
+    if (!document.body.contains(input)) { r.stop(); return; } // panneau ferme : la dictee s'arrete
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (!e.results[i].isFinal) continue;
+      const raw = e.results[i][0].transcript.trim();
+      // Ingredients : une ligne par phrase dictee ; liste d'articles : « et » devient une virgule.
+      const t = lines ? raw : raw.replace(/\s+et\s+/gi, ', ');
+      input.value = input.value.trim() ? `${input.value.replace(/[\s,]+$/, '')}${lines ? '\n' : ', '}${t}` : t;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  };
+  r.onend = done;
+  r.onerror = done;
+  try { r.start(); } catch { done(); }
 });
