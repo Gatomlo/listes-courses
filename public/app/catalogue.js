@@ -18,17 +18,19 @@ function noPrice(p) {
   return forced ? !p.prices[forced.id] : !activeStores().some((s) => p.prices[s.id]);
 }
 
-// Produits d'un rayon, par sous-rayon quand le rayon en a (« Autres » : sans sous-rayon).
+// Produits d'un rayon, par sous-rayon quand le rayon en a (« Sans sous-rayon » en dernier).
+// Un produit « sans sous-rayon » : son rayon en a, lui n'en a pas.
+const noSub = (p) => (((S.house.categories.find((c) => c.id === p.category_id) || {}).subs || []).length > 0) && !p.subcategory_id;
 function subGroups(cid, ps, row) {
   const subs = (S.house.categories.find((c) => c.id === cid) || {}).subs || [];
   if (!subs.length) return ps.map(row).join('');
-  const parts = [...subs.map((sb) => [sb.name, ps.filter((p) => p.subcategory_id === sb.id)]), ['Autres', ps.filter((p) => !subs.some((sb) => sb.id === p.subcategory_id))]].filter(([, xs]) => xs.length);
+  const parts = [...subs.map((sb) => [sb.name, ps.filter((p) => p.subcategory_id === sb.id)]), ['Sans sous-rayon', ps.filter((p) => !subs.some((sb) => sb.id === p.subcategory_id))]].filter(([, xs]) => xs.length);
   return parts.map(([n, xs]) => `<div class="subh">${esc(n)}<span class="n">${xs.length}</span></div>${xs.map(row).join('')}`).join('');
 }
 export function catalogueView() {
   const q = S.q.cat || '', f = S.q.catFilter || 'all';
   const ok = (p) => (!q || norm(p.name).includes(norm(q)))
-    && (f === 'all' || (f === 'rec' && p.recurrence) || (f === 'base' && p.is_base) || (f === 'noprice' && noPrice(p)));
+    && (f === 'all' || (f === 'rec' && p.recurrence) || (f === 'base' && p.is_base) || (f === 'noprice' && noPrice(p)) || (f === 'nosub' && noSub(p)));
   const list = S.products.filter(ok);
   const groups = categoryOrder().map((cid) => [cid, list.filter((p) => p.category_id === cid)]).filter(([, ps]) => ps.length);
   // Une ligne par produit ; sur PC, colonnes alignees a gauche (selection, produit, emballage,
@@ -55,7 +57,7 @@ export function catalogueView() {
     cols: 'wide-cols', title: 'Produits', sub: `${S.products.length} produit${S.products.length > 1 ? 's' : ''} communs au foyer${mgr && pc ? ' · cocher pour modifier en masse' : ''}`,
     right: mgr ? '<button class="btn sm sec2" data-a="csv-open">⇪ Importer</button>' : '',
     body: `<div class="search">${I('search')}<input class="txt" id="cat-q" placeholder="Rechercher un produit…" value="${esc(q)}" data-in="cat-q"></div>
-      <div class="opt">${[['all', 'Tous'], ['rec', `${I('repeat', 's')} Récurrents`], ['base', 'De base'], ['noprice', 'Prix manquant']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
+      <div class="opt">${[['all', 'Tous'], ['rec', `${I('repeat', 's')} Récurrents`], ['base', 'De base'], ['noprice', 'Prix manquant'], ['nosub', 'Sans sous-rayon']].map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-a="cat-filter" data-f="${k}">${t}</button>`).join('')}</div>
       ${bulk}
       ${groups.map(([cid, ps]) => acc('cc_' + cid, { title: catName(cid), sum: ` · ${ps.length} produit${ps.length > 1 ? 's' : ''}`, def: !!(q || f !== 'all'), body: head(cid, ps) + subGroups(cid, ps, row) })).join('')
         || `<p class="muted">Aucun produit.</p>${q ? `<button class="btn" data-a="prod-new" data-name="${esc(q)}">＋ Créer « ${esc(q)} »</button>` : ''}`}`,
