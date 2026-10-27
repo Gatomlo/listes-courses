@@ -168,3 +168,17 @@ test('produit supprime : retire des listes en cours, garde barre dans l historiq
   const again = await thomas.post(`${h}/products`, { name: 'Lait', category_id: (await thomas.get(h)).data.categories[0].id });
   assert.equal(again.status, 201, 'le nom est de nouveau libre');
 });
+
+test('cloture sans liste suivante : liste creee au debut du prochain menu', async () => {
+  const a = (await thomas.post(`${h}/lists`, { date: '2040-01-05', recurring: false })).data;
+  const r = (await thomas.post(`${h}/lists/${a.id}/close`, { fates: {} })).data;
+  assert.ok(r.created && r.next === r.created);
+  const created = (await thomas.get(`${h}/lists/${r.created}`)).data;
+  const per = (await thomas.get(`${h}/menu?at=2040-01-05`)).data.period;
+  assert.equal(created.date, new Date(Date.parse(per.end) + 86400000).toISOString().slice(0, 10));
+  // Une liste suivante existe deja : rien n'est cree.
+  const b = (await thomas.post(`${h}/lists`, { date: '2040-06-01', recurring: false })).data;
+  await thomas.post(`${h}/lists`, { date: '2040-06-20', recurring: false });
+  const r2 = (await thomas.post(`${h}/lists/${b.id}/close`, { fates: {} })).data;
+  assert.equal(r2.created, null);
+});
