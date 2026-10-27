@@ -43,7 +43,7 @@ function mealBtn(m, label) {
 }
 // Repas a l'exterieur : mention a la place d'un plat (fiche : note, retirer).
 export const outLabel = (o) => (o.rest ? `Restes${o.dish ? ` · ${o.dish}` : ''}` : 'À l’extérieur');
-const outBtn = (o, label) => `<button class="meal out${o.rest ? ' rest' : ''}" data-a="out-open" data-date="${o.date}" data-slot="${o.slot}">${label ? `<span class="sl">${SLOT[o.slot]}</span>` : ''}<span class="nm">${I(o.rest ? 'repeat' : 'pin', 's')} ${esc(outLabel(o))}${o.note ? `<span class="muted small block">${esc(o.note)}</span>` : ''}</span></button>`;
+const outBtn = (o, label) => `<button class="meal out${o.rest ? ' rest' : ''}"${isManager() ? `${isPc() ? ' draggable="true"' : ''} data-drag="o${o.id}"` : ''} data-a="out-open" data-date="${o.date}" data-slot="${o.slot}">${label ? `<span class="sl">${SLOT[o.slot]}</span>` : ''}<span class="nm">${I(o.rest ? 'repeat' : 'pin', 's')} ${esc(outLabel(o))}${o.note ? `<span class="muted small block">${esc(o.note)}</span>` : ''}</span></button>`;
 const cell = (d, s, label) => { const o = outAt(d, s), m = mealAt(d, s); return o ? outBtn(o, label) : m ? mealBtn(m, label) : addBtn(d, s, label); };
 const addBtn = (d, s, label) => `<button class="add" data-a="meal-add" data-date="${d}" data-slot="${s}" aria-label="Ajouter un plat">${I('plus', 's')}${label ? ` ${SLOT[s]}` : ''}</button>`;
 
@@ -344,6 +344,11 @@ async function dropOn(id, date, slot) {
     if (mealAt(date, slot) || outAt(date, slot)) { toast('Ce créneau est déjà pris : glissez l’envie sur un créneau libre.', true); return; }
     const dish_id = Number(String(id).slice(1)), w = (S.wishes || []).find((x) => x.dish_id === dish_id);
     if (await attempt(() => post(hp('/meals'), { date, slot, dish_id, persons: 4 }))) { toast(`${w ? w.name : 'Plat'} au menu`); afterChange(); }
+    return;
+  }
+  if (String(id).startsWith('o')) {
+    const o = (menu.outings || []).find((x) => x.id === Number(String(id).slice(1)));
+    if (o && (o.date !== date || o.slot !== slot) && await attempt(() => patch(hp(`/outings/${o.id}`), { date, slot }))) { toast('Déplacé'); afterChange(); }
     return;
   }
   const m = menu.meals.find((x) => x.id === Number(id));

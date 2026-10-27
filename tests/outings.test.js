@@ -75,3 +75,25 @@ test('restes : creneau sans achat, plat facultatif', async () => {
   assert.equal(m.meals.length, 0);
   assert.deepEqual(m.outings.map((x) => [x.slot, x.rest]), [['midi', true], ['soir', true]]);
 });
+
+test('deplacer une mention : creneau libre, repas (echange), autre mention', async () => {
+  const a = (await thomas.post(`${h}/dishes`, { name: 'Quiche' })).data.id;
+  const d1 = day(20), d2 = day(21);
+  const o1 = (await thomas.put(`${h}/outings`, { date: d1, slot: 'midi', note: 'Resto' })).data;
+  assert.equal((await lea.patch(`${h}/outings/${o1.id}`, { date: d2, slot: 'midi' })).status, 403);
+  assert.equal((await thomas.patch(`${h}/outings/${o1.id}`, { date: d2, slot: 'nuit' })).status, 400);
+  await thomas.patch(`${h}/outings/${o1.id}`, { date: d1, slot: 'soir' });
+  let m = await menuOf(d1, 2);
+  assert.deepEqual(m.outings.map((x) => [x.date, x.slot]), [[d1, 'soir']]);
+  // Echange avec un repas valide.
+  const mid = (await thomas.post(`${h}/meals`, { date: d2, slot: 'midi', dish_id: a })).data.id;
+  await thomas.patch(`${h}/outings/${o1.id}`, { date: d2, slot: 'midi' });
+  m = await menuOf(d1, 2);
+  assert.deepEqual(m.meals.map((x) => [x.id, x.date, x.slot]), [[mid, d1, 'soir']]);
+  assert.deepEqual(m.outings.map((x) => [x.date, x.slot]), [[d2, 'midi']]);
+  // Echange avec une autre mention.
+  const o2 = (await thomas.put(`${h}/outings`, { date: d1, slot: 'midi', note: 'Mamie' })).data;
+  await thomas.patch(`${h}/outings/${o1.id}`, { date: d1, slot: 'midi' });
+  m = await menuOf(d1, 2);
+  assert.deepEqual(m.outings.map((x) => [x.id, x.date, x.slot]), [[o1.id, d1, 'midi'], [o2.id, d2, 'midi']]);
+});
