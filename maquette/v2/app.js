@@ -64,7 +64,8 @@ const topV = () => S.stack[S.stack.length - 1];
 const A = {}, IN = {}, CH = {}, VIEWS = {};
 // Accueil, Listes, ＋ central (ajout rapide), Menu, Plats ; l'ancien onglet Plus est dans le menu du haut (bouton ☰ de l'en-tête).
 const TABS = [['home', 'Accueil', 'home'], ['lists', 'Listes', 'basket'], ['fab'], ['menu', 'Menu', 'calendar'], ['dishes', 'Plats', 'bowl']];
-const badge = { lists: () => LISTS.reduce((n, l) => n + l.items.filter((i) => i.sugg).length, 0) + (typeof closeDue === 'function' ? closeDue().length : 0), menu: () => WISHES.filter((w) => w.status === 'pending').length + MEALS.filter((m) => m.sugg).length };
+// Un seul indicateur : le nombre de choses « à faire » (bloc de l'Accueil) ; pas de pastille sur les autres onglets.
+const badge = { home: () => (typeof todoCount === 'function' ? todoCount() : 0) };
 
 function go(v, params = {}) { S.stack.push({ v, ...params }); render('f'); }
 function back() { if (S.stack.length > 1) { S.stack.pop(); render('b'); } }

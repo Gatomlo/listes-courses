@@ -76,7 +76,8 @@ VIEWS.product = (t) => {
       <div class="group">
         <label class="row"><span class="grow">Magasin</span><select class="in" style="width:58%;height:38px"><option>Conseil : le moins cher</option>${activeStores().map((s) => `<option ${p.imp === s ? 'selected' : ''}>Toujours ${STORES[s].n}</option>`).join('')}</select></label>
         <label class="row"><span class="grow">Rayon<span class="sub" style="display:block">et sous-rayon, facultatif</span></span><select class="in" style="width:58%;height:38px" data-ch="prod-cat" data-id="${p.id}">${catOptions(p.sub ? `${p.cat}:${p.sub}` : p.cat)}</select></label>
-        <label class="row"><span class="grow">Emballage</span><input class="in" style="width:58%;height:38px" value="${p.u}"></label>
+        <button class="row tap" data-a="pk-t"><span class="grow">Emballage<span class="sub" style="display:block">${p.u} · pour comparer les prix</span></span>${I(S.q.pkOpen ? 'down' : 'chev', 's chev')}</button>
+        ${S.q.pkOpen ? `<label class="row"><span class="grow">Type</span><input class="in" style="width:58%;height:38px" value="${p.u}"></label><label class="row"><span class="grow">Contenance<span class="sub" style="display:block">ex. 500 g, 6 x 33 cl</span></span><input class="in" style="width:58%;height:38px" placeholder="500 g"></label>` : ''}
         <div class="row"><span class="grow">Ingrédient de base<span class="sub" style="display:block">vérifié, pas ajouté d’office</span></span><span class="sw ${p.base ? 'on' : ''}"></span></div>
         <div class="row"><span class="grow">Récurrent</span><span class="pill">${p.rec ? (p.rec === 1 ? 'chaque liste' : `toutes les ${p.rec} listes`) : 'non'}</span></div>
       </div>
@@ -84,6 +85,7 @@ VIEWS.product = (t) => {
       </div></div>`,
   };
 };
+A['pk-t'] = () => { S.q.pkOpen = !S.q.pkOpen; render(); };
 A['rec-add'] = (el) => sheet(`<h3>Nouveau relevé</h3><p class="lead">${P[el.dataset.id].n}</p>
   <div class="stack"><div class="seg">${activeStores().map((s, k) => `<button class="${k ? '' : 'on'}">${STORES[s].n}</button>`).join('')}</div>
   <div class="grid2"><label class="field"><span>Prix</span><input class="in" inputmode="decimal" placeholder="0,99"></label><label class="field"><span>Date</span><input class="in" type="date" value="${TODAY}"></label></div>
@@ -135,26 +137,29 @@ A.ord = (el) => { const o = ORDER[el.dataset.id], k = Number(el.dataset.k), j = 
 A['store-col'] = (el) => { const s = STORES[el.dataset.id]; s.c = el.dataset.c; s.cs = `color-mix(in srgb, ${el.dataset.c} 16%, var(--surface))`; render(); };
 
 // ---------- Foyer ----------
-VIEWS.house = () => ({
-  title: 'Foyer', sub: HOUSE.name,
-  body: `<div class="cols"><div>
-    <div class="sh"><span>Membres</span>${isM() ? '<button data-a="invite">＋ Inviter</button>' : ''}</div>
+VIEWS.house = () => {
+  const open = (k, d) => (S.q['ho' + k] === undefined ? d : S.q['ho' + k]);
+  const sec = (k, ic, t, sub, body, d = false) => `<div class="sh" style="margin-top:6px"></div><div class="group"><button class="row tap" data-a="house-sec" data-k="${k}"><span class="ico">${I(ic)}</span><span class="grow"><b>${t}</b><span class="sub" style="display:block">${sub}</span></span>${I(open(k, d) ? 'down' : 'chev', 's chev')}</button>${open(k, d) ? `<div style="padding:4px 12px 12px">${body}</div>` : ''}</div>`;
+  const members = `${isM() ? '<div class="between" style="margin-bottom:8px"><span></span><button class="btn sm sec" data-a="invite">＋ Inviter</button></div>' : ''}
     <div class="group">${MEMBERS.map((m) => `<button class="row tap" data-a="${isM() && !m.me ? 'member' : 'noop'}" data-id="${m.id}">${avatar(m)}<span class="grow"><b>${m.n}${m.me ? ' (vous)' : ''}</b><span class="sub" style="display:block">${m.mail}</span></span><span class="pill ${m.role === 'manager' ? 'acc' : ''}">${m.role === 'manager' ? 'Gestionnaire' : 'Membre'}</span></button>`).join('')}
-      ${INVITES.map((v) => `<div class="row"><span class="ico">${I('mail')}</span><span class="grow"><b>Invitation en attente</b><span class="sub" style="display:block">${v.role === 'member' ? 'Membre' : 'Gestionnaire'} · créée le ${fmtD(v.made)}</span></span><button class="btn sm sec" data-a="invite">Lien</button></div>`).join('')}</div>
-    <div class="sh"><span>Tags des plats</span></div>
-    <div class="group">${[...new Set(Object.keys(DISHES).flatMap(tagsOf))].sort().map((tg) => (tg === 'économique'
-      ? `<div class="row"><span class="grow">#${tg}<span class="sub" style="display:block">automatique${HOUSE.eco ? ` · sous ${eur(HOUSE.eco)} par personne` : ' · palier à fixer dans les réglages'}</span></span><span class="sub">${Object.keys(DISHES).filter(isEco).length} plats</span>${I('lock', 's')}</div>`
-      : `<button class="row tap" data-a="${isM() ? 'tag-edit' : 'noop'}" data-t="${tg}"><span class="grow">#${tg}</span><span class="sub">${Object.values(DISHES).filter((d) => d.tags.includes(tg)).length} plats</span>${isM() ? I('edit', 's chev') : ''}</button>`)).join('')}</div>
-    </div><div class="side-col">
-    <div class="sh"><span>Réglages</span></div>
-    <div class="group">
+      ${INVITES.map((v) => `<div class="row"><span class="ico">${I('mail')}</span><span class="grow"><b>Invitation en attente</b><span class="sub" style="display:block">${v.role === 'member' ? 'Membre' : 'Gestionnaire'} · créée le ${fmtD(v.made)}</span></span><button class="btn sm sec" data-a="invite">Lien</button></div>`).join('')}</div>`;
+  const settings = `<div class="group">
       ${[['Rythme des courses', `${HOUSE.rhythm} jours`, 'date proposée d’une nouvelle liste'], ['Seuil d’économie', eur(HOUSE.threshold), 'pour conseiller deux magasins'], ['Palier « Économique »', HOUSE.eco ? eur(HOUSE.eco) + ' / pers.' : '—', 'sous ce coût par personne, le tag Économique est automatique'], ['Relevés pour la moyenne', HOUSE.records, 'moins de 6 mois, hors promo'], ['Durée d’un menu', `${HOUSE.menuDays} jours`, 'période proposée'], ['Début du menu', HOUSE.startDow, '']]
         .map(([a, b, c]) => `<button class="row tap" data-a="${isM() ? 'setting' : 'mgr-only'}" data-t="${a}" data-v="${b}"><span class="grow">${a}${c ? `<span class="sub" style="display:block">${c}</span>` : ''}</span><b class="num">${b}</b>${I('chev', 's chev')}</button>`).join('')}
       <div class="row"><span class="grow">Coût fixe d’un 2e magasin<span class="sub" style="display:block">trajet, temps : relève le seuil</span></span><span class="sw"></span></div>
-    </div>
-    ${isM() ? `<button class="btn ghost" style="margin-top:12px;color:var(--danger)" data-a="noop">Supprimer le foyer</button>` : ''}
-    </div></div>`,
-});
+    </div>`;
+  const tags = `<div class="group">${[...new Set(Object.keys(DISHES).flatMap(tagsOf))].sort().map((tg) => (tg === 'économique'
+      ? `<div class="row"><span class="grow">#${tg}<span class="sub" style="display:block">automatique${HOUSE.eco ? ` · sous ${eur(HOUSE.eco)} par personne` : ' · palier à fixer dans les réglages'}</span></span><span class="sub">${Object.keys(DISHES).filter(isEco).length} plats</span>${I('lock', 's')}</div>`
+      : `<button class="row tap" data-a="${isM() ? 'tag-edit' : 'noop'}" data-t="${tg}"><span class="grow">#${tg}</span><span class="sub">${Object.values(DISHES).filter((d) => d.tags.includes(tg)).length} plats</span>${isM() ? I('edit', 's chev') : ''}</button>`)).join('')}</div>`;
+  return {
+    title: 'Foyer', sub: HOUSE.name,
+    body: `${sec('m', 'users', 'Personnes', `${MEMBERS.length} membres${INVITES.length ? ` · ${INVITES.length} invitation en attente` : ''}`, members, true)}
+      ${isM() ? sec('s', 'sliders', 'Réglages', 'rythme, seuils, palier économique', settings) : ''}
+      ${sec('t', 'tag', 'Menus et plats', `${[...new Set(Object.keys(DISHES).flatMap(tagsOf))].length} tags`, tags)}
+      ${isM() ? `<button class="btn ghost" style="margin-top:12px;color:var(--danger)" data-a="noop">Supprimer le foyer</button>` : ''}`,
+  };
+};
+A['house-sec'] = (el) => { const k = 'ho' + el.dataset.k; const cur = S.q[k] === undefined ? el.dataset.k === 'm' : S.q[k]; S.q[k] = !cur; render(); };
 A.invite = () => sheet(`<h3>Inviter dans le foyer</h3><p class="lead">Le lien permet de créer un compte (e-mail + mot de passe) et rejoint ${HOUSE.name}.</p>
   <div class="seg" style="margin-bottom:12px"><button class="on">Membre</button><button>Gestionnaire</button></div>
   <div class="hstack"><input class="in grow" readonly value="https://exemple.be/cabas/?invite=Qm8x…" id="inv-url"><button class="btn sm" data-a="inv-copy">Copier</button></div>

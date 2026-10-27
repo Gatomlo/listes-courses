@@ -253,7 +253,7 @@ VIEWS.display = () => ({
 });
 
 // ---------- Plats ----------
-const DFILTERS = [['all', 'Tous'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'Suggestions']];
+const DFILTERS = [['all', 'Tous'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'À valider']];
 const nextOf = (k) => MEALS.filter((m) => !m.sugg && m.date >= TODAY && (m.dish === k || ((DISHES[m.dish] || {}).parts || []).some(([p]) => p === k && !m.skip.includes(p)))).map((m) => m.date).sort()[0];
 const hasRecipe = (d) => !!(d.url || d.steps || d.notes);
 VIEWS.dishes = () => {
@@ -298,7 +298,7 @@ VIEWS.dish = (t) => {
   const k = t.id, d = DISHES[k], tabK = S.q['dtab' + k] || (d.parts ? 'parts' : 'ing');
   const canEdit = isM() || (d.draft === 'Thomas');
   const used = Object.keys(DISHES).filter((x) => (DISHES[x].parts || []).some(([p]) => p === k));
-  const tabs = [['ing', 'Ingrédients'], ['rec', 'Recette'], ...(used.length ? [] : [['parts', 'Composition']]), ['hist', 'Historique']];
+  const tabs = [['ing', 'Ingrédients'], ['rec', 'Recette'], ...(d.parts ? [['parts', 'Composition']] : []), ['adv', 'Avancé']];
   const ingRow = (g, del) => `<div class="ing"><span class="grow">${P[g[0]].n}${P[g[0]].base ? ' <span class="pill">de base</span>' : ''}</span><span class="q">${ingText(g)}</span>${!t.edit && ingCostOf(g) != null ? `<span class="sub" style="min-width:52px;text-align:right">≈ ${eur(ingCostOf(g))}</span>` : ''}${del && t.edit ? `<button class="ib" data-a="noop" aria-label="Retirer">${I('x', 's')}</button>` : ''}</div>`;
   const body = {
     ing: `<div class="card">${d.ings.map((g) => ingRow(g, true)).join('') || `<p class="muted" style="margin:6px 0">${d.parts ? 'Rien en plus des recettes.' : 'Aucun ingrédient : simple rappel dans la liste.'}</p>`}
@@ -311,7 +311,9 @@ VIEWS.dish = (t) => {
     parts: `<p class="sub" style="margin:0 2px 10px">Plusieurs recettes pour un même plat : leurs ingrédients s’additionnent dans les courses.</p>
       <div class="group">${(d.parts || []).map(([p, por]) => `<div class="row"><span class="ico plum">${I('puzzle')}</span><button class="grow" style="text-align:left" data-a="go" data-v="dish" data-id="${p}"><b>${DISHES[p].n}</b><span class="sub" style="display:block">${por} portions sur ${DISHES[p].p} · ${hasRecipe(DISHES[p]) ? 'recette' : 'à compléter'}</span></button>${t.edit ? `<span class="stepper"><button data-a="noop">${I('minus', 's')}</button><b>${por}</b><button data-a="noop">${I('plus', 's')}</button></span>` : I('chev', 's chev')}</div>`).join('') || '<p class="empty">Plat simple : aucune recette rattachée.</p>'}</div>
       ${t.edit || isM() ? `<button class="btn sec full" style="margin-top:10px" data-a="part-add" data-id="${k}">${I('plus')} Ajouter une recette</button>` : ''}`,
-    hist: `<div class="grid2"><div class="card"><div class="big num">${d.times || 0}</div><div class="sub">fois servi</div></div><div class="card"><div class="big num">${d.last ? daysAgo(d.last) + ' j' : '—'}</div><div class="sub">depuis la dernière</div></div></div>
+    adv: `${!d.parts && !used.length ? `<div class="sh"><span>Plat composé</span></div><div class="group"><button class="row tap" data-a="part-add" data-id="${k}"><span class="ico plum">${I('puzzle')}</span><span class="grow"><b>Composer avec d’autres recettes</b><span class="sub" style="display:block">Ex. mezze = houmous + taboulé + falafels</span></span>${I('chev', 's chev')}</button></div>` : ''}
+      <div class="sh"><span>Historique</span></div>
+      <div class="grid2"><div class="card"><div class="big num">${d.times || 0}</div><div class="sub">fois servi</div></div><div class="card"><div class="big num">${d.last ? daysAgo(d.last) + ' j' : '—'}</div><div class="sub">depuis la dernière</div></div></div>
       <div class="sh"><span>À venir</span></div><div class="group">${MEALS.filter((m) => m.date >= TODAY && (m.dish === k || ((DISHES[m.dish] || {}).parts || []).some(([p]) => p === k))).map((m) => `<button class="row tap" data-a="meal-open" data-id="${m.id}"><span class="grow"><b>${fmtD(m.date)}</b> · ${SLOTS[m.slot]} · ${m.p} pers.${m.dish !== k ? ` <span class="pill plum">${I('puzzle', 's')} ${DISHES[m.dish].n}</span>` : ''}</span>${I('chev', 's chev')}</button>`).join('') || '<p class="empty">Pas prévu au menu.</p>'}</div>
       <div class="sh"><span>5 dernières fois</span></div><div class="group">${[...Array(Math.min(d.times || 0, 5))].map((_, j) => `<div class="row"><span class="grow">${fmtD(addDays(d.last, -j * 23), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span><span class="sub">Soir · 4 pers.</span></div>`).join('') || '<p class="empty">Jamais servi.</p>'}</div>`,
   }[tabK];

@@ -5,6 +5,9 @@ const statusPill = (l) => (l.type === 'backlog' ? '' : `<span class="pill ${STAT
 // Listes a venir ou en cours ; une liste ouverte dont la date est passee depuis plus d'un jour releve du rappel de cloture.
 const overdue = (l) => l.type === 'dated' && l.status !== 'closed' && l.date < addDays(TODAY, -1);
 const dated = () => LISTS.filter((l) => l.type === 'dated' && l.status !== 'closed' && !overdue(l)).sort((a, b) => a.date.localeCompare(b.date));
+// Date de la prochaine liste : début du prochain menu (lendemain de la fin du menu en cours), sinon dernière liste + rythme.
+const nextMenuStart = () => addDays(MENU.end, 1);
+const nextListDate = () => { const dated = LISTS.filter((l) => l.type === 'dated').map((l) => l.date), d = nextMenuStart(); return dated.includes(d) ? addDays(dated.sort().pop(), HOUSE.rhythm) : d; };
 const nextDate = () => addDays(LISTS.filter((l) => l.type === 'dated').map((l) => l.date).sort().pop(), HOUSE.rhythm);
 const qtyText = (i) => `${qtyOf(i)} × ${P[i.pid].u}`;
 
@@ -60,6 +63,7 @@ A['ap-quick'] = (el) => {
   if (ex) ex.q += 1; else ap.items.push(it(p.id, 1));
   queued(); render(); toast(`${p.n} ajouté à « À prévoir »`);
 };
+const todoCount = () => (isM() ? closeDue().length + LISTS.flatMap(ticketsDue).length + LISTS.flatMap((l) => l.items.filter((i) => i.sugg)).length + MEALS.filter((m) => m.sugg).length + WISHES.filter((w) => w.status === 'pending').length : 0);
 // « À faire » : tout ce qui attend une action, en un seul bloc (absent quand il n'y a rien).
 const todoBlock = () => {
   const rows = [];
@@ -67,8 +71,7 @@ const todoBlock = () => {
   const nSugg = LISTS.flatMap((l) => l.items.filter((i) => i.sugg)).length + MEALS.filter((m) => m.sugg).length;
   const wishes = WISHES.filter((w) => w.status === 'pending');
   let html = closeRows() + ticketRows(tix);
-  if (isM() && nSugg) html += `<button class="row tap" data-a="sugg-sheet"><span class="ico warn">${I('bulb')}</span><span class="grow"><b>${plural(nSugg, 'suggestion')} à valider</b><span class="sub" style="display:block">de ${[...new Set([...LISTS.flatMap((l) => l.items.filter((i) => i.sugg).map((i) => i.sugg)), ...MEALS.filter((m) => m.sugg).map((m) => m.sugg)])].join(', ')}</span></span>${I('chev', 's chev')}</button>`;
-  if (isM() && wishes.length) html += `<button class="row tap" data-a="tab" data-t="menu"><span class="ico warn">${I('bulb')}</span><span class="grow"><b>${plural(wishes.length, 'envie')} de plat à valider</b><span class="sub" style="display:block">dans le menu</span></span>${I('chev', 's chev')}</button>`;
+  if (isM() && nSugg + wishes.length) html += `<button class="row tap" data-a="sugg-sheet"><span class="ico warn">${I('bulb')}</span><span class="grow"><b>${nSugg + wishes.length} à valider</b><span class="sub" style="display:block">${[nSugg ? `${plural(nSugg, 'article')} / repas` : '', wishes.length ? plural(wishes.length, 'envie') : ''].filter(Boolean).join(' · ')}</span></span>${I('chev', 's chev')}</button>`;
   return html ? `<div class="sh"><span>À faire</span></div><div class="group">${html}</div>` : '';
 };
 // Repas du jour et du lendemain avec une preparation a l'avance (champ « à faire à l'avance » du plat).
@@ -122,6 +125,12 @@ VIEWS.lists = () => {
 A['other-toggle'] = () => { S.q.otherOpen = !S.q.otherOpen; render(); };
 A['new-list'] = () => {
   if (!needNet()) return;
+  // Un seul geste : liste créée à la date proposée (prochain menu, sinon rythme), récurrents importés ; date modifiable ensuite.
+  const date = nextListDate(), l = { id: 'n' + date, type: 'dated', date, status: 'prep', items: [it('lai', 6), it('ban', 2), it('eau', 2)] };
+  LISTS.push(l); go('list', { id: l.id });
+  toast(`Liste du ${fmtD(date, { day: 'numeric', month: 'long' })} créée · 3 récurrents`, () => { LISTS.splice(LISTS.indexOf(l), 1); back(); });
+};
+A['new-list-old'] = () => {
   const d = nextDate();
   live(() => `<h3>Nouvelle liste</h3><p class="lead">Date proposée : dernière liste + ${HOUSE.rhythm} jours.</p>
     <label class="field"><span>Date des courses</span><input class="in" type="date" id="nl-date" value="${d}"></label>
@@ -139,11 +148,13 @@ A['new-list-ok'] = () => {
 A['sugg-sheet'] = () => live(() => {
   const s = LISTS.flatMap((l) => l.items.filter((i) => i.sugg).map((i) => ({ i, l })));
   const ms = MEALS.filter((m) => m.sugg);
-  return `<h3>Suggestions à valider</h3><p class="lead">Proposées par les membres du foyer.</p>
+  const ws = WISHES.filter((w) => w.status === 'pending');
+  return `<h3>À valider</h3><p class="lead">Articles, repas et envies proposés par les membres du foyer.</p>
     <div class="group">${s.map(({ i, l }) => `<div class="row">${avatar(member(i.sugg), 's')}<span class="grow"><b>${P[i.pid].n}</b> × ${i.q}<span class="sub" style="display:block">${listName(l)}</span></span>
       <button class="ib" data-a="sugg-no" data-id="${i.id}" aria-label="Refuser">${I('x')}</button><button class="ib solid" style="color:var(--accent)" data-a="sugg-ok" data-id="${i.id}" aria-label="Accepter">${I('check')}</button></div>`).join('')}
     ${ms.map((m) => `<div class="row">${avatar(member(m.sugg), 's')}<span class="grow"><b>${DISHES[m.dish].n}</b><span class="sub" style="display:block">Repas · ${fmtD(m.date)} ${SLOTS[m.slot].toLowerCase()}</span></span><button class="btn sm sec" data-a="meal-open" data-id="${m.id}">Voir</button></div>`).join('')}</div>
-    ${!s.length && !ms.length ? '<p class="empty">Tout est validé.</p>' : ''}`;
+    ${ws.map((w) => `<div class="row">${avatar(member(w.by), 's')}<span class="grow"><b>${DISHES[w.dish].n}</b><span class="sub" style="display:block">Envie de plat</span></span><button class="ib solid" style="color:var(--accent)" data-a="wish-ok" data-id="${w.id}" aria-label="Valider">${I('check')}</button></div>`).join('')}
+    ${!s.length && !ms.length && !ws.length ? '<p class="empty">Tout est validé.</p>' : ''}`;
 });
 const findItem = (id) => { for (const l of LISTS) { const i = l.items.find((x) => x.id === Number(id)); if (i) return { i, l }; } return {}; };
 A['sugg-ok'] = (el) => { if (!needNet()) return; findItem(el.dataset.id).i.sugg = null; toast('Suggestion ajoutée à la liste'); refresh(); render(); };
@@ -259,7 +270,17 @@ A['close-list'] = (el) => {
     <div class="foot"><button class="btn sec" data-a="go" data-v="scan" data-id="${l.id}" data-st="co">${I('camera')} Scanner le ticket</button><button class="btn" data-a="close-ok" data-id="${l.id}">Clôturer</button></div>`);
 };
 A['carry-all'] = (el) => { S.q.carryAll = el.dataset.k; refresh(); };
-A['close-ok'] = (el) => { if (!needNet()) return; listById(el.dataset.id).status = 'closed'; closeSheet(); tab('lists'); toast('Liste clôturée · articles reportés'); };
+A['close-ok'] = (el) => {
+  if (!needNet()) return;
+  listById(el.dataset.id).status = 'closed'; closeSheet();
+  // La liste suivante est créée à la date du prochain menu (si aucune liste n'existe déjà ce jour-là).
+  const date = nextMenuStart(); let msg = 'Liste clôturée · articles reportés';
+  if (!LISTS.some((l) => l.type === 'dated' && l.date === date)) {
+    LISTS.push({ id: 'n' + date, type: 'dated', date, status: 'prep', items: [it('lai', 6), it('ban', 2), it('eau', 2)] });
+    msg = `Liste clôturée · liste du ${fmtD(date, { day: 'numeric', month: 'long' })} créée (prochain menu)`;
+  }
+  tab('lists'); toast(msg);
+};
 
 // Fiche article
 A['item-open'] = (el) => {
@@ -316,12 +337,14 @@ A['prod-new'] = () => {
   const name = S.q.addQ.trim();
   live(() => `<h3>Nouveau produit</h3><p class="lead">Ajouté aux produits du foyer puis à la liste.</p>
     <div class="stack"><label class="field"><span>Nom</span><input class="in" id="np-n" value="${esc(name.charAt(0).toUpperCase() + name.slice(1))}"></label>
-    <div class="grid2"><label class="field"><span>Rayon</span><select class="in" id="np-c">${catOptions('')}</select></label>
-    <label class="field"><span>Emballage</span><select class="in"><option>paquet</option><option>pièce</option><option>kg</option><option>bouteille</option><option>boîte</option></select></label></div>
-    <div class="grid2"><label class="field"><span>Contenance</span><input class="in" placeholder="500" inputmode="decimal"></label><label class="field"><span>Unité</span><select class="in"><option>g</option><option>kg</option><option>ml</option><option>cl</option><option>L</option><option>pièces</option></select></label></div>
+    <label class="field"><span>Rayon</span><select class="in" id="np-c">${catOptions('')}</select></label>
+    <button class="row tap" style="padding:0" data-a="np-more"><span class="grow">Emballage et contenance<span class="sub" style="display:block">${S.q.npMore ? 'masquer' : 'facultatif : seulement pour comparer les prix'}</span></span>${I(S.q.npMore ? 'down' : 'chev', 's chev')}</button>
+    ${!S.q.npMore ? '' : `<div class="grid2"><label class="field"><span>Emballage</span><select class="in"><option>paquet</option><option>pièce</option><option>kg</option><option>bouteille</option><option>boîte</option></select></label></div>
+    <div class="grid2"><label class="field"><span>Contenance</span><input class="in" placeholder="500" inputmode="decimal"></label><label class="field"><span>Unité</span><select class="in"><option>g</option><option>kg</option><option>ml</option><option>cl</option><option>L</option><option>pièces</option></select></label></div>`}
     <label class="row" style="padding:0"><span class="grow">Ingrédient de base (sel, huile, épices)</span><span class="sw"></span></label></div>
     <div class="foot"><button class="btn" data-a="prod-new-ok">Créer et ajouter</button></div>`);
 };
+A['np-more'] = () => { S.q.npMore = !S.q.npMore; refresh(); };
 A['prod-new-ok'] = () => {
   const id = 'x' + Date.now(), n = $('np-n').value.trim() || 'Produit';
   const [cat, sub] = $('np-c').value.split(':'); P[id] = { id, n, cat, sub: sub || null, u: 'paquet', avg: { im: null, co: null, al: null }, rc: 0 };
@@ -359,7 +382,7 @@ A['ticket-skip'] = (el) => { tripOf(listById(el.dataset.id), el.dataset.st).skip
 A['shop-pick'] = (el) => {
   const l = listById(el.dataset.id), sw = el.dataset.sw, ex = el.dataset.ex || '';
   // Dernier magasin utilise : « Partir faire les courses » y va directement (changement par l'icone magasin de l'en-tete).
-  const last = S.q.lastShop;
+  const last = S.q.lastShop || (() => { const c = {}; counted(l).filter((i) => !i.done).forEach((i) => { c[storeOf(i)] = (c[storeOf(i)] || 0) + 1; }); return Object.keys(c).sort((a, b) => c[b] - c[a])[0]; })();
   if (!sw && !ex && last && (last === 'all' || (STORES[last] && STORES[last].active))) { A['shop-go']({ dataset: { id: l.id, st: last, sw: '' } }); return; }
   const todo = counted(l).filter((i) => !i.done);
   sheet(`<h3>Où faites-vous les courses ?</h3><p class="lead">Tous les articles restants sont affichés ; ceux conseillés ailleurs portent une mention. Fonctionne hors-ligne.</p>
