@@ -115,7 +115,7 @@ function pickHtml() {
   const tags = [...new Set(Object.keys(DISHES).flatMap(tagsOf))].sort();
   return `<h3>${fmtD(pm.date, { weekday: 'long', day: 'numeric', month: 'long' })} · ${SLOTS[pm.slot]}</h3>
     <div class="search" style="margin:10px 0 8px">${I('search')}<input class="in" id="pick-q" placeholder="Rechercher un plat…" value="${esc(pm.q)}" data-in="pick-q" autocomplete="off"></div>
-    <div class="chips" style="margin-bottom:8px">${tags.map((t) => `<button class="chip ${pm.tag === t ? 'on' : ''}" data-a="pick-tag" data-t="${t}">#${t}</button>`).join('')}</div>
+    <div class="hstack" style="margin-bottom:8px;gap:6px;flex-wrap:wrap"><button class="chip ${pm.tag ? 'on' : ''}" data-a="pick-tags">${I('tag', 's')} ${pm.tag ? '#' + pm.tag + ' ✕' : `Tags (${tags.length})`}</button>${pm.tag ? '' : `<span class="sub">${ks.length} plat${ks.length > 1 ? 's' : ''}</span>`}</div>
     <div class="group">${ks.map((k) => { const d = DISHES[k]; return `<button class="row tap" data-a="pick-dish" data-k="${k}"><span class="avatar" style="--c:hsl(${hue(d.n)} 40% 45%)">${d.n[0]}</span>
       <span class="grow"><b>${wished.includes(k) ? I('bulb', 's') + ' ' : ''}${d.n}</b><span class="sub" style="display:block">${d.parts ? `${I('puzzle', 's')} ${d.parts.map(([p]) => DISHES[p].n).join(', ')}` : d.last ? `dernière fois il y a ${daysAgo(d.last)} j` : 'jamais servi'}</span></span>${ppShort(k) ? `<span class="num small">${ppShort(k)} / pers.</span>` : ''}${I('chev', 's chev')}</button>`; }).join('')}
     ${isM() && pm.q ? `<button class="row tap" data-a="dish-new" style="color:var(--accent)"><span class="ico acc">${I('plus')}</span><b class="grow">Nouveau plat « ${esc(pm.q)} »</b></button>` : ''}</div>
@@ -123,7 +123,19 @@ function pickHtml() {
       <button class="row tap" data-a="rest-set"><span class="ico">${I('repeat')}</span><span class="grow"><b>Restes</b><span class="sub" style="display:block">Un repas déjà cuisiné : aucun achat, hors budget</span></span>${I('chev', 's chev')}</button></div>` : ''}`;
 }
 IN['pick-q'] = (el) => { pm.q = el.value; refresh(); const i = $('pick-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
-A['pick-tag'] = (el) => { pm.tag = pm.tag === el.dataset.t ? '' : el.dataset.t; refresh(); };
+A['pick-tags'] = () => { if (pm.tag) { pm.tag = ''; refresh(); return; } pm.tq = ''; live(tagPickHtml); };
+// Choix d'un tag : liste avec recherche (des dizaines de tags ne doivent pas pousser la liste des plats).
+function tagPickHtml() {
+  const n = norm(pm.tq || ''), all = [...new Set(Object.keys(DISHES).flatMap(tagsOf))].sort();
+  const cnt = (t) => Object.keys(DISHES).filter((k) => tagsOf(k).includes(t)).length;
+  const ts = all.filter((t) => !n || norm(t).includes(n));
+  return `<h3>Filtrer par tag</h3>
+    <div class="search" style="margin:10px 0 8px">${I('search')}<input class="in" id="tag-q" placeholder="Rechercher un tag…" value="${esc(pm.tq || '')}" data-in="tag-q" autocomplete="off"></div>
+    <div class="group">${ts.map((t) => `<button class="row tap" data-a="pick-tag" data-t="${t}"><span class="grow">#${t}</span><span class="num small">${cnt(t)}</span></button>`).join('') || '<p class="empty">Aucun tag</p>'}</div>
+    <div class="foot"><button class="btn sec" data-a="pm-back">Retour aux plats</button></div>`;
+}
+IN['tag-q'] = (el) => { pm.tq = el.value; refresh(); const i = $('tag-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+A['pick-tag'] = (el) => { pm.tag = el.dataset.t; live(pickHtml); };
 A['pick-dish'] = (el) => { pm.dish = el.dataset.k; pm.skip = []; pm.opts = Object.fromEntries((DISHES[pm.dish].groups || []).map((g) => [g.g, g.o[0][0]])); live(cfgHtml); };
 const ingsOfMeal = (k, opts, skip = []) => {
   const d = DISHES[k];
