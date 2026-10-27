@@ -304,7 +304,7 @@ export function dishView() {
     title: ed.id ? ed.name : 'Nouveau plat', back: !ed.id && S.dishReturn ? '#/menu' : '#/plats',
     sub: ed.draft ? 'Proposition à valider par un gestionnaire' : !canEdit ? 'Lecture seule (membre)' : !ro && ed.id ? 'Modification' : '',
     right: ro ? (canEdit ? `<button class="btn sm sec2" data-a="dish-edit">${I('edit', 's')} Modifier</button>` : '')
-      : `${ed.id && mgr ? `<button class="ib" data-a="dish-del" aria-label="Supprimer">${I('trash')}</button>` : ''}${ed.id ? '<button class="btn sm sec2" data-a="dish-cancel">Annuler</button>' : ''}<button class="btn sm" data-a="dish-save">${ed.draft && mgr ? 'Valider la fiche' : 'Enregistrer'}</button>`,
+      : `${ed.id && mgr ? `<button class="ib" data-a="dish-merge" aria-label="Fusionner avec un autre plat" title="Fusionner">${I('merge')}</button><button class="ib" data-a="dish-del" aria-label="Supprimer">${I('trash')}</button>` : ''}${ed.id ? '<button class="btn sm sec2" data-a="dish-cancel">Annuler</button>' : ''}<button class="btn sm" data-a="dish-save">${ed.draft && mgr ? 'Valider la fiche' : 'Enregistrer'}</button>`,
     // Telephone en lecture : onglets juste sous la photo, informations en bas.
     body: ro && !isPc() ? `${banner}${hero}${tabsHtml}${usedIn}<div class="sec">Infos</div>${infoRo}`
       : `${banner}<div class="split dish"><div>${hero}
@@ -503,6 +503,19 @@ on('click', 'dish-save', async () => {
   S.wishes = null;
   toast(isNew ? 'Plat créé' : wasDraft && !d.draft ? 'Fiche validée' : 'Plat enregistré · listes recalculées');
   if (isNew && S.dishReturn) { S.dishReturn.dish_id = d.id; go('#/menu'); } else if (isNew) go(`#/plats/${d.id}`); else render();
+});
+on('click', 'dish-merge', async () => {
+  if (!S.dishes) S.dishes = await get(hp('/dishes'));
+  const others = S.dishes.filter((x) => x.id !== ed.id);
+  if (!others.length) return toast('Aucun autre plat', true);
+  sheet(`<h3>Fusionner « ${esc(ed.name)} »</h3><p class="muted">Pour supprimer un doublon : ses repas au menu, envies, tags et types passent au plat choisi, qui garde sa recette (les champs vides sont complétés), puis « ${esc(ed.name)} » est supprimé.</p>
+    <select class="txt" name="into">${others.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select>
+    <div class="row end" style="margin-top:10px"><button class="btn" data-a="dish-merge-ok">Fusionner</button></div>`);
+});
+on('click', 'dish-merge-ok', async () => {
+  const into = Number(document.querySelector('.sheet [name=into]').value), name = ed.name;
+  const d = await attempt(() => post(hp(`/dishes/${ed.id}/merge`), { into }));
+  if (d) { S.dishes = null; S.wishes = null; closeSheet(); toast(`« ${name} » fusionné dans « ${d.name} »`); go(`#/plats/${d.id}`); }
 });
 on('click', 'dish-del', async () => {
   const n = ed.upcoming.length;
