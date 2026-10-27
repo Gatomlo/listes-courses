@@ -36,9 +36,8 @@ VIEWS.products = () => {
   return {
     title: 'Produits', sub: `Prix moyens : ${HOUSE.records} derniers relevés hors promo, moins de 6 mois`,
     actions: `<button class="ib" data-a="csv" aria-label="Importer">${I('upload')}</button>`,
-    body: `<div class="search" style="margin-bottom:10px">${I('search')}<input class="in" id="pq" placeholder="Rechercher un produit…" value="${esc(S.q.pq || '')}" data-in="pq"></div>
-      <div class="chips" style="margin-bottom:12px"><button class="chip ${!c ? 'on' : ''}" data-a="pc" data-c="">Tous</button>${Object.entries(CATS).map(([k, v]) => `<button class="chip ${c === k ? 'on' : ''}" data-a="pc" data-c="${k}">${v}</button>`).join('')}</div>
-      ${c && SUBS[c] ? `<div class="chips" style="margin:-4px 0 12px">${Object.entries(SUBS[c]).map(([k, v]) => `<button class="chip ${sb === k ? 'on' : ''}" data-a="ps" data-s="${k}" style="height:30px;font-size:12.5px">${v}</button>`).join('')}</div>` : ''}
+    body: `<div class="hstack" style="flex-wrap:nowrap;margin-bottom:12px"><div class="search grow">${I('search')}<input class="in" id="pq" placeholder="Rechercher un produit…" value="${esc(S.q.pq || '')}" data-in="pq"></div>
+        <button class="btn ${c ? '' : 'sec'}" data-a="pcs" style="white-space:nowrap">${I('tag', 's')} ${c ? (sb ? SUBS[c][sb] : CATS[c]) : 'Rayon'}</button>${c ? `<button class="btn sec icon-m" data-a="pc" data-c="" aria-label="Tous les rayons">${I('x')}</button>` : ''}</div>
       <div class="group">${ps.map((p) => { const adv = advised(p.id); return `<button class="row tap" data-a="go" data-v="product" data-id="${p.id}">
         <span class="grow"><b>${p.n}</b><span class="sub" style="display:block">${catLabel(p)} · ${p.u}${p.base ? ' · de base' : ''}${p.imp ? ` · imposé ${STORES[p.imp].n}` : ''}</span></span>
         <span style="display:grid;gap:2px;justify-items:end">${activeStores().map((s) => `<span class="small num ${s === adv ? 'b' : 'faint'}" style="${s === adv ? `color:${STORES[s].c}` : ''}">${dotS(s)} ${eur(price(p.id, s))}</span>`).join('')}</span></button>`; }).join('')}</div>`,
@@ -47,7 +46,16 @@ VIEWS.products = () => {
 };
 IN.pq = (el) => { S.q.pq = el.value; render(); const i = $('pq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
 CH['prod-cat'] = (el) => { const p = P[el.dataset.id], [cat, sub] = el.value.split(':'); p.cat = cat; p.sub = sub || null; toast(`${p.n} : ${catLabel(p)}`); render(); };
-A.pc = (el) => { S.q.pc = el.dataset.c; S.q.ps = ''; render(); };
+// Rayon et sous-rayon : une seule liste avec recherche (remplace les deux rangees de pastilles).
+A.pcs = () => { S.q.pcq = ''; live(pcsHtml); };
+const pcsHtml = () => {
+  const n = norm(S.q.pcq || ''), cnt = (c, s) => Object.values(P).filter((p) => p.cat === c && (!s || p.sub === s)).length;
+  const rows = Object.entries(CATS).flatMap(([k, v]) => [[k, '', v, cnt(k)], ...Object.entries(SUBS[k] || {}).map(([s, nm]) => [k, s, v + ' › ' + nm, cnt(k, s)])]).filter(([, , t]) => !n || norm(t).includes(n));
+  return `<h3>Rayon</h3><div class="search" style="margin:10px 0 8px">${I('search')}<input class="in" id="pcq" placeholder="Rechercher un rayon…" value="${esc(S.q.pcq || '')}" data-in="pcq" autocomplete="off"></div>
+    <div class="group"><button class="row tap" data-a="pc" data-c=""><span class="grow">Tous les rayons</span><span class="num small">${Object.keys(P).length}</span></button>${rows.map(([k, s, t, c]) => `<button class="row tap" data-a="pc" data-c="${k}" data-s="${s}"><span class="grow">${t}</span><span class="num small">${c}</span>${S.q.pc === k && (S.q.ps || '') === s ? I('check', 's') : ''}</button>`).join('')}</div>`;
+};
+IN.pcq = (el) => { S.q.pcq = el.value; refresh(); const i = $('pcq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+A.pc = (el) => { S.q.pc = el.dataset.c; S.q.ps = el.dataset.s || ''; closeSheet(); render(); };
 A.ps = (el) => { S.q.ps = S.q.ps === el.dataset.s ? '' : el.dataset.s; render(); };
 function spark(rs) {
   const W = 320, H = 84, pad = 10, xs = rs.map((r) => dt(r.date).getTime()), ys = rs.map((r) => r.price);

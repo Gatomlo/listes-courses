@@ -174,10 +174,12 @@ VIEWS.list = (t) => {
   const segs = false ? `<div class="chips" style="position:sticky;top:0;z-index:1;background:var(--bg);padding-block:6px">
       <button class="chip ${f === 'all' ? 'on' : ''}" data-a="lfilter" data-id="${l.id}" data-f="all">Tous <span class="n">${l.items.length}</span></button>
       ${activeStores().map((s) => `<button class="chip ${f === s ? 'on' : ''}" data-a="lfilter" data-id="${l.id}" data-f="${s}">${dotS(s)} ${STORES[s].n} <span class="n">${l.items.filter((i) => storeOf(i) === s).length}</span></button>`).join('')}</div>` : '';
-  const scen = sc && !ro ? `<button class="card tap" style="width:100%;text-align:left;margin-bottom:6px" data-a="scen" data-id="${l.id}">
+  const worth = sc && activeStores().length > 1 && sc.saving >= HOUSE.threshold;
+  const scenLine = sc && !ro && !worth ? `<button class="row tap" style="width:100%;margin-bottom:6px;border-radius:var(--r,14px)" data-a="scen" data-id="${l.id}"><span class="grow sub">Estimation · ${sc.split ? '2 magasins' : STORES[sc.all[0].st].n}</span><b class="num">≈ ${eur(sc.all[0].total)}</b>${I('chev', 's chev')}</button>` : '';
+  const scen = scenLine || (sc && !ro ? `<button class="card tap" style="width:100%;text-align:left;margin-bottom:6px" data-a="scen" data-id="${l.id}">
       <div class="between"><span class="sub">Estimation · ${sc.split ? 'conseil : 2 magasins' : 'conseil : 1 magasin'}</span>${I('chev', 's chev')}</div>
       <div class="between" style="margin-top:4px"><span class="big num">${eur(sc.split ? sc.plan.total : sc.all[0].total)}</span>${sc.saving > 0 ? `<span class="pill ${sc.split ? 'acc' : ''}">−${eur(sc.saving)} vs ${STORES[sc.all[0].st].n}</span>` : ''}</div>
-      <div class="pricebar" style="margin-top:10px">${sc.all.map((a) => `<span class="small">${STORES[a.st].n}</span><i style="--c:${STORES[a.st].c};width:${Math.round((a.total / sc.all[sc.all.length - 1].total) * 100)}%"></i><b class="num small">${eur(a.total)}</b>`).join('')}</div></button>` : '';
+      <div class="pricebar" style="margin-top:10px">${sc.all.map((a) => `<span class="small">${STORES[a.st].n}</span><i style="--c:${STORES[a.st].c};width:${Math.round((a.total / sc.all[sc.all.length - 1].total) * 100)}%"></i><b class="num small">${eur(a.total)}</b>`).join('')}</div></button>` : '');
   const presence = l.status === 'cours' ? `<div class="hstack small muted" style="margin:0 2px 10px">${avatar(MEMBERS[1], 's')} Léa regarde aussi cette liste</div>` : '';
   return {
     title: l.type === 'backlog' ? 'À prévoir' : fmtD(l.date, { weekday: 'short', day: 'numeric', month: 'long' }),
@@ -289,17 +291,19 @@ A['item-open'] = (el) => {
     ${i.sugg ? `<div class="banner">${I('bulb')}<span class="grow">Suggéré par ${i.sugg}</span>${isM() ? `<button class="btn sm" data-a="sugg-ok" data-id="${i.id}">Accepter</button>` : ''}</div>` : ''}
     <div class="group">
       <div class="row"><span class="grow">Quantité${i.mq ? `<span class="sub" style="display:block">dont ${i.mq} pour les repas</span>` : ''}</span><span class="stepper"><button data-a="qty" data-id="${i.id}" data-d="-1" aria-label="Moins">${I('minus')}</button><b>${qtyOf(i)}</b><button data-a="qty" data-id="${i.id}" data-d="1" aria-label="Plus">${I('plus')}</button></span></div>
-      <label class="row"><span class="grow">Note</span><input class="in" style="width:60%;height:38px" value="${esc(i.note)}" placeholder="ex. marque, taille…" data-ch="item-note" data-id="${i.id}"></label>
       ${l.type === 'dated' ? `<button class="row tap" data-a="store-pick" data-id="${i.id}"><span class="grow">Magasin</span>${sp(storeOf(i))}${I('chev', 's chev')}</button>` : ''}
+      <button class="row tap" data-a="item-more"><span class="grow">Plus de détails<span class="sub" style="display:block">${S.q.itemMore ? 'masquer' : 'note, indisponible, récurrent, prix'}</span></span>${I(S.q.itemMore ? 'down' : 'chev', 's chev')}</button>
+      ${!S.q.itemMore ? '' : `<label class="row"><span class="grow">Note</span><input class="in" style="width:60%;height:38px" value="${esc(i.note)}" placeholder="ex. marque, taille…" data-ch="item-note" data-id="${i.id}"></label>
       <button class="row tap" data-a="item-toggle" data-k="unav" data-id="${i.id}"><span class="grow">Indisponible en magasin</span><span class="sw ${i.unav ? 'on' : ''}"></span></button>
-      <button class="row tap" data-a="item-rec" data-id="${i.id}"><span class="grow">Récurrent<span class="sub" style="display:block">${p.rec ? `toutes les ${p.rec > 1 ? p.rec + ' listes' : 'listes'}` : 'non'}</span></span>${I('chev', 's chev')}</button>
+      <button class="row tap" data-a="item-rec" data-id="${i.id}"><span class="grow">Récurrent<span class="sub" style="display:block">${p.rec ? `toutes les ${p.rec > 1 ? p.rec + ' listes' : 'listes'}` : 'non'}</span></span>${I('chev', 's chev')}</button>`}
     </div>
-    ${i.from.length ? `<div class="sh"><span>Pour les repas</span></div><div class="group">${i.from.map((d) => `<div class="row">${I('bowl')}<span class="grow">${d}</span></div>`).join('')}
+    ${!S.q.itemMore ? '' : `${i.from.length ? `<div class="sh"><span>Pour les repas</span></div><div class="group">${i.from.map((d) => `<div class="row">${I('bowl')}<span class="grow">${d}</span></div>`).join('')}
       <button class="row tap" data-a="in-stock" data-id="${i.id}"><span class="ico">${I('box')}</span><span class="grow"><b>Déjà en réserve</b><span class="sub" style="display:block">Retiré des repas, il ne reviendra pas</span></span></button></div>` : ''}
     <div class="sh"><span>Prix</span><button data-a="go" data-v="product" data-id="${p.id}">Fiche produit</button></div>
-    <div class="cmp">${activeStores().map((s) => `<div style="--c:${STORES[s].c};--cs:${STORES[s].cs}" class="${advised(p.id) === s ? 'best' : ''}"><div class="small b">${STORES[s].n}</div><div class="big num" style="margin-top:4px">${eur(price(p.id, s))}</div>${promoOf(p.id, s) ? '<div class="xs b">promo</div>' : ''}</div>`).join('')}</div>
+    <div class="cmp">${activeStores().map((s) => `<div style="--c:${STORES[s].c};--cs:${STORES[s].cs}" class="${advised(p.id) === s ? 'best' : ''}"><div class="small b">${STORES[s].n}</div><div class="big num" style="margin-top:4px">${eur(price(p.id, s))}</div>${promoOf(p.id, s) ? '<div class="xs b">promo</div>' : ''}</div>`).join('')}</div>`}
     <div class="foot btn-row">${bI('doc', 'Fiche produit', `data-a="go" data-v="product" data-id="${p.id}"`)}${bI('tag', 'Promo', 'data-a="promo-add"')}${bI('move', 'Déplacer', `data-a="item-move" data-id="${i.id}"`)}${bI('trash', 'Retirer', `data-a="item-del" data-id="${i.id}"`, 'danger')}</div>`);
 };
+A['item-more'] = () => { S.q.itemMore = !S.q.itemMore; refresh(); };
 A.qty = (el) => { const { i } = findItem(el.dataset.id); i.q = Math.max(0, i.q + Number(el.dataset.d)); if (qtyOf(i) < 1) i.q = 1 - i.mq > 0 ? 1 - i.mq : 0; queued(); refresh(); render(); };
 CH['item-note'] = (el) => { findItem(el.dataset.id).i.note = el.value; queued(); render(); };
 A['item-toggle'] = (el) => { const { i } = findItem(el.dataset.id); i[el.dataset.k] = !i[el.dataset.k]; queued(); refresh(); render(); };

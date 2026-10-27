@@ -72,16 +72,16 @@ VIEWS.menu = () => {
     title: 'Menu', sub: `${fmtD(MENU.start, { day: 'numeric', month: 'short' })} → ${fmtD(MENU.end, { day: 'numeric', month: 'short' })} · ${MENU.saved ? 'menu fixé' : 'période proposée'}`, large: true,
     actions: `<button class="ib" data-a="menu-share" aria-label="Partager">${I('share')}</button><button class="ib" data-a="menu-more" aria-label="Options">${I('sliders')}</button>`,
     body: `<div class="between" style="margin-bottom:6px"><button class="btn sm sec" data-a="menu-nav" data-d="-1">${I('back', 's')} Précédent</button><span class="small muted">14 jours</span><button class="btn sm sec" data-a="menu-nav" data-d="1">Suivant ${I('chev', 's')}</button></div>
-      ${(() => { const c = menuCost(); if (!c.persons) return '';
-        return `<button class="card budget-btn" data-a="bud-toggle"><div class="between"><span><b>Budget ${c.partial ? 'dès ' : '≈ '}${eur(c.total)}</b> <span class="muted small">· ${eur(Math.round(c.total / c.persons))} / pers. / repas${c.partial ? ' · partiel' : ''}</span></span>${I(S.q.budOpen ? 'up' : 'down', 's')}</div>
-          ${S.q.budOpen ? `<div class="small" style="margin-top:8px">${c.weeks.map((t, k) => (t == null ? '' : `<div class="between"><span class="muted">Semaine du ${fmtD(addDays(MENU.start, 7 * k), { day: 'numeric', month: 'short' })}</span><b class="num">${eur(t)}</b></div>`)).join('')}${c.unknown ? `<p class="sub" style="margin:6px 0 0">${plural(c.unknown, 'repas')} sans prix connu.</p>` : ''}</div>` : ''}</button>`; })()}
+      ${(() => { const c = menuCost(), open = S.q.budOpen;
+        return `<div class="card budget-btn"><button class="between" style="width:100%;text-align:left" data-a="bud-toggle"><span>${c.persons ? `<b>Budget ${c.partial ? 'dès ' : '≈ '}${eur(c.total)}</b>` : '<b>Infos du menu</b>'} <span class="muted small">${c.persons ? `· ${eur(Math.round(c.total / c.persons))} / pers.` : ''}${MENU.note ? ' · 1 remarque' : ''}</span></span>${I(open ? 'up' : 'down', 's')}</button>
+          ${!open ? '' : `${c.persons ? `<div class="small" style="margin-top:10px">${c.weeks.map((t, k) => (t == null ? '' : `<div class="between"><span class="muted">Semaine du ${fmtD(addDays(MENU.start, 7 * k), { day: 'numeric', month: 'short' })}</span><b class="num">${eur(t)}</b></div>`)).join('')}${c.unknown ? `<p class="sub" style="margin:6px 0 0">${plural(c.unknown, 'repas')} sans prix connu.</p>` : ''}</div>` : ''}
+          <div class="sh" style="margin:12px 0 4px"><span>Remarques</span></div>
+          ${isM() ? `<textarea class="in" rows="3" placeholder="Remarques sur ce menu (imprimées avec l’export)" data-ch="menu-note">${esc(MENU.note)}</textarea>` : `<div class="small">${esc(MENU.note) || '<span class="muted">Aucune remarque</span>'}</div>`}`}</div>`; })()}
       <div class="agenda">${agenda}</div>${grid}
       <p class="sub" style="margin:8px 2px">Les repas alimentent la liste de leur période : un repas en ${I('cart', 's')} jour de courses tombe dans cette liste. Appui long sur un repas pour le déplacer.</p>
       <div class="sh"><span>Envies de plats</span><button data-a="wish-add">＋ Proposer</button></div>
       ${isM() ? '<p class="sub" style="margin:-4px 2px 8px">Glissez une envie sur un créneau libre du menu (appui long sur téléphone).</p>' : ''}
-      <div class="hscroll wishes">${wishes}</div>
-      <button class="sh" style="width:100%" data-a="note-toggle"><span>Remarques${MENU.note ? ' · 1' : ''}</span>${I(S.q.noteOpen ? 'up' : 'down', 's')}</button>
-      ${!S.q.noteOpen ? '' : isM() ? `<textarea class="in" rows="3" placeholder="Remarques sur ce menu (imprimées avec l’export)" data-ch="menu-note">${esc(MENU.note)}</textarea>` : `<div class="card">${esc(MENU.note) || '<span class="muted">Aucune remarque</span>'}</div>`}`,
+      <div class="hscroll wishes">${wishes}</div>`,
   };
 };
 CH['menu-note'] = (el) => { MENU.note = el.value; toast('Remarques enregistrées'); };
@@ -264,11 +264,10 @@ VIEWS.dishes = () => {
   const tags = [...new Set(Object.keys(DISHES).flatMap(tagsOf))].sort();
   const actF = [...(f !== 'all' ? [['df', DFILTERS.find(([k]) => k === f)[1]]] : []), ...(tg ? [['dt', '#' + tg]] : []), ...(S.q.dp ? [['dp', 'Prix ' + PRICES.find(([k]) => k === S.q.dp)[1] + ' / pers.']] : [])];
   return {
-    title: 'Plats', sub: `${plural(Object.keys(DISHES).length, 'plat')} du foyer`, large: true,
+    title: 'Plats', sub: actF.length ? `${plural(ks.length, 'plat')} · ${actF.map(([, t]) => t).join(' · ')}` : `${plural(Object.keys(DISHES).length, 'plat')} du foyer`, large: true,
     actions: isM() ? `<button class="ib" data-a="dish-new" aria-label="Nouveau plat">${I('plus')}</button>` : '',
     body: `<div class="hstack" style="flex-wrap:nowrap;margin-bottom:8px"><div class="search grow">${I('search')}<input class="in" id="dq" placeholder="Plat, ingrédient, recette…" value="${esc(S.q.dq || '')}" data-in="dq"></div>
-        <button class="btn sec icon-m" data-a="dfs" aria-label="Filtres" style="position:relative">${I('sliders')}${actF.length ? `<span class="bd" style="position:absolute;top:-4px;right:-4px">${actF.length}</span>` : ''}</button></div>
-      ${actF.length ? `<div class="hstack" style="margin-bottom:10px">${actF.map(([k, t]) => `<button class="pill" data-a="dunset" data-k="${k}">${t} ✕</button>`).join('')}</div>` : ''}
+        <button class="btn ${actF.length ? '' : 'sec'} icon-m" data-a="dfs" aria-label="Filtres" style="position:relative">${I('sliders')}${actF.length ? `<span class="bd" style="position:absolute;top:-4px;right:-4px">${actF.length}</span>` : ''}</button>${actF.length ? `<button class="btn sec icon-m" data-a="dclear" aria-label="Effacer les filtres">${I('x')}</button>` : ''}</div>
       <div class="dgrid">${ks.map((k) => { const d = DISHES[k], nx = nextOf(k);
         return `<button class="dcard" data-a="go" data-v="dish" data-id="${k}">${tile(k, '', `${ppShort(k) ? `<span class="pill">${ppShort(k)}</span>` : ''}${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts.length}</span>` : ''}${hasRecipe(d) ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`)}
           <div><h4>${d.n}</h4><div class="sub">${nx ? `<span style="color:var(--accent);font-weight:600">prévu ${fmtD(nx, { weekday: 'short', day: 'numeric' })}</span>` : d.last ? `il y a ${daysAgo(d.last)} j` : 'jamais servi'}</div></div></button>`; }).join('')}</div>
@@ -283,11 +282,20 @@ A.dfs = () => live(() => { const f = S.q.df || 'all', tg = S.q.dt || '', tags = 
   return `<h3>${I('sliders', 's')} Filtres</h3>
   <div class="sh" style="margin-top:6px"><span>Afficher</span></div><div class="chips" style="flex-wrap:wrap">${DFILTERS.map(([k, t]) => `<button class="chip ${f === k ? 'on' : ''}" data-a="df" data-f="${k}">${t}</button>`).join('')}</div>
   <div class="sh"><span>Prix par personne</span></div><div class="chips" style="flex-wrap:wrap">${PRICES.map(([k, t]) => `<button class="chip ${S.q.dp === k ? 'on' : ''}" data-a="dp" data-k="${k}">${t}</button>`).join('')}</div>
-  <div class="sh"><span>Tags</span></div><div class="chips" style="flex-wrap:wrap">${tags.map((t) => `<button class="chip ${tg === t ? 'on' : ''}" data-a="dt" data-t="${t}">#${t}</button>`).join('')}</div>
+  <div class="sh"><span>Tag</span></div><div class="group"><button class="row tap" data-a="dtags"><span class="ico">${I('tag')}</span><span class="grow"><b>${tg ? '#' + tg : 'Tous les tags'}</b><span class="sub" style="display:block">${tags.length} tags</span></span>${I('chev', 's chev')}</button></div>
   <div class="foot"><button class="btn sec" data-a="dclear">Effacer</button><button class="btn" data-a="close">Voir les plats</button></div>`; });
 A.dclear = () => { S.q.df = 'all'; S.q.dt = ''; S.q.dp = ''; render(); refresh(); };
 A.dunset = (el) => { const k = el.dataset.k; S.q[k] = k === 'df' ? 'all' : ''; render(); };
-A.dt = (el) => { S.q.dt = S.q.dt === el.dataset.t ? '' : el.dataset.t; render(); if (sheetFn) refresh(); };
+// Choix d'un tag : liste avec recherche (des dizaines de tags).
+A.dtags = () => { S.q.dtq = ''; live(dtagsHtml); };
+const dtagsHtml = () => {
+  const n = norm(S.q.dtq || ''), ts = [...new Set(Object.keys(DISHES).flatMap(tagsOf))].sort().filter((t) => !n || norm(t).includes(n));
+  return `<h3>Filtrer par tag</h3><div class="search" style="margin:10px 0 8px">${I('search')}<input class="in" id="dtq" placeholder="Rechercher un tag…" value="${esc(S.q.dtq || '')}" data-in="dtq" autocomplete="off"></div>
+    <div class="group">${S.q.dt ? `<button class="row tap" data-a="dt" data-t="${S.q.dt}"><span class="grow">Tous les tags</span></button>` : ''}${ts.map((t) => `<button class="row tap" data-a="dt" data-t="${t}"><span class="grow">#${t}</span><span class="num small">${Object.keys(DISHES).filter((k) => tagsOf(k).includes(t)).length}</span>${S.q.dt === t ? I('check', 's') : ''}</button>`).join('') || '<p class="empty">Aucun tag</p>'}</div>
+    <div class="foot"><button class="btn sec" data-a="dfs">Retour aux filtres</button></div>`;
+};
+IN.dtq = (el) => { S.q.dtq = el.value; refresh(); const i = $('dtq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+A.dt = (el) => { S.q.dt = S.q.dt === el.dataset.t ? '' : el.dataset.t; render(); A.dfs(); };
 A['dish-new'] = () => { closeSheet(); const k = 'n' + Date.now(); DISHES[k] = { n: (pm && pm.q) || S.q.dq || 'Nouveau plat', p: 4, tags: [], ings: [], isNew: true }; go('dish', { id: k, edit: true }); };
 
 const fmtQ = (q) => String(Math.round(q * 10) / 10).replace('.', ',');
