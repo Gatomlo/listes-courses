@@ -154,8 +154,8 @@ export const closeCount = () => closeDue().length;
 function todoBlock() {
   const mgr = isManager(), sug = S.house.pending || (S.suggestions || []).length;
   let html = closeRows() + ticketRows(summary.tickets || [], 0, true);
-  if (mgr && sug) html += `<button class="item click" data-a="sugg-sheet"><span class="ico carrot">${I('bulb')}</span><span class="grow"><b>${plural(S.house.pending || (S.suggestions || []).length, 'suggestion')} à valider</b><span class="muted block">articles et plats proposés par les membres</span></span>${I('chev', 's chev')}</button>`;
-  if (mgr && S.house.wishesPending) html += `<a class="item click" href="#/menu"><span class="ico carrot">${I('bulb')}</span><span class="grow"><b>${plural(S.house.wishesPending, 'envie')} de plat à valider</b><span class="muted block">dans le menu</span></span>${I('chev', 's chev')}</a>`;
+  const nS = S.house.pending || (S.suggestions || []).length, nW = S.house.wishesPending || 0;
+  if (mgr && nS + nW) html += `<button class="item click" data-a="sugg-sheet"><span class="ico carrot">${I('bulb')}</span><span class="grow"><b>${nS + nW} à valider</b><span class="muted block">${[nS ? `${plural(nS, 'article')} / repas` : '', nW ? plural(nW, 'envie') : ''].filter(Boolean).join(' · ')}</span></span>${I('chev', 's chev')}</button>`;
   return html ? box('À faire', '', html, 'todo-c') : '';
 }
 // « À préparer à l'avance » : plats d'aujourd'hui et de demain.
@@ -247,7 +247,9 @@ function weekPreview() {
       ...(week.outings || []).filter((o) => o.date === d).map((o) => ({ slot: o.slot, html: `${I(o.rest ? 'repeat' : 'pin', 's')} ${esc(o.rest ? `Restes${o.dish ? ` · ${o.dish}` : ''}` : 'À l’extérieur')}${o.note ? ` · ${esc(o.note)}` : ''}` }))].sort((a, b) => rank(a.slot) - rank(b.slot));
     return `<div class="item"><span class="muted small" style="width:78px;flex:none">${esc(fmtDate(d, { weekday: 'short', day: 'numeric' }))}</span><span class="grow small">${ms.map((m) => `<span class="faint">${SLOT[m.slot]}</span> ${m.html}`).join(' · ') || '<span class="faint">—</span>'}</span></div>`; }).join(''));
 }
-on('click', 'sugg-sheet', () => sheet(`<h3>Suggestions à valider</h3><p class="muted small">Proposées par les membres du foyer.</p>${suggestionsHtml()}`));
+on('click', 'sugg-sheet', () => sheet(`<h3>À valider</h3><p class="muted small">Articles, repas et envies proposés par les membres du foyer.</p>${suggestionsHtml()}${S.house.wishesPending ? `<a class="item click" href="#/menu" data-a="close"><span class="ico carrot">${I('bulb')}</span><span class="grow"><b>${plural(S.house.wishesPending, 'envie')} de plat</b><span class="muted block">à valider dans le menu</span></span>${I('chev', 's chev')}</a>` : ''}`));
+// Total des choses « à faire » (pastille unique de l'Accueil).
+export const todoCount = () => closeCount() + ((summary && summary.tickets) || []).length + (S.house.pending || 0) + (S.house.wishesPending || 0);
 
 // ---------- Nouvelle liste ----------
 async function newListSheet(date) {
@@ -260,7 +262,13 @@ async function newListSheet(date) {
     ${pv.backlog.length ? `<div class="muted small" style="margin-top:8px">Depuis « À prévoir »</div>${pv.backlog.map((i) => `<label class="row line"><input type="checkbox" class="cb" data-backlog="${i.id}" checked><span class="grow">${qtyText(i.qty)} × ${esc(i.name)}${i.note ? ` <span class="muted">· ${esc(i.note)}</span>` : ''}</span></label>`).join('')}` : '<p class="muted small">« À prévoir » est vide.</p>'}
     <div class="row end"><button class="btn" data-a="list-create">Créer la liste</button></div>`);
 }
-on('click', 'list-new', () => newListSheet());
+// Un seul geste : liste creee a la date proposee (debut du prochain menu), recurrents importes ; date modifiable ensuite.
+on('click', 'list-new', async () => {
+  const pv = await attempt(() => get(hp('/lists/new')));
+  if (!pv) return;
+  const l = await attempt(() => post(hp('/lists'), { date: pv.date, recurring: true, backlogItemIds: [] }));
+  if (l) { current = l; summary = null; toast(`Liste du ${fmtDate(pv.date, { day: 'numeric', month: 'long' })} créée${pv.recurring.length ? ` · ${pv.recurring.length} récurrent${pv.recurring.length > 1 ? 's' : ''}` : ''}`); go(`#/listes/${l.id}`); }
+});
 on('change', 'list-new-date', (el) => newListSheet(el.value));
 on('click', 'list-create', async () => {
   const root = document.querySelector('.sheet');
@@ -430,6 +438,8 @@ const presenceLine = (l) => { const o = others(l); return o.length ? `<p class="
 function scenCard(l) {
   const p = l.pricing;
   if (!p || !p.stores.length) return '';
+  // Comparaison complete seulement si elle sert (plusieurs magasins et economie >= seuil) ; sinon une ligne.
+  if (!p.recommendSplit) return `<button class="item click" data-a="scen" style="margin-bottom:6px"><span class="grow muted small">Estimation · ${p.stores.length > 1 ? 'un seul magasin suffit' : esc(p.stores[0].name)}</span><b class="price">≈ ${eur(p.split)}</b>${I('chev', 's chev')}</button>`;
   const max = Math.max(1, ...p.stores.map((x) => x.total));
   return `<button class="card click" data-a="scen" style="margin-bottom:6px">
     <div class="row"><span class="grow muted small">Estimation · ${p.recommendSplit ? 'conseil : plusieurs magasins' : 'conseil : un magasin'}</span>${I('chev', 's chev')}</div>
@@ -471,7 +481,13 @@ on('click', 'shop-pick', async (el) => {
   const last = lastShop();
   if (last && (last === 'tous' || (storeById(Number(last)) || {}).active)) { go(`#/listes/${id}/magasin/${last}`); return; }
   const l = current && current.id === id ? current : await attempt(() => get(hp(`/lists/${id}`)));
-  if (l) shopPickSheet(l);
+  if (!l) return;
+  // Premier passage : le magasin qui a le plus d'articles conseillés, sans question (changement par l'icône magasin).
+  const cnt = {};
+  l.items.filter((i) => !i.suggestion && i.status === 'todo' && i.at_store_id).forEach((i) => { cnt[i.at_store_id] = (cnt[i.at_store_id] || 0) + 1; });
+  const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+  if (top) { go(`#/listes/${id}/magasin/${top}`); return; }
+  shopPickSheet(l);
 });
 function shopPickSheet(l, exclude) {
   const left = (sid) => l.items.filter((i) => !i.suggestion && i.status === 'todo' && (!sid || i.at_store_id === sid)).length;
@@ -835,16 +851,20 @@ on('click', 'item', async (el) => {
   sheet(`<h3>${esc(i.name)}</h3><p class="muted">${esc(catName(i.category_id))} · ${esc(i.unit)}</p>
     ${i.suggestion ? `<p class="muted">Suggéré par ${esc(i.suggested_by_name || '?')}</p>` : ''}
     ${current.type === 'dated' && current.status !== 'closed' && !i.suggestion && i.at_store_id ? `<div class="row line"><span class="grow"><b>Magasin</b><span class="muted block">${i.prices && i.prices[i.at_store_id] != null ? `≈ ${eur(i.prices[i.at_store_id] * i.qty)}` : 'prix inconnu'} · touchez pour changer</span></span>${storeButton(i)}</div>` : ''}
-    ${i.prices ? `<p class="muted small">${priceHint(i)}</p>` : ''}${i.promos && i.promos.length ? `<div class="pills">${promoPills(i)}</div>` : ''}
+    ${i.manual_store ? `<div class="row line"><span class="grow">Magasin choisi : <b>${esc(storeName(i.at_store_id))}</b>${i.best_store_id ? ` (conseil : ${esc(storeName(i.best_store_id))})` : ''}</span><button class="btn sm sec2" data-a="store-advice" data-id="${i.id}">Revenir au conseil</button></div>` : ''}
     <div class="row"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="${qtyText(i.qty)}"><button class="btn sm sec2" data-a="qty" data-d="1">＋</button></div>
+    <button class="row line" data-a="item-more"><span class="grow">Plus de détails<span class="muted block">note, indisponible, récurrent, prix</span></span>${I('down', 's')}</button>
+    <div id="item-more" hidden>
+    ${i.prices ? `<p class="muted small">${priceHint(i)}</p>` : ''}${i.promos && i.promos.length ? `<div class="pills">${promoPills(i)}</div>` : ''}
     <label class="muted" style="display:block;margin-top:8px">Note</label><input class="txt" name="note" value="${esc(i.note || '')}" placeholder="ex. bio, grand format">
     ${current.type === 'dated' ? `<label class="row line" style="margin-top:8px"><input type="checkbox" class="cb" name="unavailable" ${i.status === 'unavailable' ? 'checked' : ''}><span class="grow">Indisponible en magasin</span></label>` : ''}
     ${i.meal_qty > 0 ? `<div class="row line"><span class="grow">Dont ${qtyText(i.meal_qty)}${i.need ? ` (${esc(i.need)})` : ''} pour ${esc(i.from.join(', '))}</span><button class="btn sm sec2" data-a="item-stock" data-id="${i.id}">${I('box', 's')} Déjà en réserve</button></div>` : ''}
-    ${i.manual_store ? `<div class="row line"><span class="grow">Magasin choisi : <b>${esc(storeName(i.at_store_id))}</b>${i.best_store_id ? ` (conseil : ${esc(storeName(i.best_store_id))})` : ''}</span><button class="btn sm sec2" data-a="store-advice" data-id="${i.id}">Revenir au conseil</button></div>` : ''}
     ${mgr && others.length ? `<div class="sec">Déplacer vers</div><div class="opt">${others.map((o) => `<button data-a="item-move" data-id="${i.id}" data-to="${o.id}">${o.type === 'backlog' ? 'À prévoir' : 'Liste du ' + esc(fmtDate(o.date))}</button>`).join('')}</div>` : ''}
     ${mgr ? `<div class="row line"><span class="grow"><b>Récurrent</b><span class="muted block">${p.recurrence ? 'Revient automatiquement' : 'Non'}</span></span><button class="btn sm sec2" data-a="item-rec" data-pid="${i.product_id}" data-rec="${p.recurrence ? '' : 1}">${p.recurrence ? 'Arrêter' : 'Rendre récurrent'}</button></div>` : ''}
+    </div>
     <div class="btn-row" style="margin-top:14px">${btnI('doc', 'Fiche produit', `data-a="go-product" data-pid="${i.product_id}"`)}${current.type === 'dated' ? btnI('tag', 'Promo', `data-a="promo" data-pid="${i.product_id}" data-sid="${i.promos && i.promos[0] ? i.promos[0].store_id : i.at_store_id || ''}"`) : ''}${mgr ? btnI('trash', 'Retirer', `data-a="item-del" data-id="${i.id}"`, 'sec2 danger-t') : ''}${btnI('check', 'Enregistrer', `data-a="item-save" data-id="${i.id}"`, '')}</div>`);
 });
+on('click', 'item-more', (el) => { const m = document.getElementById('item-more'); if (m) { m.hidden = !m.hidden; el.querySelector('.muted').textContent = m.hidden ? 'note, indisponible, récurrent, prix' : 'masquer'; } });
 on('click', 'qty', (el) => {
   const input = document.querySelector('.sheet [name=qty]');
   const v = Number(String(input.value).replace(',', '.')) || 0;
@@ -915,7 +935,7 @@ on('click', 'list-close-ok', async () => {
   const fates = {};
   document.querySelectorAll('.sheet [data-fate]').forEach((s) => { fates[s.dataset.fate] = s.value; });
   const r = await attempt(() => post(hp(`/lists/${current.id}/close`), { fates }));
-  if (r) { closeSheet(); summary = null; toast('Liste clôturée'); await refreshList(); if (S.route[0] === 'magasin') go(`#/listes/${current.id}`); }
+  if (r) { closeSheet(); summary = null; toast(r.created ? `Liste clôturée · liste du ${fmtDate(r.created_date, { day: 'numeric', month: 'long' })} créée (prochain menu)` : 'Liste clôturée'); await refreshList(); if (S.route[0] === 'magasin') go(`#/listes/${current.id}`); }
 });
 on('click', 'list-copy', async () => {
   const r = await attempt(() => post(hp(`/lists/${current.id}/copy-to-backlog`)));

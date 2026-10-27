@@ -17,7 +17,7 @@ import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
 import { platsView, dishView, cookView, loadDishes, loadDish } from './plats.js';
 import { menuView, exportView, publicView, loadMenu, loadExport, loadPublic } from './menu.js';
-import { listesView, accueilView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList, todayMeals, closeCount, rememberShop } from './listes.js';
+import { listesView, accueilView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList, todayMeals, closeCount, todoCount, rememberShop } from './listes.js';
 
 const app = document.getElementById('app');
 
@@ -54,7 +54,8 @@ function shell(v) {
   const tab = { produit: 'catalogue', foyers: 'foyer', liste: 'listes', magasin: 'listes', scan: 'listes', plat: 'plats', cuisine: 'plats', menuexport: 'menu', promos: 'plus' }[S.route[0]] || S.route[0];
   const inPlus = ['catalogue', 'magasins', 'foyer', 'plus'].includes(tab);
   const mgr = S.house && S.house.role === 'manager';
-  const badge = { listes: mgr && (S.house.pending + closeCount()), menu: mgr && S.house.wishesPending };
+  // Une seule pastille : le nombre de choses « à faire » (bloc de l'Accueil).
+  const badge = { accueil: mgr && todoCount() };
   const link = ([k, t, ic], on) => `<a href="#/${k}" class="${on ? 'on' : ''}">${I(ic, 'l')}<span>${t}</span>${badge[k] ? `<span class="badge">${badge[k]}</span>` : ''}</a>`;
   const nav = v.noNav || !S.house ? '' : `<nav class="tabs"><div class="brand"><span class="logo">${I('basket')}</span>Le Cabas</div>
     <a class="hh" href="#/foyers">${I('users', 's')}<span class="grow">${esc(S.house.household.name)}</span>${I('down', 's')}</a>

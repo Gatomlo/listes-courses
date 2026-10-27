@@ -56,7 +56,7 @@ const hue = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 
 // Avec photo (adresse de l'API, ou image en attente d'enregistrement) : la photo remplace l'initiale.
 const photoSrc = (p) => (!p ? '' : /^(data:|https?:)/.test(p) ? p : `api/${p}`);
 export const tile = (name, pills = '', cls = '', photo = null) => `<div class="tile ${cls}${photo ? ' ph' : ''}" style="--h:${hue(name)}${photo ? `;background-image:url('${esc(photoSrc(photo)).replace(/'/g, '%27')}')` : ''}"><span class="mono-l">${esc(String(name || '?')[0].toUpperCase())}</span><div class="tb">${pills}</div></div>`;
-const FILTERS = [['all', 'Tous'], ['wish', 'Envies'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'Suggestions']];
+const FILTERS = [['all', 'Tous'], ['wish', 'Envies'], ['recipe', 'Avec recette'], ['parts', 'Composés'], ['planned', 'Au menu'], ['memo', 'Sans détail'], ['draft', 'À valider']];
 // Plats retenus par la recherche et les filtres (S.q : dish, dishFilter, dishSlot, dishType, dishTag).
 function filteredDishes() {
   const f = S.q.dishFilter || 'all', tg = S.q.dishTag || '', ty = S.q.dishType || '', sl = S.q.dishSlot || '';
@@ -87,13 +87,11 @@ export function platsView() {
   };
   const search = `<div class="search grow">${I('search')}<input class="txt" id="dish-q" placeholder="Plat, ingrédient, recette…" value="${esc(q)}" data-in="dish-q"></div>`;
   // Un seul bouton de filtres (a cote de la recherche) ouvre un panneau ; filtres actifs en pastilles retirables.
-  const filters = `<div class="row gap">${search}<button class="btn sec2 fbtn" data-a="dish-filters" aria-label="Filtres">${I('sliders')}${act.length ? `<span class="badge">${act.length}</span>` : ''}</button></div>
-      ${act.length ? `<div class="pills" style="margin:8px 2px 0">${act.map(([k, t]) => `<button class="pill p-grey" data-a="dish-unset" data-k="${k}">${esc(t)} ✕</button>`).join('')}</div>` : ''}`;
+  const filters = `<div class="row gap">${search}<button class="btn sec2 fbtn" data-a="dish-filters" aria-label="Filtres">${I('sliders')}${act.length ? `<span class="badge">${act.length}</span>` : ''}</button>${act.length ? `<button class="btn sec2 fbtn" data-a="dish-unfilter" aria-label="Effacer les filtres">${I('x')}</button>` : ''}</div>`;
   return {
-    title: 'Plats', sub: `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`, large: true,
+    title: 'Plats', sub: act.length ? `${list.length} plat${list.length > 1 ? 's' : ''} · ${act.map(([, t]) => t).join(' · ')}` : `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`, large: true,
     right: isManager() ? `<button class="ib" data-a="dish-csv-open" aria-label="Importer des plats (CSV)" title="Importer des plats (CSV)">${I('upload')}</button><a class="ib" href="#/plats/nouveau" aria-label="Nouveau plat">${I('plus')}</a>` : '',
     body: `${filters}
-      ${act.length ? `<div class="row" style="margin:6px 2px 0"><span class="muted small grow">${list.length} plat${list.length > 1 ? 's' : ''} sur ${S.dishes.length}</span>${isPc() ? `<button class="btn sm sec2" data-a="dish-unfilter">${I('x', 's')} Effacer les filtres</button>` : ''}</div>` : ''}
       <div class="dgrid" style="margin-top:8px">${list.map(card).join('')}</div>
       ${list.length ? '' : `<div class="empty">Aucun plat trouvé.${isManager() && q ? `<br><button class="btn" style="margin-top:10px" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}</div>`}`,
   };
@@ -274,7 +272,10 @@ export function dishView() {
       <div class="sec">À venir</div><div class="group">${ed.upcoming.map((m) => mealRow(m)).join('') || '<p class="muted" style="padding:12px 14px;margin:0">Pas encore prévu au menu.</p>'}</div>
       <div class="sec">Historique${ed.times > 5 ? ' · 5 dernières fois' : ''}</div><div class="group">${ed.past.map((m) => mealRow(m)).join('') || '<p class="muted" style="padding:12px 14px;margin:0">Jamais planifié pour l’instant.</p>'}</div>`;
   // [clé, libellé, icône, compteur] ; « Général » seulement en édition ; icône seule sur téléphone.
-  const tabs = [...(ro ? [] : [['gen', 'Général', 'sliders']]), ['ing', 'Ingrédients', 'basket'], ['rec', 'Recette', 'book'], ...(ed.used_in.length || (ro && !ed.parts.length) ? [] : [['parts', 'Composition', 'puzzle', ed.parts.length]]), ...(ed.id ? [['hist', 'Historique', 'clock']] : [])];
+  // « Avancé » : composition (plat simple, en modification) et historique ; l'onglet Composition n'apparaît que pour un plat composé.
+  const showComp = !ro && !ed.used_in.length && !ed.parts.length;
+  const tabAdv = `${showComp ? `<div class="sec">Plat composé</div>${tabParts}` : ''}${ed.id ? `<div class="sec">Historique</div>${tabHist}` : ''}`;
+  const tabs = [...(ro ? [] : [['gen', 'Général', 'sliders']]), ['ing', 'Ingrédients', 'basket'], ['rec', 'Recette', 'book'], ...(ed.parts.length ? [['parts', 'Composition', 'puzzle', ed.parts.length]] : []), ...(tabAdv ? [['adv', 'Avancé', 'clock']] : [])];
   const cur = tabs.some(([k]) => k === S.q.dtab) ? S.q.dtab : !ro && !ed.id ? 'gen' : ed.parts.length ? 'parts' : 'ing';
   const pills = `${ed.parts.length ? `<span class="pill">${I('puzzle', 's')} plat composé</span>` : ''}${ed.tags.map((t) => `<span class="pill">#${esc(t)}</span>`).join('')}`;
   // Lecture : informations en liste (sous les onglets sur telephone, a gauche sur PC).
@@ -298,7 +299,7 @@ export function dishView() {
   const hero = tile(ed.name || '?', pills, 'hero-t', curPhoto());
   const usedIn = ed.used_in.length ? `<p class="small" style="margin:8px 2px">${I('puzzle', 's')} Recette de ${ed.used_in.map((d) => `<a href="#/plats/${d.id}" style="color:var(--plum);font-weight:650">${esc(d.name)}</a>`).join(', ')}</p>` : '';
   const tabsHtml = `<div class="seg" style="margin-top:14px">${tabs.map(([k, t, ic, n]) => `<button class="tb ${cur === k ? 'on' : ''}" data-a="dtab" data-k="${k}" aria-label="${t}" title="${t}">${I(ic, 's')}<span class="tl">${t}</span>${n ? `<span class="tn">${n}</span>` : ''}</button>`).join('')}</div>
-      ${{ gen: info, ing: tabIng, rec: tabRec, parts: tabParts, hist: tabHist }[cur]}`;
+      ${{ gen: info, ing: tabIng, rec: tabRec, parts: tabParts, adv: tabAdv }[cur]}`;
   return {
     title: ed.id ? ed.name : 'Nouveau plat', back: !ed.id && S.dishReturn ? '#/menu' : '#/plats',
     sub: ed.draft ? 'Proposition à valider par un gestionnaire' : !canEdit ? 'Lecture seule (membre)' : !ro && ed.id ? 'Modification' : '',
@@ -370,7 +371,7 @@ on('input', 'part-q', async (el) => {
   document.getElementById('part-ac').innerHTML = q ? `<div class="ac">${ms.map((d) => `<button data-a="part-add" data-id="${d.id}"><span class="grow">${esc(d.name)}</span><span class="muted">${d.portions} p.</span></button>`).join('')}
     ${isManager() && !S.dishes.some((d) => norm(d.name) === norm(q)) ? `<button data-a="part-new"><b>＋ Créer le plat « ${esc(q)} »</b></button>` : ''}</div>` : '';
 });
-const addPart = (d) => { ed.parts.push({ dish_id: d.id, name: d.name, portions: d.portions, dish_portions: d.portions }); };
+const addPart = (d) => { ed.parts.push({ dish_id: d.id, name: d.name, portions: d.portions, dish_portions: d.portions }); S.q.dtab = 'parts'; };
 const partFocus = () => setTimeout(() => document.getElementById('part-q')?.focus());
 on('click', 'part-add', (el) => { addPart(S.dishes.find((d) => d.id === Number(el.dataset.id))); render(); partFocus(); });
 on('click', 'part-first', (el) => { const ms = partMatches(el.value); if (ms.length) { addPart(ms[0]); render(); partFocus(); } });
