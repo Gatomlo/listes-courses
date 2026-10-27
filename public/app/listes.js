@@ -3,7 +3,7 @@
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
 import { get, post, put, patch, del, attempt, sync, newOp, setCached, net } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
-import { unitOptions, catOptions, catSubOptions, subName, contField } from './catalogue.js';
+import { packBlock, unitOptions, catOptions, catSubOptions, subName, contField } from './catalogue.js';
 import { SLOT, tile, isAwake, syncWake } from './plats.js';
 import { startScan } from './scan.js';
 import { I, btnI } from './icons.js';
@@ -752,9 +752,8 @@ on('click', 'add-new', () => {
   const q = document.getElementById('add-q').value.trim();
   sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté aux produits du foyer, puis à la liste.</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(q)}">
-    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="rayon">${catSubOptions()}</select></label>
-    <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
-    ${contField()}
+    <label class="muted">Rayon</label><select class="txt" name="rayon">${catSubOptions()}</select>
+    ${packBlock(`<label class="muted">Emballage</label><select class="txt" name="unit">${unitOptions('paquet')}</select>`, contField())}
     <div class="row end"><button class="btn" data-a="add-new-ok">Créer et ajouter</button></div>`);
 });
 on('click', 'add-new-ok', async () => {
@@ -853,7 +852,7 @@ on('click', 'item', async (el) => {
     ${current.type === 'dated' && current.status !== 'closed' && !i.suggestion && i.at_store_id ? `<div class="row line"><span class="grow"><b>Magasin</b><span class="muted block">${i.prices && i.prices[i.at_store_id] != null ? `≈ ${eur(i.prices[i.at_store_id] * i.qty)}` : 'prix inconnu'} · touchez pour changer</span></span>${storeButton(i)}</div>` : ''}
     ${i.manual_store ? `<div class="row line"><span class="grow">Magasin choisi : <b>${esc(storeName(i.at_store_id))}</b>${i.best_store_id ? ` (conseil : ${esc(storeName(i.best_store_id))})` : ''}</span><button class="btn sm sec2" data-a="store-advice" data-id="${i.id}">Revenir au conseil</button></div>` : ''}
     <div class="row"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="${qtyText(i.qty)}"><button class="btn sm sec2" data-a="qty" data-d="1">＋</button></div>
-    <button class="row line" data-a="item-more"><span class="grow">Plus de détails<span class="muted block">note, indisponible, récurrent, prix</span></span>${I('down', 's')}</button>
+    <button class="item click" data-a="item-more"><span class="grow">Plus de détails<span class="muted block">note, indisponible, récurrent, prix</span></span>${I('down', 's')}</button>
     <div id="item-more" hidden>
     ${i.prices ? `<p class="muted small">${priceHint(i)}</p>` : ''}${i.promos && i.promos.length ? `<div class="pills">${promoPills(i)}</div>` : ''}
     <label class="muted" style="display:block;margin-top:8px">Note</label><input class="txt" name="note" value="${esc(i.note || '')}" placeholder="ex. bio, grand format">

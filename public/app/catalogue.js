@@ -111,6 +111,8 @@ export function contField(cur = '', dis = '') {
     <select class="txt w6" name="cont_u" ${dis}>${CONT_UNITS.map((x) => `<option ${x === u ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
     ${!m && c ? `<input type="hidden" name="contenance" value="${esc(c)}"><p class="muted small">⚠ Ancienne valeur « ${esc(c)} » : à ressaisir en nombre + unité.</p>` : ''}`;
 }
+// Emballage et contenance : facultatifs, replies (details natif : les champs restent dans le formulaire).
+export const packBlock = (unitHtml, contHtml, open = false) => `<details class="pack"${open ? ' open' : ''}><summary><b>Emballage et contenance</b> <span class="muted small">facultatif : pour comparer les prix et convertir les recettes</span></summary>${unitHtml}${contHtml}</details>`;
 // Liste unique « Rayon » / « Rayon › Sous-rayon » (valeur « cid » ou « cid:sid »).
 export const catSubOptions = (cur, curSub) => categoryOrder().map((cid) => {
   const c = S.house.categories.find((x) => x.id === cid) || { subs: [] };
@@ -122,9 +124,8 @@ export const catOptions = (cur) => categoryOrder().map((cid) => `<option value="
 on('click', 'prod-new', (el) => {
   sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté aux produits communs du foyer.</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(el.dataset.name || '')}" placeholder="ex. Beurre doux 250 g">
-    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="rayon">${catSubOptions()}</select></label>
-    <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
-    ${contField()}
+    <label class="muted">Rayon</label><select class="txt" name="rayon">${catSubOptions()}</select>
+    ${packBlock(`<label class="muted">Emballage</label><select class="txt" name="unit">${unitOptions('paquet')}</select>`, contField())}
     <label class="row" style="margin-top:8px"><input type="checkbox" class="cb" name="is_base"><span class="grow">Ingrédient de base (sel, huile, épices…)</span></label>
     <p class="muted small">Prix inconnus jusqu'aux premiers relevés.</p>
     <div class="row end"><button class="btn" data-a="prod-create">Créer</button></div>`);
@@ -199,9 +200,8 @@ export function productView() {
       ${acc('p_fiche', { icon: `${I('tag', 's')} `, title: 'Caractéristiques', sum: ` · ${esc(catName(p.category_id))}, ${esc(p.unit)}${p.recurrence ? `, ${I('repeat', 's')} ` + REC[p.recurrence] : ''}`,
         body: `<div class="form" id="prod-form">
           <label class="muted">Nom</label><input class="txt" name="name" value="${esc(p.name)}" ${dis}>
-          <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="rayon" ${dis}>${catSubOptions(p.category_id, p.subcategory_id)}</select></label>
-          <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit" ${dis}>${unitOptions(p.unit)}</select></label></div>
-          ${contField(p.contenance, dis)}
+          <label class="muted">Rayon</label><select class="txt" name="rayon" ${dis}>${catSubOptions(p.category_id, p.subcategory_id)}</select>
+          ${packBlock(`<label class="muted">Emballage</label><select class="txt" name="unit" ${dis}>${unitOptions(p.unit)}</select>`, contField(p.contenance, dis), !!p.contenance)}
           <p class="muted small">${p.size ? `1 ${esc(p.unit)} = <b>${esc(sizeText(p.size))}</b>. ` : ''}Sert à convertir les quantités des recettes (g, ml, pièces) en emballages.</p>
           <label class="row"><span class="grow"><b>Poids d'une pièce</b><span class="muted block">Facultatif, en g (ou ml) : relie « 2 oignons » à un filet au kg</span></span><input class="txt w5 c" name="piece_qty" inputmode="decimal" value="${p.piece_qty != null ? String(p.piece_qty).replace('.', ',') : ''}" placeholder="g" ${dis}></label>
           <label class="row"><span class="grow"><b>${I('repeat', 's')} Récurrent</b><span class="muted block">Ajouté aux nouvelles listes datées</span></span><select class="txt w12" name="recurrence" ${dis}>

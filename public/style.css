@@ -607,3 +607,10 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 .pick-ov .sheet{max-height:80vh}
 @media (min-width:900px){.pick-ov{align-items:center;justify-content:center}.pick-ov .sheet{width:420px;border-radius:24px}}
 select.txt{cursor:pointer}
+
+/* Emballage et contenance : bloc replie (details) */
+details.pack{margin:10px 0;border-radius:14px;background:var(--sunk,#0000000a);padding:0 12px}
+details.pack>summary{cursor:pointer;padding:10px 0;list-style:none;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline}
+details.pack>summary::-webkit-details-marker{display:none}
+details.pack[open]>summary{border-bottom:1px solid var(--line,#0001);margin-bottom:8px}
+details.pack[open]{padding-bottom:10px}

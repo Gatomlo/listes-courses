@@ -5,7 +5,7 @@ import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder } from './state.js';
 import { matchLines } from './ticket.mjs';
 import { micButton, stopDictation } from './multi.js';
-import { unitOptions, catOptions, catSubOptions, contField } from './catalogue.js';
+import { packBlock, unitOptions, catOptions, catSubOptions, contField } from './catalogue.js';
 import { I, btnI } from './icons.js';
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -435,9 +435,8 @@ on('click', 'ing-new', () => {
   const q = ingInput().value.trim();
   sheet(`<h3>Nouveau produit</h3><p class="muted small">Ajouté aux produits du foyer, puis au plat.</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(q.charAt(0).toUpperCase() + q.slice(1))}">
-    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="rayon">${catSubOptions()}</select></label>
-    <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
-    ${contField()}
+    <label class="muted">Rayon</label><select class="txt" name="rayon">${catSubOptions()}</select>
+    ${packBlock(`<label class="muted">Emballage</label><select class="txt" name="unit">${unitOptions('paquet')}</select>`, contField())}
     <label class="row line"><input type="checkbox" class="cb" name="is_base"><span class="grow">Ingrédient de base (sel, huile, épices…)</span></label>
     <div class="row end"><button class="btn" data-a="ing-new-ok">Créer et ajouter</button></div>`);
 });

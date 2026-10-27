@@ -412,7 +412,7 @@ let tq = '';
 function tagPickSheet() {
   const n = norm(tq), ts = allTags().filter((t) => !n || norm(t).includes(n)), cnt = (t) => S.dishes.filter((d) => d.tags.includes(t)).length;
   sheet(`<h3>Filtrer par tag</h3><input class="txt" id="tag-q" placeholder="Rechercher un tag…" value="${esc(tq)}" data-in="tag-q" autocomplete="off">
-    <div class="group" style="margin-top:8px">${ts.map((t) => `<button class="row line" data-a="pick-tag" data-t="${esc(t)}"><span class="grow">#${esc(t)}</span><span class="muted small">${cnt(t)}</span></button>`).join('') || '<p class="muted" style="padding:12px 14px;margin:0">Aucun tag.</p>'}</div>
+    <div class="group fs-list" style="margin-top:8px">${ts.map((t) => `<button class="item click" data-a="pick-tag" data-t="${esc(t)}"><span class="grow">#${esc(t)}</span><span class="muted small">${cnt(t)}</span></button>`).join('') || '<p class="muted" style="padding:12px 14px;margin:0">Aucun tag.</p>'}</div>
     <div class="row end"><button class="btn sec2" data-a="pick-back">Retour aux plats</button></div>`);
 }
 on('click', 'pick-tags', () => { if (pm.tag) { pm.tag = ''; pickSheet(); return; } tq = ''; tagPickSheet(); });
@@ -464,7 +464,7 @@ async function stockSheet() {
       const nBuy = ing.filter((i) => !pm.skip.includes(i.product_id)).length, open = !!S.q.stockOpen;
       if (!ing.length && !base.length) return '<p class="muted">Plat sans ingrédients détaillés : simple rappel dans la liste.</p>';
       const sub = `${pm.skip.length ? `${pm.skip.length} en réserve` : 'Rien en réserve'}${(pm.extra || []).length ? ` · ${pm.extra.length} de base ajouté${pm.extra.length > 1 ? 's' : ''}` : ''} · ${open ? 'masquer' : 'modifier'}`;
-      return `<div class="sec">Courses</div><div class="group"><button class="row line" data-a="stock-t"><span class="grow"><b>${ing.length ? (nBuy === ing.length ? `${nBuy} ingrédient${nBuy > 1 ? 's' : ''} à acheter` : `${nBuy} sur ${ing.length} à acheter`) : 'Rien à acheter'}</b><span class="muted small block">${sub}</span></span>${I(open ? 'up' : 'down', 's')}</button>
+      return `<div class="sec">Courses</div><div class="group"><button class="item click" data-a="stock-t"><span class="grow"><b>${ing.length ? (nBuy === ing.length ? `${nBuy} ingrédient${nBuy > 1 ? 's' : ''} à acheter` : `${nBuy} sur ${ing.length} à acheter`) : 'Rien à acheter'}</b><span class="muted small block">${sub}</span></span>${I(open ? 'up' : 'down', 's')}</button>
       ${!open ? '' : `${ing.length ? `<div class="row"><p class="muted small grow">Décocher ce qui est encore en réserve.</p>
         <button class="btn sm sec2" data-a="pm-all" data-on="${ing.every((i) => !pm.skip.includes(i.product_id)) ? '' : '1'}">${ing.every((i) => !pm.skip.includes(i.product_id)) ? 'Tout décocher' : 'Tout cocher'}</button></div>
         ${ing.map((i) => `<label class="row line"><input type="checkbox" class="cb" data-ch="pm-skip" data-pid="${i.product_id}" ${pm.skip.includes(i.product_id) ? '' : 'checked'}><span class="grow">${esc(i.name)}</span></label>`).join('')}` : ''}
