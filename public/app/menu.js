@@ -439,7 +439,7 @@ async function stockSheet() {
   d.parts = d.parts || [];
   pm.options = chosenOf(d, pm.options);
   pm.part_skip = pm.part_skip || [];
-  const ing = mealIngredients(d, pm);
+  const ing = mealIngredients(d, pm), base = baseIngredients(d, pm);
   sheet(`<h3>${esc(d.name)}</h3><p class="muted">${esc(fmtDate(pm.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[pm.slot]}</p>
     ${d.groups.map((g) => `<div class="sec">${esc(g.name)}</div><div class="opt">${g.options.map((o) => `<button class="${pm.options.includes(o.id) ? 'on' : ''}" data-a="pm-opt" data-id="${o.id}">${esc(o.name)}</button>`).join('')}</div>`).join('')}
     ${d.parts.length ? `<div class="sec">Recettes</div><p class="muted small">Décocher une recette pour ne pas la faire cette fois.</p>
@@ -449,6 +449,8 @@ async function stockSheet() {
       <button class="btn sm sec2" data-a="pm-all" data-on="${ing.every((i) => !pm.skip.includes(i.product_id)) ? '' : '1'}">${ing.every((i) => !pm.skip.includes(i.product_id)) ? 'Tout décocher' : 'Tout cocher'}</button></div>
       ${ing.map((i) => `<label class="row line"><input type="checkbox" class="cb" data-ch="pm-skip" data-pid="${i.product_id}" ${pm.skip.includes(i.product_id) ? '' : 'checked'}><span class="grow">${esc(i.name)}</span></label>`).join('')}`
       : '<p class="muted">Plat sans ingrédients détaillés : simple rappel dans la liste.</p>'}
+    ${base.length ? `<div class="sec">Ingrédients de base</div><p class="muted small">Cocher ceux à ajouter à la liste.</p>
+      ${base.map((i) => `<label class="row line"><input type="checkbox" class="cb" data-ch="pm-extra" data-pid="${i.product_id}" ${(pm.extra || []).includes(i.product_id) ? 'checked' : ''}><span class="grow">${esc(i.name)}</span></label>`).join('')}` : ''}
     <div class="row end"><button class="btn" data-a="pm-save">${pm.id ? 'Enregistrer' : isManager() ? 'Ajouter au menu' : 'Suggérer ce plat'}</button></div>`);
 }
 // Ingredients a acheter : plat (variantes) + recettes non ecartees, un par produit.
@@ -456,6 +458,15 @@ function mealIngredients(d, m) {
   const all = [...dishIngredients(d, m.options), ...d.parts.filter((x) => !m.part_skip.includes(x.dish_id)).flatMap((x) => x.ingredients)];
   return all.filter((i, k) => !i.is_base && all.findIndex((x) => x.product_id === i.product_id) === k);
 }
+// Ingredients de base : proposes, decoches par defaut (a cocher pour les ajouter a la liste).
+function baseIngredients(d, m) {
+  const all = [...dishIngredients(d, m.options), ...d.parts.filter((x) => !m.part_skip.includes(x.dish_id)).flatMap((x) => x.ingredients)];
+  return all.filter((i, k) => i.is_base && all.findIndex((x) => x.product_id === i.product_id) === k);
+}
+on('change', 'pm-extra', (el) => {
+  const pid = Number(el.dataset.pid);
+  pm.extra = el.checked ? [...new Set([...(pm.extra || []), pid])] : (pm.extra || []).filter((x) => x !== pid);
+});
 on('change', 'pm-part', (el) => {
   const id = Number(el.dataset.id);
   pm.part_skip = el.checked ? pm.part_skip.filter((x) => x !== id) : [...pm.part_skip, id];
@@ -481,8 +492,8 @@ on('change', 'pm-skip', (el) => {
   if (all) { all.dataset.on = none ? '' : '1'; all.textContent = none ? 'Tout décocher' : 'Tout cocher'; }
 });
 on('click', 'pm-save', async () => {
-  const body = { date: pm.date, slot: pm.slot, dish_id: pm.dish_id, persons: pm.persons, skip: pm.skip, options: pm.options, part_skip: pm.part_skip };
-  const r = await attempt(() => (pm.id ? patch(hp(`/meals/${pm.id}`), { persons: pm.persons, skip: pm.skip, options: pm.options, part_skip: pm.part_skip }) : post(hp('/meals'), body)));
+  const body = { date: pm.date, slot: pm.slot, dish_id: pm.dish_id, persons: pm.persons, skip: pm.skip, extra: pm.extra || [], options: pm.options, part_skip: pm.part_skip };
+  const r = await attempt(() => (pm.id ? patch(hp(`/meals/${pm.id}`), { persons: pm.persons, skip: pm.skip, extra: pm.extra || [], options: pm.options, part_skip: pm.part_skip }) : post(hp('/meals'), body)));
   if (!r) return;
   closeSheet();
   toast(pm.id ? 'Repas mis à jour · liste recalculée' : isManager() ? `${pm.dish.name} ajouté · ingrédients ajoutés à la liste de la période` : 'Plat suggéré au gestionnaire');
@@ -582,7 +593,7 @@ on('click', 'meal-edit', async (el) => {
   const r = await attempt(() => get(hp(`/menu?from=${el.dataset.date}&days=1`)));
   const m = r && r.meals.find((x) => x.id === Number(el.dataset.id));
   if (!m) return;
-  pm = { id: m.id, date: m.date, slot: m.slot, dish_id: m.dish_id, persons: m.persons, skip: [...m.skip], options: [...m.options], part_skip: [...m.part_skip] };
+  pm = { id: m.id, date: m.date, slot: m.slot, dish_id: m.dish_id, persons: m.persons, skip: [...m.skip], extra: [...(m.extra || [])], options: [...m.options], part_skip: [...m.part_skip] };
   stockSheet();
 });
 on('click', 'meal-change', (el) => {

@@ -97,3 +97,14 @@ test('deplacer une mention : creneau libre, repas (echange), autre mention', asy
   m = await menuOf(d1, 2);
   assert.deepEqual(m.outings.map((x) => [x.id, x.date, x.slot]), [[o1.id, d1, 'midi'], [o2.id, d2, 'midi']]);
 });
+
+test('ingredient de base : absent par defaut, ajoute avec extra', async () => {
+  const cat = (await thomas.get(h)).data.categories[0].id;
+  const sel = (await thomas.post(`${h}/products`, { name: 'Sel fin', category_id: cat, is_base: true })).data;
+  const dish = (await thomas.post(`${h}/dishes`, { name: 'Pates sel', ingredients: [{ product_id: sel.id, qty: 1 }] })).data.id;
+  const d = day(30);
+  const m1 = (await thomas.post(`${h}/meals`, { date: d, slot: 'soir', dish_id: dish })).data.id;
+  assert.deepEqual((await menuOf(d)).meals[0].extra, []);
+  assert.equal((await thomas.patch(`${h}/meals/${m1}`, { extra: [sel.id] })).status, 200);
+  assert.deepEqual((await menuOf(d)).meals[0].extra, [sel.id]);
+});
