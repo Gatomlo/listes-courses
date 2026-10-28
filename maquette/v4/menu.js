@@ -70,8 +70,7 @@ VIEWS.menu = () => {
     actions: `<button class="ib" data-a="menu-more" aria-label="Options du menu">${I('more')}</button>`,
     body: `<div class="between" style="margin-bottom:6px"><button class="btn sm sec" data-a="menu-nav" data-d="-1">${I('back', 's')} Précédent</button><span class="small muted">14 jours</span><button class="btn sm sec" data-a="menu-nav" data-d="1">Suivant ${I('chev', 's')}</button></div>
       <div class="agenda">${agenda}</div>${grid}
-      <p class="sub" style="margin:8px 2px">Les repas alimentent la liste de leur période : un repas en ${I('cart', 's')} jour de courses tombe dans cette liste. Appui long sur un repas pour le déplacer.</p>
-      <div class="group" style="margin-top:14px"><button class="row tap" data-a="go" data-v="dishes"><span class="ico plum">${I('bowl')}</span><span class="grow"><b>Bibliothèque de plats</b><span class="sub" style="display:block">${plural(Object.keys(DISHES).length, 'plat')} · recettes, ingrédients, mode cuisine</span></span>${I('chev', 's chev')}</button></div>`,
+      <p class="sub" style="margin:8px 2px">Les repas alimentent la liste de leur période : un repas en ${I('cart', 's')} jour de courses tombe dans cette liste. Appui long sur un repas pour le déplacer.</p>`,
   };
 };
 CH['menu-note'] = (el) => { MENU.note = el.value; toast('Remarques enregistrées'); };

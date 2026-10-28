@@ -63,18 +63,13 @@ const isM = () => S.role === 'manager';
 const topV = () => S.stack[S.stack.length - 1];
 const A = {}, IN = {}, CH = {}, VIEWS = {};
 // Accueil, Listes, ＋ central (ajout rapide), Menu, Plats ; l'ancien onglet Plus est dans le menu du haut (bouton ☰ de l'en-tête).
-const TABS = [['home', 'Courses', 'basket'], ['fab'], ['menu', 'Menu', 'calendar'], ['dishes', 'Plats', 'bowl', 'pc']];
+const TABS = [['home', 'Accueil', 'home'], ['lists', 'Listes', 'basket'], ['fab'], ['menu', 'Menu', 'calendar'], ['dishes', 'Plats', 'bowl']];
 // Un seul indicateur : le nombre de choses « à faire » (bloc de l'Accueil) ; pas de pastille sur les autres onglets.
 const badge = { home: () => (typeof todoCount === 'function' ? todoCount() : 0) };
 
 function go(v, params = {}) { S.stack.push({ v, ...params }); render('f'); }
 function back() { if (S.stack.length > 1) { S.stack.pop(); render('b'); } }
-// Trois onglets (Courses, ＋, Menu). Les Plats se trouvent dans le Menu (téléphone) ; sur PC, ils ont leur entrée dans la barre latérale.
-function tab(t) {
-  if (t === 'lists') t = 'home';
-  if (t === 'dishes' && S.format !== 'pc') { S.tab = 'menu'; S.stack = [{ v: 'menu' }, { v: 'dishes' }]; render('f'); return; }
-  S.tab = t; S.stack = [{ v: t }]; render('f');
-}
+function tab(t) { S.tab = t; S.stack = [{ v: t }]; render('f'); }
 function replace(v, params = {}) { S.stack[S.stack.length - 1] = { v, ...params }; render(); }
 
 const $ = (id) => document.getElementById(id);
@@ -166,7 +161,7 @@ A.noop = () => toast('Dans l’app : action réelle');
 
 // ---------- Panneau de maquette ----------
 const JUMPS = [
-  ['Courses (accueil + listes)', () => tab('home')], ['Menu du haut (☰, 6 entrées)', () => A.menu()], ['Profil et rappels', () => A.profile()], ['Recherche globale', () => A.gsearch()], ['Liste en cours', () => { tab('lists'); go('list', { id: 'l13' }); }],
+  ['Accueil', () => tab('home')], ['Listes', () => tab('lists')], ['Menu du haut (☰)', () => A.menu()], ['Profil et rappels', () => A.profile()], ['Recherche globale', () => A.gsearch()], ['Liste en cours', () => { tab('lists'); go('list', { id: 'l13' }); }],
   ['Mode courses', () => { tab('lists'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'co' }); }],
   ['Mode courses (tout)', () => { tab('lists'); go('list', { id: 'l13' }); go('shop', { id: 'l13', st: 'all' }); }],
   ['Scan du ticket', () => { tab('lists'); go('scan', { id: 'l13', st: 'co' }); }],
@@ -180,21 +175,21 @@ const JUMPS = [
 ];
 function panelHtml() {
   const seg = (k, opts) => `<div class="pseg">${opts.map(([v, t]) => `<button class="${S[k] === v ? 'on' : ''}" data-a="demo" data-k="${k}" data-v="${v}">${t}</button>`).join('')}</div>`;
-  $('panel').innerHTML = `<h1>Le Cabas</h1><p>Maquette v4 : la v2 épurée (3 onglets, moins de boutons, fonctions rares rangées dans « Avancé »). Toutes les fonctions de l’app, données d’exemple.</p>
+  $('panel').innerHTML = `<h1>Le Cabas</h1><p>Maquette v4 : la v2 épurée (moins de boutons, fiches allégées, fonctions rares rangées dans « Avancé »). Toutes les fonctions de l’app, données d’exemple.</p>
     <h3>Rôle simulé</h3>${seg('role', [['manager', 'Gestionnaire'], ['member', 'Membre']])}
     <h3>Réseau</h3>${seg('online', [[true, 'En ligne'], [false, 'Hors-ligne']])}
     <h3>Format</h3>${seg('format', [['phone', 'Téléphone'], ['pc', 'PC']])}
     <h3>Thème</h3>${seg('theme', [['auto', 'Système'], ['light', 'Clair'], ['dark', 'Sombre']])}
     <h3>Aller à</h3><div class="jump">${JUMPS.map(([t], k) => `<button data-a="jump" data-k="${k}">${t}</button>`).join('')}</div>
     <h3>Ce qui change dans la v4</h3><ul>
-      <li><b>3 onglets</b> : Courses · ＋ · Menu. Accueil et Listes fusionnent en « Courses » : à faire, repas du jour, À prévoir, prochaine liste ; les autres listes restent repliées.</li>
-      <li><b>Plats dans le Menu</b> : bouton « Bibliothèque de plats » sous la grille, dans ⋯ et dans le menu ☰ (sur PC : entrée dans la barre latérale).</li>
-      <li><b>Menu : un seul ⋯</b> (Générer le menu, infos du menu — budget et remarques —, réglages, export, plats, envies). Plus de carrousel d’envies : elles apparaissent en tête du choix d’un plat.</li>
-      <li><b>Un seul « À valider »</b> : articles, repas et envies proposés. Une seule pastille, sur Courses.</li>
-      <li><b>☰ réduit</b> : Profil, Plats, Produits, Magasins, Promos, Foyer. Profil = rappels, installation, mot de passe, déconnexion.</li>
+      <li><b>Barre du bas inchangée</b> : Accueil, Listes, ＋, Menu, Plats.</li>
+      <li><b>Menu : un seul ⋯</b> (Générer le menu, infos du menu — budget et remarques —, envies, réglages, export). Plus de carrousel d’envies : elles apparaissent en tête du choix d’un plat.</li>
+      <li><b>Un seul « À valider »</b> : articles, repas et envies proposés.</li>
+      <li><b>☰ réduit</b> : Profil, Produits, Magasins, Promos, Foyer. Profil = rappels, installation, mot de passe, déconnexion.</li>
       <li><b>Foyer › Avancé</b> : modèles de semaine, types de plats, imports CSV (produits, plats), lien d’affichage, historique des listes.</li>
-      <li><b>Un seul rappel</b> de la veille (menu du lendemain + à préparer à l’avance), une seule heure.</li>
-      <li>Tout le reste de la v2 est conservé : mode courses par magasin, tickets, budget, plats composés, variantes, mode cuisine…</li>
+      <li><b>Un seul rappel</b> de la veille (menu du lendemain + à préparer à l’avance).</li>
+      <li><b>Fiches allégées</b> : produit, liste en préparation et article (détails repliés).</li>
+      <li>Tout le reste de la v2 est conservé.</li>
     </ul>`;
   S.theme = S.theme || 'auto';
 }

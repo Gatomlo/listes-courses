@@ -5,7 +5,6 @@ A.menu = () => {
   topSheet(`<div class="th"><button class="row tap" style="padding:0;background:none;gap:12px;flex:1" data-a="profile">${avatar(MEMBERS[0])}<span class="grow" style="text-align:left"><b>Thomas</b><span class="sub" style="display:block">${isM() ? 'Gestionnaire' : 'Membre'} · ${HOUSE.name} · profil et rappels</span></span></button>
       <button class="ib x" data-a="close" aria-label="Fermer">${I('x')}</button></div>
     <div class="group">
-      ${row('dishes', 'bowl', 'Plats', `${plural(Object.keys(DISHES).length, 'plat')} · recettes et ingrédients`)}
       ${isM() ? `${row('products', 'tag', 'Produits', `${Object.keys(P).length} produits · prix moyens`)}
       ${row('stores', 'store', 'Magasins', 'Couleurs, rayons et parcours')}
       ${row('promos', 'flame', 'Promos', `${PROMOS.filter((p) => p.until >= TODAY).length} en cours`)}

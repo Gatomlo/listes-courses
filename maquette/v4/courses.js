@@ -82,12 +82,9 @@ const aheadRows = () => [0, 1].flatMap((n) => MEALS.filter((m) => m.date === add
   return ds.map((k) => `<div class="row"><span class="ico warn">${I('clock')}</span><span class="grow"><b>À préparer à l’avance</b><span class="sub" style="display:block">${n ? 'pour demain' : 'pour ce soir'} · ${DISHES[k].n} : ${DISHES[k].ahead}</span></span></div>`).join('');
 })).join('');
 VIEWS.home = () => {
-  // Courses : tout ce qui est « à faire », les repas du jour, « À prévoir » et la prochaine liste ; les autres listes sont repliées.
-  const [cur, ...later] = dated(), meals = dayMeals(), ahead = aheadRows(), open = S.q.otherOpen;
-  const row = (l) => `<button class="row tap" data-a="go" data-v="list" data-id="${l.id}"><div class="ico ${l.status === 'cours' ? 'acc' : ''}">${I('basket')}</div>
-    <span class="grow"><b>${listName(l)}</b><span class="sub" style="display:block">${plural(counted(l).length, 'article')} · ≈ ${eur(scenarios(l).plan.total)}</span></span>${statusPill(l)}${I('chev', 's chev')}</button>`;
+  const cur = dated()[0], meals = dayMeals(), ahead = aheadRows();
   return {
-    title: 'Courses', sub: `${HOUSE.name} · ${fmtD(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}`, large: true,
+    title: 'Accueil', sub: `${HOUSE.name} · ${fmtD(TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}`, large: true,
     body: `${todoBlock()}
       <div class="home-grid"><div>
       ${meals.length || ahead ? `<div class="sh"><span>Aujourd’hui au menu</span><button data-a="tab" data-t="menu">Menu</button></div>
@@ -95,18 +92,37 @@ VIEWS.home = () => {
       <div class="sh"><span>À prévoir</span><button data-a="go" data-v="list" data-id="ap">Voir</button></div>
       ${backlogCard()}
       </div><div>
-      <div class="sh"><span>Prochaine liste</span></div>
-      ${cur ? heroCard(cur) : noNext()}
+      <div class="sh"><span>Prochaines courses</span></div>
+      ${cur ? nextRow(cur) : noNext()}
+      </div></div>`,
+  };
+};
+
+// ---------- Listes ----------
+// « À prévoir » et la prochaine liste en grand ; les autres listes a venir et l'historique
+// sont repliés (usage rare, quelques fois par an).
+VIEWS.lists = () => {
+  const [cur, ...later] = dated(), closed = LISTS.filter((l) => l.status === 'closed').sort((a, b) => b.date.localeCompare(a.date));
+  const open = S.q.otherOpen;
+  const row = (l) => `<button class="row tap" data-a="go" data-v="list" data-id="${l.id}"><div class="ico ${l.status === 'cours' ? 'acc' : ''}">${I(l.status === 'closed' ? 'check' : 'basket')}</div>
+    <span class="grow"><b>${listName(l)}</b><span class="sub" style="display:block">${plural(counted(l).length, 'article')}${l.status === 'closed' ? '' : ` · ≈ ${eur(scenarios(l).plan.total)}`}</span></span>${statusPill(l)}${I('chev', 's chev')}</button>`;
+  return {
+    title: 'Listes', sub: 'À prévoir et prochaine liste', large: true,
+    body: `${ticketsBox(LISTS.flatMap(ticketsDue))}<div class="home-grid"><div>
+        <div class="sh"><span>À prévoir</span><button data-a="go" data-v="list" data-id="ap">Ouvrir</button></div>
+        ${backlogCard()}
+        <div class="btn-row" style="margin-top:10px">${bI('plus', 'Ajouter à « À prévoir »', `data-a="add-sheet" data-id="ap"`)}</div>
+      </div><div>
+        <div class="sh"><span>Prochaine liste</span></div>
+        ${cur ? heroCard(cur).replace('<span class="sub">Prochaine liste</span>', '<span class="sub">Courses</span>') : noNext()}
       </div></div>
       <div class="rare">
-        <button class="fold" data-a="other-toggle">${I(open ? 'up' : 'down', 's')}<span>Autres listes</span><span class="n">${plural(later.length, 'à venir', 'à venir')}</span></button>
-        ${open ? `${later.length ? `<div class="group">${later.map(row).join('')}</div>` : '<p class="sub" style="margin:8px 2px">Aucune autre liste à venir.</p>'}
+        <button class="fold" data-a="other-toggle">${I(open ? 'up' : 'down', 's')}<span>Autres listes</span><span class="n">${later.length ? `${plural(later.length, 'à venir', 'à venir')} · ` : ''}${plural(closed.length, 'clôturée')}</span></button>
+        ${open ? `${later.length ? `<div class="group">${later.map(row).join('')}</div>` : ''}
           ${isM() ? `<button class="btn sec" style="margin-top:12px" data-a="new-list">${I('plus')} Nouvelle liste datée</button>` : ''}` : ''}
       </div>`,
   };
 };
-// Ancien écran « Listes » : fusionné dans Courses.
-VIEWS.lists = VIEWS.home;
 A['other-toggle'] = () => { S.q.otherOpen = !S.q.otherOpen; render(); };
 A['new-list'] = () => {
   if (!needNet()) return;
