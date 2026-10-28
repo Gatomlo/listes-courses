@@ -188,6 +188,7 @@ export async function loadProduct(id) { current = await get(hp(`/products/${id}`
 
 const SRC = { check: 'coché en magasin', manual: 'saisie manuelle', ocr: 'ticket scanné' };
 
+const recRow = (r) => `<div class="item"><span class="muted w5">${fmtDate(r.date)}</span>${stTag(r.store_id)}<span class="grow muted">${SRC[r.source]}${r.promo ? ` · ${I('tag', 's')} promo` : ''}${r.user ? ' · ' + esc(r.user) : ''}</span><span class="price">${eur(r.price_cents)}</span>${isManager() ? `<button class="ic" title="Supprimer ce relevé" data-a="rec-del" data-id="${r.id}">✕</button>` : ''}</div>`;
 export function productView() {
   const p = current, mgr = isManager(), dis = mgr ? '' : 'disabled';
   const stores = activeStores();
@@ -203,19 +204,22 @@ export function productView() {
         body: `<div class="form" id="prod-form">
           <label class="muted">Nom</label><input class="txt" name="name" value="${esc(p.name)}" ${dis}>
           <label class="muted">Rayon</label><select class="txt" name="rayon" ${dis}>${catSubOptions(p.category_id, p.subcategory_id)}</select>
+          <label class="row"><span class="grow"><b>Magasin imposé</b><span class="muted block">Ignore le conseil prix (qualité, habitude)</span></span><select class="txt w12" name="forced_store_id" ${dis}>
+            <option value="">aucun</option>${stores.map((s) => `<option value="${s.id}" ${p.forced_store_id === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+          <details class="more"><summary>Plus de réglages <span class="muted fw4">emballage, récurrent, produit de base</span></summary>
           ${packBlock(`<label class="muted">Emballage</label><select class="txt" name="unit" ${dis}>${unitOptions(p.unit)}</select>`, contField(p.contenance, dis), !!p.contenance)}
           <p class="muted small">${p.size ? `1 ${esc(p.unit)} = <b>${esc(sizeText(p.size))}</b>. ` : ''}Sert à convertir les quantités des recettes (g, ml, pièces) en emballages.</p>
           <label class="row"><span class="grow"><b>Poids d'une pièce</b><span class="muted block">Facultatif, en g (ou ml) : relie « 2 oignons » à un filet au kg</span></span><input class="txt w5 c" name="piece_qty" inputmode="decimal" value="${p.piece_qty != null ? String(p.piece_qty).replace('.', ',') : ''}" placeholder="g" ${dis}></label>
           <label class="row"><span class="grow"><b>${I('repeat', 's')} Récurrent</b><span class="muted block">Ajouté aux nouvelles listes datées</span></span><select class="txt w12" name="recurrence" ${dis}>
             <option value="">non</option>${[1, 2, 3].map((n) => `<option value="${n}" ${p.recurrence === n ? 'selected' : ''}>${REC[n]}</option>`).join('')}</select></label>
           <label class="row"><span class="grow"><b>Ingrédient de base</b><span class="muted block">Proposé « à vérifier », jamais ajouté d'office</span></span><input type="checkbox" class="cb" name="is_base" ${p.is_base ? 'checked' : ''} ${dis}></label>
-          <label class="row"><span class="grow"><b>Magasin imposé</b><span class="muted block">Ignore le conseil prix (qualité, habitude)</span></span><select class="txt w12" name="forced_store_id" ${dis}>
-            <option value="">aucun</option>${stores.map((s) => `<option value="${s.id}" ${p.forced_store_id === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+          </details>
           ${mgr ? '<div class="row end"><button class="btn" data-a="prod-save">Enregistrer</button></div>' : ''}</div>` })}
-      ${acc('p_hist', { icon: `${I('receipt', 's')} `, title: 'Derniers relevés', sum: ` · ${p.records.length}`,
-        body: `${p.records.map((r) => `<div class="item"><span class="muted w5">${fmtDate(r.date)}</span>${stTag(r.store_id)}<span class="grow muted">${SRC[r.source]}${r.promo ? ` · ${I('tag', 's')} promo` : ''}${r.user ? ' · ' + esc(r.user) : ''}</span><span class="price">${eur(r.price_cents)}</span>${mgr ? `<button class="ic" title="Supprimer ce relevé" data-a="rec-del" data-id="${r.id}">✕</button>` : ''}</div>`).join('') || '<p class="muted">Aucun relevé.</p>'}
-          <button class="btn sec2 full" style="margin:8px 0" data-a="rec-add">＋ Ajouter un relevé</button>` })}
+      ${acc('p_hist', { icon: `${I('receipt', 's')} `, title: 'Derniers relevés', sum: ` · ${p.records.length}`, def: true,
+        body: `${p.records.slice(0, 3).map(recRow).join('') || '<p class="muted">Aucun relevé.</p>'}
+          ${p.records.length > 3 ? `<details class="more"><summary>Historique complet <span class="muted fw4">${p.records.length} relevés</span></summary>${p.records.slice(3).map(recRow).join('')}</details>` : ''}` })}
       ${mgr ? `<div class="btn-row wide" style="margin-top:12px">${btnI('merge', 'Fusionner avec…', 'data-a="prod-merge"')}${btnI('trash', 'Supprimer', 'data-a="prod-del"', 'sec2 danger-t')}</div>` : ''}`,
+    dock: `<button class="addbar" data-a="rec-add">${I('plus')}<span class="grow">Ajouter un relevé de prix</span></button>`,
   };
 }
 

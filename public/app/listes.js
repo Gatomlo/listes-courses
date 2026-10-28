@@ -207,13 +207,9 @@ export function listesView() {
     <span class="grow"><b>${esc(shortTitle(l))}</b><span class="muted block">${plural(l.items, 'article')}${l.estimate != null && l.items ? ` · ≈ ${eur(l.estimate)}` : ''}${l.pending ? ` · ${plural(l.pending, 'suggestion')}` : ''}</span></span>${l.status !== 'closed' ? statusPill(l) : ''}${I('chev', 's chev')}</a>`;
   const b = s.backlog, open = S.q.otherOpen || isPc();
   const empty = (t) => `<p class="muted small" style="margin:4px 0 0">${t}</p>`;
-  const sug = S.house.pending || (S.suggestions || []).length;
   return {
     title: 'Listes', sub: 'À prévoir et prochaine liste',
-    body: `${sug && mgr ? `<button class="banner" data-a="sugg-sheet">${I('bulb')}<span class="grow">${plural(S.house.pending || sug, 'suggestion')} à valider</span>${I('chev', 's')}</button>` : ''}
-      ${closeRows() ? box('À clôturer', '', closeRows(), 'todo-c') : ''}
-      ${ticketsBox(s.tickets, 0, true)}
-      <div class="home-grid${isPc() ? ' three' : ''}"><div>
+    body: `<div class="home-grid${isPc() ? ' three' : ''}"><div>
       ${next ? heroCard(next) : box('Prochaines courses', '', `<p class="muted">Aucune liste de courses prévue.</p>${mgr ? '<button class="btn" data-a="list-new">＋ Nouvelle liste</button>' : ''}`, 'hero-c')}
       ${box('À prévoir', `<a href="#/listes/${b.id}">Ouvrir</a>`, `<a class="item click" href="#/listes/${b.id}"><span class="grow"><b>${plural(b.items, 'article')}</b>${b.pending ? ` <span class="pill p-carrot">${plural(b.pending, 'suggestion')}</span>` : ''}
         <span class="muted block">Sans date : à importer dans une prochaine liste${b.estimate != null && b.items ? ` · ≈ ${eur(b.estimate)}` : ''}.</span></span>${I('chev', 's chev')}</a>`)}
@@ -298,6 +294,12 @@ function itemRow(i, l, o = {}) {
     !o.shop && dated && open && i.status === 'bought' ? `<span style="color:var(--leaf)">${I('check', 's')} dans le caddie</span>` : '',
     o.shop && storeById(i.at_store_id) && (o.allStores || (o.here && i.at_store_id !== o.here)) ? `<span style="color:${esc(storeById(i.at_store_id).color)}">● ${o.allStores ? '' : 'conseillé chez '}${esc(storeById(i.at_store_id).name)}</span>` : '',
   ].join('');
+  // Preparation / « A prevoir » : un seul detail sous le nom (suggestion, indisponible, plat, besoin ou note) ; le reste est dans la fiche.
+  const one = i.suggestion ? `<span style="color:var(--carrot)">${I('bulb', 's')} ${esc(i.suggested_by_name || '?')}</span>`
+    : i.status === 'unavailable' ? `<span>${I('ban', 's')} indisponible</span>`
+    : i.from && i.from.length ? `<span>${I('bowl', 's')} ${esc(i.from.length > 1 ? `${i.from[0]} +${i.from.length - 1}` : i.from[0])}</span>`
+    : i.need ? `<span>${esc(i.need)}</span>` : i.note ? `<span>${I('note', 's')} ${esc(i.note)}</span>` : '';
+  const simple = !o.shop && open;
   const check = o.shop && open && !i.suggestion
     ? `<button class="chk${i.status === 'bought' ? ' on' : ''}" data-a="item-check" data-id="${i.id}" aria-label="Acheté">${I('check')}</button>` : '';
   const priced = open && !i.deleted;
@@ -311,7 +313,7 @@ function itemRow(i, l, o = {}) {
   const swipe = o.shop && open && mgr && i.status === 'todo' && !i.suggestion && !isTemp(i.id);
   const html = `<div class="item line1${i.suggestion ? ' pending' : ''}${i.status === 'bought' && open ? ' done' : ''}${i.deleted ? ' gone' : ''}" id="it${i.id}">${check}
     <div class="grow nm${tap ? ' click' : ''}" ${tap ? `data-a="item" data-id="${i.id}"` : ''}><span class="t">${esc(i.name)}${i.qty !== 1 ? ` <span class="faint fw4">× ${qtyText(i.qty)}</span>` : ''}</span>
-      <span class="meta">${meta || `<span>${esc(i.unit)}</span>`}</span></div>${right}</div>`;
+      ${simple ? (one ? `<span class="meta">${one}</span>` : '') : `<span class="meta">${meta || `<span>${esc(i.unit)}</span>`}</span>`}</div>${right || (simple && i.promos && i.promos.length ? '<span class="pill p-carrot">promo</span>' : '')}</div>`;
   // Gestionnaire en courses : balayer vers la gauche pour retirer (swipe.js).
   return swipe ? `<div class="swipe"><button class="swipe-del" data-a="shop-del" data-id="${i.id}" tabindex="-1">${I('trash', 's')} Retirer</button>${html.replace('class="item line1', 'data-swipe="1" class="item line1')}</div>` : html;
 }
@@ -369,7 +371,7 @@ function scenPanel(l) {
 
 function basePanel(l) {
   if (!l.base || !l.base.length) return '';
-  return acc('lc_base', { icon: I('box'), title: 'À vérifier dans les placards', sum: ` · ${l.base.length}`,
+  return acc('lc_base', { icon: I('box'), title: 'À vérifier dans les placards', sum: ` · ${l.base.length}`, def: 'closed',
     body: l.base.map((b) => `<div class="item"><span class="grow"><b>${esc(b.name)}</b><span class="muted block">pour ${esc(b.dishes.join(', '))}</span></span><button class="btn sm sec2" data-a="add-item" data-id="${b.product_id}">＋ À acheter</button></div>`).join('') });
 }
 
@@ -383,8 +385,9 @@ const subRank = (i, store) => {
   const k = [...((store && store.subOrder) || []), ...subs.map((x) => x.id)].indexOf(i.subcategory_id);
   return k < 0 ? 1e6 : k;
 };
-function rowsWithSubs(its, store, rowFn) {
+function rowsWithSubs(its, store, rowFn, flat) {
   let last = null, out = '';
+  if (flat) return its.map(rowFn).join(''); // l'ordre du magasin est gardé, sans intitulé de sous-rayon
   for (const i of its) {
     const subs = subsOf(i.category_id);
     if (subs.length) {
@@ -407,7 +410,7 @@ function prepBody(l) {
     its.sort((a, b) => rank(a) - rank(b) || subRank(a, s) - subRank(b, s) || a.name.localeCompare(b.name, 'fr'));
     const p = st(s.id);
     return `<div class="rayon"><span class="dot" style="background:${esc(s.color)}"></span><b style="color:var(--ink)">${esc(s.name)}</b><span class="n">${plural(its.length, 'article')}${p ? ` · ${eur(p.itemsTotal)}` : ''}</span></div>
-      <div class="group">${rowsWithSubs(its, s, (i) => itemRow(i, l))}</div>`;
+      <div class="group">${rowsWithSubs(its, s, (i) => itemRow(i, l), true)}</div>`;
   }).join('');
   return `${sugg.length ? `<div class="rayon" style="color:var(--carrot)">${I('bulb', 's')} Suggestions à valider<span class="n">${sugg.length}</span></div><div class="group">${sugg.map((i) => itemRow(i, l)).join('')}</div>` : ''}
     ${blocks}
@@ -423,7 +426,7 @@ function itemsBody(l, items, order, o = {}) {
   const known = new Set(order);
   const groups = [...order, ...new Set(todo.map((i) => i.category_id).filter((c) => !known.has(c)))].map((cid) => [cid, todo.filter((i) => i.category_id === cid)]).filter(([, is]) => is.length);
   const key = `cart${l.id}`;
-  return `${groups.map(([cid, is]) => `<div class="rayon">${esc(catName(cid))}<span class="n">${is.length}</span></div><div class="group">${rowsWithSubs([...is].sort((a, b) => subRank(a, o.store) - subRank(b, o.store)), o.store, (i) => itemRow(i, l, o))}</div>`).join('')}
+  return `${groups.map(([cid, is]) => `<div class="rayon">${esc(catName(cid))}<span class="n">${is.length}</span></div><div class="group">${rowsWithSubs([...is].sort((a, b) => subRank(a, o.store) - subRank(b, o.store)), o.store, (i) => itemRow(i, l, o), !o.shop)}</div>`).join('')}
     ${!items.length ? `<div class="empty">${I('basket', 'l')}<p>${o.empty || `Liste vide. ${isManager() ? 'Ajoutez un article ci-dessous.' : 'Suggérez un article ci-dessous.'}`}</p></div>`
       : !todo.length && cart.length ? `<div class="empty">${I('check', 'l')}<p><b>Tout est dans le caddie.</b></p></div>` : ''}
     ${unav.length ? `<div class="rayon">Indisponibles<span class="n">${unav.length}</span></div><div class="group">${unav.map((i) => itemRow(i, l, o)).join('')}</div>` : ''}
@@ -453,8 +456,7 @@ on('click', 'scen', () => sheet(`<h3>Scénarios comparés</h3>${scenPanel(curren
 export function listView() {
   const l = current, mgr = isManager(), open = l.status !== 'closed', dated = l.type === 'dated';
   const real = l.items.filter((i) => !i.suggestion), done = real.filter((i) => i.status === 'bought').length;
-  const meals = dated && l.meals && l.meals.length ? `<div class="sec">Repas couverts <a href="#/menu">Menu</a></div>
-    <div class="hscroll">${l.meals.map((m) => `<button class="card click" style="width:150px;padding:12px" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted small">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric' }))} · ${SLOT[m.slot]}</span><div style="font-weight:650;line-height:1.25;margin-top:2px">${esc(m.dish)}</div></button>`).join('')}</div>` : '';
+  const meals = dated && l.meals && l.meals.length ? acc('lc_meals', { icon: I('calendar'), title: 'Repas couverts', sum: ` · ${l.meals.length}`, def: 'closed', body: `<div class="hscroll">${l.meals.map((m) => `<button class="card click" style="width:150px;padding:12px" data-a="meal-open" data-id="${m.id}" data-date="${m.date}"><span class="muted small">${esc(fmtDate(m.date, { weekday: 'short', day: 'numeric' }))} · ${SLOT[m.slot]}</span><div style="font-weight:650;line-height:1.25;margin-top:2px">${esc(m.dish)}</div></button>`).join('')}</div>` }) : '';
   const body = !open ? `${ticketsBox(l.tickets, l.id)}${closedBody(l)}` : `${presenceLine(l)}${closeBanner(l)}${ticketsBox(l.tickets, l.id)}<div class="split"><div>
       ${dated ? prepBody(l) : itemsBody(l, l.items, categoryOrder())}</div>
       <div class="side">${dated ? scenCard(l) : ''}${meals}${dated ? basePanel(l) : ''}</div></div>`;
@@ -548,7 +550,7 @@ export function storeListView(sid) {
     <span class="grow">${!hidden.length ? 'Articles des autres magasins affichés' : shown.length ? `${shown.length} autre${shown.length > 1 ? 's' : ''} magasin${shown.length > 1 ? 's' : ''} affiché${shown.length > 1 ? 's' : ''} · ${hiddenN} masqué${hiddenN > 1 ? 's' : ''}` : `Seulement ce magasin · ${hiddenN} masqué${hiddenN > 1 ? 's' : ''}`}</span>${I('down', 's')}</button>` : '';
   const endLbl = all ? 'Terminer les courses' : `Terminer chez ${s.name}`;
   return {
-    title: s.name, back: `#/listes/${l.id}`, noNav: true, sub: `Courses du ${shortTitle(l)}${isAwake() ? ' · écran allumé' : ''}`,
+    title: s.name, titleAct: stores.length > 1 ? 'shop-switch' : '', titleLabel: 'Changer de magasin', back: `#/listes/${l.id}`, noNav: true, sub: `Courses du ${shortTitle(l)}${isAwake() ? ' · écran allumé' : ''}`,
     right: stores.length > 1 ? `<button class="ib" data-a="shop-switch" aria-label="Changer de magasin" title="Changer de magasin">${I('store')}</button>` : '',
     body: `<div class="shop">
       <div class="shopbar2" style="--c:${esc(s.color)}"><b>${done.length}/${items.length}</b><div class="prog"><i style="width:${pct}%"></i></div><span class="price muted small">≈ ${eur(total)}</span>
@@ -855,13 +857,14 @@ on('click', 'item', async (el) => {
     <button class="item click" data-a="item-more"><span class="grow">Plus de détails<span class="muted block">note, indisponible, récurrent, prix</span></span>${I('down', 's')}</button>
     <div id="item-more" hidden>
     ${i.prices ? `<p class="muted small">${priceHint(i)}</p>` : ''}${i.promos && i.promos.length ? `<div class="pills">${promoPills(i)}</div>` : ''}
+    ${current.type === 'dated' ? `<div class="btn-row" style="margin:8px 0">${btnI('tag', 'Ajouter une promo', `data-a="promo" data-pid="${i.product_id}" data-sid="${i.promos && i.promos[0] ? i.promos[0].store_id : i.at_store_id || ''}"`, 'sec2')}</div>` : ''}
     <label class="muted" style="display:block;margin-top:8px">Note</label><input class="txt" name="note" value="${esc(i.note || '')}" placeholder="ex. bio, grand format">
     ${current.type === 'dated' ? `<label class="row line" style="margin-top:8px"><input type="checkbox" class="cb" name="unavailable" ${i.status === 'unavailable' ? 'checked' : ''}><span class="grow">Indisponible en magasin</span></label>` : ''}
     ${i.meal_qty > 0 ? `<div class="row line"><span class="grow">Dont ${qtyText(i.meal_qty)}${i.need ? ` (${esc(i.need)})` : ''} pour ${esc(i.from.join(', '))}</span><button class="btn sm sec2" data-a="item-stock" data-id="${i.id}">${I('box', 's')} Déjà en réserve</button></div>` : ''}
     ${mgr && others.length ? `<div class="sec">Déplacer vers</div><div class="opt">${others.map((o) => `<button data-a="item-move" data-id="${i.id}" data-to="${o.id}">${o.type === 'backlog' ? 'À prévoir' : 'Liste du ' + esc(fmtDate(o.date))}</button>`).join('')}</div>` : ''}
     ${mgr ? `<div class="row line"><span class="grow"><b>Récurrent</b><span class="muted block">${p.recurrence ? 'Revient automatiquement' : 'Non'}</span></span><button class="btn sm sec2" data-a="item-rec" data-pid="${i.product_id}" data-rec="${p.recurrence ? '' : 1}">${p.recurrence ? 'Arrêter' : 'Rendre récurrent'}</button></div>` : ''}
     </div>
-    <div class="btn-row" style="margin-top:14px">${btnI('doc', 'Fiche produit', `data-a="go-product" data-pid="${i.product_id}"`)}${current.type === 'dated' ? btnI('tag', 'Promo', `data-a="promo" data-pid="${i.product_id}" data-sid="${i.promos && i.promos[0] ? i.promos[0].store_id : i.at_store_id || ''}"`) : ''}${mgr ? btnI('trash', 'Retirer', `data-a="item-del" data-id="${i.id}"`, 'sec2 danger-t') : ''}${btnI('check', 'Enregistrer', `data-a="item-save" data-id="${i.id}"`, '')}</div>`);
+    <div class="btn-row" style="margin-top:14px">${btnI('doc', 'Fiche produit', `data-a="go-product" data-pid="${i.product_id}"`)}${mgr ? btnI('trash', 'Retirer', `data-a="item-del" data-id="${i.id}"`, 'sec2 danger-t') : ''}${btnI('check', 'Enregistrer', `data-a="item-save" data-id="${i.id}"`, '')}</div>`);
 });
 on('click', 'item-more', (el) => { const m = document.getElementById('item-more'); if (m) { m.hidden = !m.hidden; el.querySelector('.muted').textContent = m.hidden ? 'note, indisponible, récurrent, prix' : 'masquer'; } });
 on('click', 'qty', (el) => {

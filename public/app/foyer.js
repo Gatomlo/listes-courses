@@ -3,7 +3,6 @@ import { esc, eur, on, acc, sheet, closeSheet, confirmSheet, toast, formData } f
 import { I } from './icons.js';
 import { patch, post, put, del, attempt } from './api.js';
 import { S, hp, isManager, render, loadHouse } from './state.js';
-import { installCard } from './install.js';
 import { rulesHtml, editRules, ruleText, copyRules } from './modeles.js';
 
 const DOW = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
@@ -16,10 +15,17 @@ export function foyerView() {
       <span class="grow"><b>${esc(m.name)}${m.me ? ' (vous)' : ''}</b><span class="muted block">${esc(m.email)}</span></span>
       <span class="pill ${m.role === 'manager' ? 'p-leaf' : 'p-grey'}">${roleLabel(m.role)}</span>${mgr || m.me ? '<span class="muted">›</span>' : ''}</div>`).join('');
   const h = H.household;
+  const typesBody = `${H.types.map((t) => `<div class="ord"><span class="grow">${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}</span></span>
+          ${mgr ? `<button class="ic" title="Renommer" data-a="type-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="type-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="type-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
+          || '<p class="muted">Aucun type. Ex. poisson, pâtes, riz, porc, poulet : un plat peut en avoir plusieurs, les modèles de semaine s’en servent.</p>'}
+          ${mgr ? '<div class="row gap" style="margin-top:8px"><input class="txt grow" id="type-in" placeholder="Nouveau type (ex. poisson)" data-enter="type-add"><button class="btn sm sec2" data-a="type-add">＋</button></div>' : ''}`;
+  const modelsBody = `${H.models.map((m) => `<div class="item${mgr ? ' click' : ''}" ${mgr ? `data-a="model-edit" data-id="${m.id}"` : ''}><span class="grow"><b>${esc(m.name)}</b><span class="muted block">${m.rules.map(ruleText).join(' · ') || 'aucune règle'}</span></span>${mgr ? '<span class="muted">›</span>' : ''}</div>`).join('')
+          || '<p class="muted">Aucun modèle. Un modèle fixe la composition d’une semaine pour « Générer le menu » : ex. exactement 1 poisson, 2 pâtes, au plus 1 porc.</p>'}
+          ${mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="model-edit">＋ Nouveau modèle</button>' : ''}`;
   return {
     cols: true, title: h.name, sub: mgr ? 'Vous êtes gestionnaire' : 'Vous êtes membre',
     right: '<button class="btn sm sec2" data-a="go" data-to="#/foyers">Mes foyers</button>',
-    body: `${installCard()}${acc('mem', { icon: `${I('users', 's')} `, title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
+    body: `${acc('mem', { icon: `${I('users', 's')} `, title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
         body: members + (mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="invite">＋ Inviter un membre</button>' : '') })}
       ${acc('set', { icon: `${I('sliders', 's')} `, title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, ${h.avg_records} relevés, courses ${h.rhythm_days} j, menu ${h.menu_days} j dès le ${DOW[h.menu_start_dow]}, plat ≥ ${h.menu_gap_days} j`,
         body: `<div class="form">
@@ -36,15 +42,13 @@ export function foyerView() {
         body: H.tags.map((t) => `<div class="ord"><span class="grow">#${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}${t.auto ? ` · automatique${H.household.eco_cents ? `, sous ${eur(H.household.eco_cents)} par personne` : ' (palier à fixer dans les réglages)'}` : ''}</span></span>
           ${mgr && !t.auto ? `<button class="ic" title="Renommer" data-a="tag-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="tag-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="tag-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
           || '<p class="muted">Aucun tag : ajoutez-en depuis la fiche d’un plat.</p>' })}
-      ${acc('types', { icon: `${I('bowl', 's')} `, title: 'Types de plats', sum: ` · ${H.types.length}`,
-        body: `${H.types.map((t) => `<div class="ord"><span class="grow">${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}</span></span>
-          ${mgr ? `<button class="ic" title="Renommer" data-a="type-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="type-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="type-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
-          || '<p class="muted">Aucun type. Ex. poisson, pâtes, riz, porc, poulet : un plat peut en avoir plusieurs, les modèles de semaine s’en servent.</p>'}
-          ${mgr ? '<div class="row gap" style="margin-top:8px"><input class="txt grow" id="type-in" placeholder="Nouveau type (ex. poisson)" data-enter="type-add"><button class="btn sm sec2" data-a="type-add">＋</button></div>' : ''}` })}
-      ${acc('models', { icon: `${I('calendar', 's')} `, title: 'Modèles de semaine', sum: ` · ${H.models.length}`,
-        body: `${H.models.map((m) => `<div class="item${mgr ? ' click' : ''}" ${mgr ? `data-a="model-edit" data-id="${m.id}"` : ''}><span class="grow"><b>${esc(m.name)}</b><span class="muted block">${m.rules.map(ruleText).join(' · ') || 'aucune règle'}</span></span>${mgr ? '<span class="muted">›</span>' : ''}</div>`).join('')
-          || '<p class="muted">Aucun modèle. Un modèle fixe la composition d’une semaine pour « Générer le menu » : ex. exactement 1 poisson, 2 pâtes, au plus 1 porc.</p>'}
-          ${mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="model-edit">＋ Nouveau modèle</button>' : ''}` })}`,
+      ${mgr ? acc('adv', { icon: `${I('sliders', 's')} `, title: 'Avancé', sum: ` · modèles de semaine, types, imports, lien d’affichage`,
+        body: `<div class="sec" style="margin-top:0">Modèles de semaine · ${H.models.length}</div>${modelsBody}
+          <div class="sec">Types de plats · ${H.types.length}</div>${typesBody}
+          <div class="sec">Imports et affichage</div><div class="group tiles">
+            <button class="item click" data-a="csv-open"><span class="ico">${I('upload')}</span><span class="grow"><b>Importer des produits</b><span class="muted block">Fichier CSV, avec relevés de prix</span></span>${I('chev', 's chev')}</button>
+            <button class="item click" data-a="dish-csv-open"><span class="ico">${I('upload')}</span><span class="grow"><b>Importer des plats</b><span class="muted block">Fichier CSV : repas, tags, ingrédients</span></span>${I('chev', 's chev')}</button>
+            <a class="item click" href="#/menu/export"><span class="ico">${I('link')}</span><span class="grow"><b>Lien d’affichage du menu</b><span class="muted block">Page publique en lecture seule, export A4</span></span>${I('chev', 's chev')}</a></div>` }) : ''}`,
   };
 }
 

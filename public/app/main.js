@@ -73,7 +73,7 @@ function shell(v) {
   const key = location.hash.split('?')[0];
   const enter = key !== lastRoute;
   lastRoute = key;
-  app.innerHTML = `<header class="top">${v.back ? `<a class="back" href="${v.back}" aria-label="Retour">${I('back')}</a>` : ''}<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2><div class="acts-r">${v.right || ''}${TAB_SCREENS.includes(S.route[0]) && S.house ? `<button class="ib" data-a="gsearch" aria-label="Rechercher">${I('search')}</button>` : ''}${TAB_SCREENS.includes(S.route[0]) && !isPc() && S.house ? `<button class="ib" data-a="topmenu" aria-label="Menu : produits, magasins, foyer…">${I('menu')}</button>` : ''}</div></header>
+  app.innerHTML = `<header class="top">${v.back ? `<a class="back" href="${v.back}" aria-label="Retour">${I('back')}</a>` : ''}<h2>${v.titleAct ? `<button class="tbtn" data-a="${v.titleAct}" aria-label="${esc(v.titleLabel || v.title)}">${esc(v.title)}${I('down', 's')}</button>` : esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2><div class="acts-r">${v.right || ''}${TAB_SCREENS.includes(S.route[0]) && S.house ? `<button class="ib" data-a="gsearch" aria-label="Rechercher">${I('search')}</button>` : ''}${TAB_SCREENS.includes(S.route[0]) && !isPc() && S.house ? `<button class="ib" data-a="topmenu" aria-label="Menu : produits, magasins, foyer…">${I('menu')}</button>` : ''}</div></header>
     <main class="${enter ? 'enter' : ''}">${banner}<div class="${v.cols ? `cols ${v.cols === true ? '' : v.cols}` : ''}">${v.body}</div></main>
     ${v.dock ? `<div class="dock">${v.dock}</div>` : ''}${nav}`;
   onScroll();

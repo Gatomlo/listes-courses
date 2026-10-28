@@ -21,25 +21,25 @@ const AT = new Date('2030-03-10T17:45:00Z'), D = '2030-03-11';
 test('reglages, abonnements et droits', async () => {
   assert.ok((await thomas.get('/api/push/key')).data.key.length > 40);
   let p = (await thomas.get(`${h}/push`)).data;
-  assert.deepEqual([p.menu_on, p.menu_time, p.ahead_on, p.ahead_time, p.devices], [false, '19:00', false, '20:00', 0]);
+  assert.deepEqual([p.menu_on, p.menu_time, p.devices], [false, '19:00', 0]);
   assert.equal((await thomas.put(`${h}/push`, { menu_time: '25:00' })).status, 400);
   assert.equal((await thomas.post(`${h}/push/subscribe`, { endpoint: 'http://x', keys: {} })).status, 400);
   p = (await thomas.post(`${h}/push/subscribe`, sub('thomas'))).data;
   assert.equal(p.devices, 1);
   // Reglages propres a chacun : un membre regle les siens.
-  p = (await lea.put(`${h}/push`, { ahead_on: true, ahead_time: '18:00' })).data;
-  assert.deepEqual([p.menu_on, p.ahead_on, p.ahead_time], [false, true, '18:00']);
-  assert.equal((await thomas.get(`${h}/push`)).data.ahead_on, false);
+  p = (await lea.put(`${h}/push`, { menu_on: true, menu_time: '18:00' })).data;
+  assert.deepEqual([p.menu_on, p.menu_time], [true, '18:00']);
+  assert.equal((await thomas.get(`${h}/push`)).data.menu_on, false);
   // Essai sans abonnement : refuse.
-  assert.equal((await lea.post(`${h}/push/test`, { kind: 'menu' })).status, 409);
-  const t = await thomas.post(`${h}/push/test`, { kind: 'menu' });
+  assert.equal((await lea.post(`${h}/push/test`, {})).status, 409);
+  const t = await thomas.post(`${h}/push/test`, {});
   assert.equal(t.data.sent, 1);
   assert.equal(sent.pop().title, 'Demain au menu');
   p = (await thomas.post(`${h}/push/unsubscribe`, { endpoint: sub('thomas').endpoint })).data;
   assert.equal(p.devices, 0);
 });
 
-test('contenu : menu du lendemain et a faire a l avance (composants compris)', async () => {
+test('contenu : menu du lendemain puis a faire a l avance, un seul message (composants compris)', async () => {
   const lasagnes = (await thomas.post(`${h}/dishes`, { name: 'Lasagnes', ahead: 'Sortir le haché du congélateur' })).data;
   assert.equal(lasagnes.ahead, 'Sortir le haché du congélateur');
   // Enregistrer sans `ahead` : inchange.
@@ -53,7 +53,7 @@ test('contenu : menu du lendemain et a faire a l avance (composants compris)', a
   await lea.post(`${h}/meals`, { date: D, slot: 'pdj', dish_id: taboule });
 
   const menu = P.content(hid, 'menu', D);
-  assert.equal(menu.body, 'Midi : Mezze · 6 pers.\nSoir : Lasagnes');
+  assert.equal(menu.body, 'Midi : Mezze · 6 pers.\nSoir : Lasagnes\nÀ préparer : Houmous (midi) : Faire tremper les pois chiches\nLasagnes (soir) : Sortir le haché du congélateur');
   const ahead = P.content(hid, 'ahead', D);
   assert.equal(ahead.title, 'À préparer pour demain');
   assert.equal(ahead.body, 'Houmous (midi) : Faire tremper les pois chiches\nLasagnes (soir) : Sortir le haché du congélateur');
@@ -67,21 +67,20 @@ test('planificateur : a l heure, une fois par jour, abonnements expires oublies'
   await thomas.post(`${h}/push/subscribe`, sub('thomas-tel'));
   await thomas.post(`${h}/push/subscribe`, sub('thomas-expire'));
   await lea.post(`${h}/push/subscribe`, sub('lea'));
-  await thomas.put(`${h}/push`, { menu_on: true, menu_time: '18:30', ahead_on: true, ahead_time: '21:00' });
-  await lea.put(`${h}/push`, { menu_on: false, ahead_on: true, ahead_time: '18:00' });
+  await thomas.put(`${h}/push`, { menu_on: true, menu_time: '18:30' });
+  await lea.put(`${h}/push`, { menu_on: true, menu_time: '21:00' });
 
   let r = await P.tick(AT);
-  assert.deepEqual(r.map((x) => [x.kind, x.user_id === r[0].user_id]).sort(), [['ahead', false], ['menu', true]]);
-  assert.deepEqual(sent.map((s) => [s.endpoint.split('/').pop(), s.title]).sort(),
-    [['lea', 'À préparer pour demain'], ['thomas-tel', 'Demain au menu']]);
+  assert.deepEqual(r.map((x) => x.kind), ['menu']);
+  assert.deepEqual(sent.map((s) => [s.endpoint.split('/').pop(), s.title]), [['thomas-tel', 'Demain au menu']]);
   assert.equal((await thomas.get(`${h}/push`)).data.devices, 1); // abonnement expire retire
 
-  // Meme jour : rien de plus ; 21 h : le rappel « a l'avance » de thomas.
+  // Meme jour : rien de plus ; 21 h : le rappel de lea.
   sent.length = 0;
   assert.equal((await P.tick(new Date('2030-03-10T18:10:00Z'))).length, 0);
   r = await P.tick(new Date('2030-03-10T20:05:00Z'));
-  assert.deepEqual(r.map((x) => x.kind), ['ahead']);
+  assert.deepEqual(sent.map((s) => s.endpoint.split('/').pop()), ['lea']);
   // Plus de 2 h apres l'heure : trop tard, rien.
   await thomas.put(`${h}/push`, { menu_time: '10:00' });
-  assert.equal((await P.tick(new Date('2030-03-11T17:00:00Z'))).filter((x) => x.kind === 'menu').length, 0);
+  assert.equal((await P.tick(new Date('2030-03-11T17:00:00Z'))).length, 0);
 });

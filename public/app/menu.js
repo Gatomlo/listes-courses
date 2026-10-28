@@ -49,11 +49,11 @@ const addBtn = (d, s, label) => `<button class="add" data-a="meal-add" data-date
 
 // Budget estime de la periode affichee (repas valides : personnes, variantes, produits en reserve).
 // Pas dans l'export ni l'impression.
-function budgetCard() {
+// Infos du menu : budget (sous-totaux par semaine) et remarques, dans un panneau (menu ⋯).
+function infoHtml() {
   const c = menu.cost, ms = menu.meals.filter((m) => !m.suggestion && m.cost != null), mgr = isManager();
   const hasMeals = c && menu.meals.some((m) => !m.suggestion);
-  if (!hasMeals && !mgr && !menu.note) return '';
-  const persons = ms.reduce((n, m) => n + m.persons, 0), open = !!S.q.budgetOpen;
+  const persons = ms.reduce((n, m) => n + m.persons, 0);
   const note = c && c.partial ? ` · estimation partielle${c.unknown ? ` (${c.unknown} repas sans prix)` : ' (des ingrédients sans prix)'}` : '';
   // Sous-totaux par semaine (tranches de 7 jours depuis le debut de la periode) : chaque repas compte pour ses personnes.
   const weeks = [];
@@ -65,10 +65,10 @@ function budgetCard() {
   const notes = mgr ? `<textarea class="txt" rows="3" maxlength="2000" placeholder="Remarques sur ce menu (imprimées avec l’export)" data-ch="menu-note">${esc(menu.note || '')}</textarea>` : `<div class="pre small">${esc(menu.note || 'Aucune remarque')}</div>`;
   const title = hasMeals ? `Budget ${c.partial ? 'dès ' : '≈ '}${esc(eur(c.total))}` : 'Infos du menu';
   const sub = `${hasMeals && persons ? `≈ ${esc(eur(Math.round(c.total / persons)))} / pers. / repas` : ''}${menu.note ? `${hasMeals && persons ? ' · ' : ''}1 remarque` : ''}`;
-  return `<div class="card" style="margin:8px 0"><button class="row" style="gap:10px;width:100%;background:none;border:0;padding:0;text-align:left;color:inherit" data-a="budget-toggle"><span class="ico leaf">${I('tag')}</span><span class="grow"><b>${title}</b><span class="muted small block">${sub}</span></span>${I(open ? 'up' : 'down', 's')}</button>
-    ${!open ? '' : `${hasMeals ? `${wk}<p class="muted small" style="margin:6px 0 0">${esc(note.replace(/^ · /, ''))}</p>` : ''}<div class="sec" style="margin:12px 0 4px">Remarques</div>${notes}`}</div>`;
+  return `<h3>Infos du menu</h3>${hasMeals ? `<div class="card"><b>${title}</b><span class="muted small block">${sub}</span>${wk}<p class="muted small" style="margin:6px 0 0">${esc(note.replace(/^ · /, ''))}</p></div>` : ''}
+    <div class="sec">Remarques</div>${notes}`;
 }
-on('click', 'budget-toggle', () => { S.q.budgetOpen = !S.q.budgetOpen; render(); });
+on('click', 'menu-info', () => sheet(infoHtml()));
 export function menuView() {
   const days = []; for (let d = menu.from; d <= menu.to; d = addDays(d, 1)) days.push(d);
   const slots = slotsShown(), p = menu.period, mgr = isManager();
@@ -89,14 +89,12 @@ export function menuView() {
   return {
     title: 'Menu', sub: `${range} · ${p.saved ? 'menu enregistré' : 'période proposée'}`, large: true,
     // PC : actions dans la barre ; telephone : un bouton d'options.
-    right: isPc() ? menuActions().map(([a, t, ic]) => `<button class="btn sm sec2" data-a="${a}">${I(ic, 's')} ${t}</button>`).join('') : `${mgr && menu.to >= today() ? `<button class="ib" data-a="menu-gen" aria-label="Générer le menu" title="Générer le menu">${I('spark')}</button>` : ''}<button class="ib" data-a="menu-export" aria-label="Exporter et partager">${I('share')}</button><button class="ib" data-a="menu-more" aria-label="Options du menu">${I('sliders')}</button>`,
+    right: `<button class="ib" data-a="menu-more" aria-label="Options du menu" title="Options du menu">${I('more')}</button>`,
     body: `<div class="row"><button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.from, -1)}" aria-label="Menu précédent">${I('back', 's')}</button>
       <div class="grow c"><b>${range}</b><span class="muted small block">${days.length} jours</span></div>
       <button class="btn sm sec2" data-a="menu-nav" data-d="${addDays(menu.to, 1)}" aria-label="Menu suivant">${I('chev', 's')}</button></div>
-      ${budgetCard()}
       <div class="row end wrap" style="margin:6px 0 4px">${!days.includes(today()) ? '<button class="btn sm sec2" data-a="menu-nav" data-d="">Aujourd’hui</button>' : ''}</div>
-      ${body}
-      ${wishesHtml()}`,
+      ${body}`,
   };
 }
 // ---------- Envies de plats (sans date) ----------
@@ -108,18 +106,16 @@ function wishCard(w) {
   else acts.push(btnI('book', 'Fiche du plat', `href="#/plats/${w.dish_id}"`, 'sec2', 'a'));
   acts.push(btnI('calendar', mgr ? 'Mettre au menu' : 'Suggérer au menu', `data-a="plan-dish" data-id="${w.dish_id}"`, ''));
   if (mgr || (mine && w.status === 'pending')) acts.push(btnI('x', mgr && w.status === 'pending' ? 'Refuser l’envie' : 'Retirer l’envie', `data-a="wish-del" data-id="${w.id}"`, 'sec2 danger-t'));
-  // Gestionnaire : l'envie se glisse sur un creneau libre (souris, ou appui long sur telephone).
-  const drag = mgr && !w.draft ? `${isPc() ? ' draggable="true"' : ''} data-drag="w${w.dish_id}"` : '';
-  return `<div class="card wish"${drag}>${tile(w.name, w.status === 'pending' ? '<span class="pill">à valider</span>' : '', '', w.photo)}
+  return `<div class="card wish">${tile(w.name, w.status === 'pending' ? '<span class="pill">à valider</span>' : '', '', w.photo)}
     <b>${w.draft ? I('edit', 's') + ' ' : ''}${esc(w.name)}</b><span class="muted small">${w.created_by === S.me.id ? 'Votre envie' : `Envie de ${esc(w.created_by_name || '?')}`}</span>${wishCost(w)}
     <div class="btn-row icons">${acts.join('')}</div></div>`;
 }
 const wishCost = (w) => { const d = (S.dishes || []).find((x) => x.id === w.dish_id); return d && d.cost_pp != null ? `<span class="price small">${esc(ppShort(d))} / pers.</span>` : ''; };
-function wishesHtml() {
-  const ws = S.wishes || [];
-  return `<div class="sec">Envies de plats <button data-a="wish-add">＋ Proposer</button></div>
-    ${ws.length ? `<div class="hscroll wishes">${ws.map(wishCard).join('')}</div>` : '<p class="muted small" style="margin:0 4px">Aucune envie pour l’instant. Proposez des plats pour les prochains menus.</p>'}`;
-}
+// Envies de plats : panneau du menu ⋯ (elles passent aussi en tête du choix d'un plat pour un créneau).
+const wishesSheet = () => sheet(`<h3>Envies de plats</h3><p class="muted small">Sans date : elles passent en tête quand on choisit un plat pour un créneau.</p>
+  ${(S.wishes || []).length ? `<div class="hscroll wishes">${S.wishes.map(wishCard).join('')}</div>` : '<p class="muted small">Aucune envie pour l’instant. Proposez des plats pour les prochains menus.</p>'}
+  <div class="row end"><button class="btn sec2" data-a="wish-add">＋ Proposer une envie</button></div>`);
+on('click', 'wishes-open', () => wishesSheet());
 let wq = '';
 function wishSheet() {
   const q = norm(wq.trim()), taken = new Set((S.wishes || []).map((w) => w.dish_id));
@@ -366,13 +362,16 @@ async function moveMeal(id, date, slot) {
   }
 }
 function menuActions() {
+  const w = (S.wishes || []).length;
   return [
-    ...(isManager() && menu.to >= today() ? [['menu-gen', 'Générer le menu', 'spark']] : []),
-    ['menu-export', 'Exporter et partager', 'doc'],
-    ...(isManager() ? [['menu-set', 'Réglages du menu', 'sliders']] : [['menu-slots', 'Repas affichés', 'eye']]),
+    ...(isManager() && menu.to >= today() ? [['menu-gen', 'Générer le menu', 'spark', 'Propose des plats pour les créneaux libres']] : []),
+    ['menu-info', 'Infos du menu', 'tag', `${menu.cost && menu.meals.some((m) => !m.suggestion) ? `Budget ${menu.cost.partial ? 'dès ' : '≈ '}${eur(menu.cost.total)} · ` : ''}${menu.note ? '1 remarque' : 'remarques'}`],
+    ['wishes-open', 'Envies de plats', 'bulb', `${w} envie${w > 1 ? 's' : ''}`],
+    ...(isManager() ? [['menu-set', 'Réglages du menu', 'sliders', 'Dates · repas affichés']] : [['menu-slots', 'Repas affichés', 'eye', '']]),
+    ['menu-export', 'Exporter et partager', 'doc', 'A4, impression, PDF, lien d’affichage'],
   ];
 }
-on('click', 'menu-more', () => sheet(`<h3>Menu</h3><div class="menu-pop">${menuActions().map(([a, t, ic]) => `<button data-a="${a}"><span class="ico">${I(ic)}</span>${t}</button>`).join('')}</div>`));
+on('click', 'menu-more', () => sheet(`<h3>Menu</h3><div class="menu-pop">${menuActions().map(([a, t, ic, sub]) => `<button data-a="${a}"><span class="ico">${I(ic)}</span><span style="display:grid;text-align:left"><span>${t}</span>${sub ? `<span class="muted small">${sub}</span>` : ''}</span></button>`).join('')}</div>`));
 // Dates et repas affichés : rarement utilises, regroupes.
 on('click', 'menu-set', () => sheet(`<h3>Réglages du menu</h3><div class="menu-pop">
   <button data-a="menu-dates"><span class="ico">${I('calendar')}</span>${menu.period.saved ? 'Modifier les dates' : 'Fixer les dates'}</button>

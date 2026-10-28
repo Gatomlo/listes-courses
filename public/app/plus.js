@@ -11,31 +11,33 @@ const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const row = (href, ic, title, sub, cls = '') => `<a class="item click ${cls}" href="${href}"><span class="ico">${I(ic)}</span><span class="grow"><b>${title}</b>${sub ? `<span class="muted block">${sub}</span>` : ''}</span>${I('chev', 's chev')}</a>`;
 const act = (a, ic, title, sub, cls = '') => `<button class="item click ${cls}" data-a="${a}"><span class="ico ${cls.includes('leaf') ? 'leaf' : ''}">${I(ic)}</span><span class="grow"><b>${title}</b>${sub ? `<span class="muted block">${sub}</span>` : ''}</span>${I('chev', 's chev')}</button>`;
 
-// ---------- Onglet Plus ----------
-// Gestionnaire : outils du foyer + profil ; membre : son profil seulement.
+// ---------- Menu ☰ / onglet Plus ----------
+// Gestionnaire : profil + Produits, Magasins, Promos, Historique, Foyer ; membre : son profil seulement.
+// Le reste (rappel, installation, mot de passe, quitter, deconnexion) est dans le panneau Profil.
 function plusBody() {
   const H = S.house, me = H.members.find((m) => m.me) || { name: S.me.name };
-  return `<a class="card click row" href="#/foyers"><span class="avatar">${esc((me.name || '?')[0])}</span><span class="grow"><b>${esc(S.me.name)}</b><span class="muted block">${isManager() ? 'Gestionnaire' : 'Membre'} · ${esc(H.household.name)} · changer de foyer</span></span>${I('chev', 's chev')}</a>
+  return `<button class="card click row" data-a="profile"><span class="avatar">${esc((me.name || '?')[0])}</span><span class="grow"><b>${esc(S.me.name)}</b><span class="muted block">${isManager() ? 'Gestionnaire' : 'Membre'} · ${esc(H.household.name)} · profil et rappel</span></span>${I('chev', 's chev')}</button>
       ${isManager() ? `<div class="group tiles">
         ${row('#/catalogue', 'tag', 'Produits', 'Prix moyens, relevés, magasin conseillé')}
         ${row('#/magasins', 'store', 'Magasins', 'Couleurs, magasins actifs, parcours des rayons')}
         ${row('#/promos', 'flame', 'Promos', 'Promos signalées en cours')}
         ${act('history', 'clock', 'Historique des listes', 'Listes clôturées')}
-        ${row('#/foyer', 'users', 'Foyer', `${H.members.length} membre${H.members.length > 1 ? 's' : ''} · réglages · tags des plats`)}
-      </div>
-      <div class="group tiles">
-        ${act('csv-open', 'upload', 'Importer des produits', 'Fichier CSV, avec relevés de prix')}
-        ${act('dish-csv-open', 'upload', 'Importer des plats', 'Fichier CSV : repas, tags, ingrédients')}
-        ${row('#/menu/export', 'link', 'Export et lien d’affichage du menu', 'A4 à imprimer, page publique en lecture seule')}
-      </div>` : ''}
-      <div class="group tiles">
-        ${act('push-open', 'bell', 'Rappels de la veille', rappelsSub())}
-        ${isInstalled() ? '' : act('install', 'phone', 'Installer l’app', 'Sur l’écran d’accueil, utilisable sans réseau', 'leaf')}
-        ${act('me-password', 'lock', S.me.hasPassword ? 'Changer mon mot de passe' : 'Choisir un mot de passe', '')}
-        ${isManager() || !me.id ? '' : `<button class="item click danger-t" data-a="member-del" data-id="${me.id}"><span class="ico">${I('x')}</span><span class="grow"><b>Quitter le foyer</b><span class="muted block">${esc(H.household.name)}</span></span>${I('chev', 's chev')}</button>`}
-        ${act('logout', 'logout', 'Se déconnecter', '', 'danger-t')}
-      </div>`;
+        ${row('#/foyer', 'users', 'Foyer', `${H.members.length} membre${H.members.length > 1 ? 's' : ''} · réglages · avancé`)}
+      </div>` : ''}`;
 }
+// Profil : rappel de la veille, installation, foyers, mot de passe, quitter le foyer, deconnexion.
+on('click', 'profile', () => {
+  const H = S.house, me = H.members.find((m) => m.me) || { name: S.me.name };
+  sheet(`<div class="row gap" style="margin-bottom:10px"><span class="avatar">${esc((me.name || '?')[0])}</span><span class="grow"><b>${esc(S.me.name)}</b><span class="muted block">${isManager() ? 'Gestionnaire' : 'Membre'} · ${esc(H.household.name)}</span></span></div>
+    <div class="group tiles">
+      ${act('push-open', 'bell', 'Rappel de la veille', rappelsSub())}
+      ${isInstalled() ? '' : act('install', 'phone', 'Installer l’app', 'Sur l’écran d’accueil, utilisable sans réseau', 'leaf')}
+      ${row('#/foyers', 'users', 'Mes foyers', 'Changer de foyer')}
+      ${act('me-password', 'lock', S.me.hasPassword ? 'Changer mon mot de passe' : 'Choisir un mot de passe', '')}
+      ${isManager() || !me.id ? '' : `<button class="item click danger-t" data-a="member-del" data-id="${me.id}"><span class="ico">${I('x')}</span><span class="grow"><b>Quitter le foyer</b><span class="muted block">${esc(H.household.name)}</span></span>${I('chev', 's chev')}</button>`}
+      ${act('logout', 'logout', 'Se déconnecter', '', 'danger-t')}
+    </div>`);
+});
 export const plusView = () => ({ title: 'Plus', sub: S.house.household.name, body: plusBody() });
 // Menu du haut (telephone) : meme contenu que l'ancien onglet Plus.
 export const topMenu = () => topSheet(plusBody());
