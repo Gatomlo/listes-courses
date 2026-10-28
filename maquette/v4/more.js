@@ -65,29 +65,36 @@ function spark(rs) {
 VIEWS.product = (t) => {
   const p = P[t.id], rs = records(p.id), adv = advised(p.id);
   const inLists = LISTS.filter((l) => l.status !== 'closed' && l.items.some((i) => i.pid === p.id));
+  const more = S.q.pmore, hist = S.q.phist;
+  const rec = (r) => `<div class="row">${dotS(r.st)}<span class="grow">${fmtD(r.date, { day: 'numeric', month: 'short', year: 'numeric' })}<span class="sub" style="display:block">${STORES[r.st].n} · ${{ ticket: 'ticket scanné', caisse: 'prix payé en magasin', manuel: 'saisi à la main' }[r.src]}</span></span><b class="num">${eur(r.price)}</b></div>`;
   return {
-    title: p.n, sub: `${catLabel(p)} · ${p.u}`,
+    title: p.n, sub: `${catLabel(p)} · ${p.u}${inLists.length ? ` · dans ${plural(inLists.length, 'liste')}` : ''}`,
     actions: `<button class="ib" data-a="prod-menu" data-id="${p.id}" aria-label="Actions">${I('more')}</button>`,
     body: `<div class="cols"><div>
       <div class="cmp">${activeStores().map((s) => `<div style="--c:${STORES[s].c};--cs:${STORES[s].cs}" class="${adv === s ? 'best' : ''}"><div class="between"><b class="small">${STORES[s].n}</b>${adv === s ? `<span class="xs b">${p.imp === s ? 'imposé' : 'conseillé'}</span>` : ''}</div>
         <div class="big num" style="margin:6px 0 2px">${eur(price(p.id, s))}</div><div class="xs">${promoOf(p.id, s) ? `promo · moyenne ${eur(p.avg[s])}` : p.avg[s] == null ? 'aucun relevé' : `moyenne · ${Math.min(p.rc, HOUSE.records)} relevés`}</div></div>`).join('')}</div>
-      ${rs.length > 1 ? `<div class="card" style="margin-top:12px"><div class="between small"><b>Évolution</b><span class="hstack">${['co', 'im'].map((s) => `${dotS(s)} <span class="muted">${STORES[s].n}</span>`).join(' ')}</span></div>${spark(rs)}</div>` : ''}
-      <div class="sh"><span>Relevés</span><button data-a="rec-add" data-id="${p.id}">＋ Relevé</button></div>
-      <div class="group">${rs.slice(0, 8).map((r) => `<div class="row">${dotS(r.st)}<span class="grow">${fmtD(r.date, { day: 'numeric', month: 'short', year: 'numeric' })}<span class="sub" style="display:block">${STORES[r.st].n} · ${{ ticket: 'ticket scanné', caisse: 'prix payé en magasin', manuel: 'saisi à la main' }[r.src]}</span></span><b class="num">${eur(r.price)}</b></div>`).join('') || '<p class="empty">Aucun relevé.</p>'}</div>
-      </div><div class="side-col">
-      <div class="sh"><span>Réglages</span></div>
-      <div class="group">
+      <div class="group" style="margin-top:12px">
         <label class="row"><span class="grow">Magasin</span><select class="in" style="width:58%;height:38px"><option>Conseil : le moins cher</option>${activeStores().map((s) => `<option ${p.imp === s ? 'selected' : ''}>Toujours ${STORES[s].n}</option>`).join('')}</select></label>
-        <label class="row"><span class="grow">Rayon<span class="sub" style="display:block">et sous-rayon, facultatif</span></span><select class="in" style="width:58%;height:38px" data-ch="prod-cat" data-id="${p.id}">${catOptions(p.sub ? `${p.cat}:${p.sub}` : p.cat)}</select></label>
-        <button class="row tap" data-a="pk-t"><span class="grow">Emballage<span class="sub" style="display:block">${p.u} · pour comparer les prix</span></span>${I(S.q.pkOpen ? 'down' : 'chev', 's chev')}</button>
-        ${S.q.pkOpen ? `<label class="row"><span class="grow">Type</span><input class="in" style="width:58%;height:38px" value="${p.u}"></label><label class="row"><span class="grow">Contenance<span class="sub" style="display:block">ex. 500 g, 6 x 33 cl</span></span><input class="in" style="width:58%;height:38px" placeholder="500 g"></label>` : ''}
-        <div class="row"><span class="grow">Ingrédient de base<span class="sub" style="display:block">vérifié, pas ajouté d’office</span></span><span class="sw ${p.base ? 'on' : ''}"></span></div>
-        <div class="row"><span class="grow">Récurrent</span><span class="pill">${p.rec ? (p.rec === 1 ? 'chaque liste' : `toutes les ${p.rec} listes`) : 'non'}</span></div>
+        <label class="row"><span class="grow">Rayon</span><select class="in" style="width:58%;height:38px" data-ch="prod-cat" data-id="${p.id}">${catOptions(p.sub ? `${p.cat}:${p.sub}` : p.cat)}</select></label>
+        <button class="row tap" data-a="pm-t"><span class="grow">Plus de réglages<span class="sub" style="display:block">${more ? 'masquer' : 'emballage, produit de base, récurrent'}</span></span>${I(more ? 'down' : 'chev', 's chev')}</button>
+        ${!more ? '' : `<label class="row"><span class="grow">Emballage</span><input class="in" style="width:58%;height:38px" value="${p.u}"></label>
+          <label class="row"><span class="grow">Contenance<span class="sub" style="display:block">ex. 500 g, 6 x 33 cl</span></span><input class="in" style="width:58%;height:38px" placeholder="500 g"></label>
+          <div class="row"><span class="grow">Ingrédient de base<span class="sub" style="display:block">vérifié, pas ajouté d’office</span></span><span class="sw ${p.base ? 'on' : ''}"></span></div>
+          <div class="row"><span class="grow">Récurrent</span><span class="pill">${p.rec ? (p.rec === 1 ? 'chaque liste' : `toutes les ${p.rec} listes`) : 'non'}</span></div>
+          ${inLists.map((l) => `<button class="row tap" data-a="go" data-v="list" data-id="${l.id}"><span class="grow">Dans ${listName(l)}</span>${I('chev', 's chev')}</button>`).join('')}`}
       </div>
-      ${inLists.length ? `<div class="sh"><span>Dans les listes</span></div><div class="group">${inLists.map((l) => `<button class="row tap" data-a="go" data-v="list" data-id="${l.id}"><span class="grow">${listName(l)}</span>${I('chev', 's chev')}</button>`).join('')}</div>` : ''}
+      </div><div class="side-col">
+      <div class="sh"><span>Derniers relevés</span></div>
+      <div class="group">${rs.slice(0, 3).map(rec).join('') || '<p class="empty">Aucun relevé.</p>'}
+        ${rs.length > 3 || rs.length > 1 ? `<button class="row tap" data-a="ph-t"><span class="grow">${hist ? 'Masquer' : `Courbe et historique (${rs.length})`}</span>${I(hist ? 'up' : 'down', 's chev')}</button>` : ''}</div>
+      ${hist ? `${rs.length > 1 ? `<div class="card" style="margin-top:10px"><div class="between small"><b>Évolution</b><span class="hstack">${['co', 'im'].map((s) => `${dotS(s)} <span class="muted">${STORES[s].n}</span>`).join(' ')}</span></div>${spark(rs)}</div>` : ''}
+        <div class="group" style="margin-top:10px">${rs.slice(3, 12).map(rec).join('')}</div>` : ''}
       </div></div>`,
+    dock: `<button class="addbar" data-a="rec-add" data-id="${p.id}">${I('plus')}<span class="grow">Ajouter un relevé de prix</span></button>`,
   };
 };
+A['pm-t'] = () => { S.q.pmore = !S.q.pmore; render(); };
+A['ph-t'] = () => { S.q.phist = !S.q.phist; render(); };
 A['pk-t'] = () => { S.q.pkOpen = !S.q.pkOpen; render(); };
 A['rec-add'] = (el) => sheet(`<h3>Nouveau relevé</h3><p class="lead">${P[el.dataset.id].n}</p>
   <div class="stack"><div class="seg">${activeStores().map((s, k) => `<button class="${k ? '' : 'on'}">${STORES[s].n}</button>`).join('')}</div>

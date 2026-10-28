@@ -16,7 +16,9 @@ const closeDue = () => (isM() ? LISTS.filter((l) => l.type === 'dated' && l.stat
   return allDone || overdue(l) ? { l, left, allDone } : null; }).filter(Boolean) : []);
 const closeRows = () => closeDue().map(({ l, left, allDone }) => `<button class="row tap" data-a="close-list" data-id="${l.id}"><span class="ico acc">${I('check')}</span><span class="grow"><b>Clôturer les courses du ${fmtD(l.date, { day: 'numeric', month: 'long' })}</b><span class="sub" style="display:block">${allDone ? 'Tout est pris' : `date passée${left ? ` · ${plural(left, 'article')} non pris` : ''}`}</span></span>${I('chev', 's chev')}</button>`).join('');
 // Un rayon et ses articles ; si le rayon a des sous-rayons, un intitulé par sous-rayon (ordre du magasin).
-const rayonBlock = (cat, xs, st, row) => {
+const rayonBlock = (cat, xs, st, row, flat) => {
+  if (flat && SUBS[cat]) xs = bySub(cat, xs, st).flatMap(([, ys]) => ys);
+  if (flat) return `<div class="rayon">${CATS[cat]}<span class="n">${xs.length}</span></div><div class="group">${xs.map(row).join('')}</div>`;
   const gs = SUBS[cat] ? bySub(cat, xs, st) : [['', xs]];
   const head = `<div class="rayon">${CATS[cat]}<span class="n">${xs.length}</span></div>`;
   if (!SUBS[cat]) return `${head}<div class="group">${xs.map(row).join('')}</div>`;
@@ -170,17 +172,17 @@ VIEWS.list = (t) => {
     actions: `<button class="ib" data-a="list-menu" data-id="${l.id}" aria-label="Actions">${I('more')}</button>`,
     body: `${closeDue().some((x) => x.l === l) ? `<button class="banner" style="width:100%" data-a="close-list" data-id="${l.id}">${I('check')}<span class="grow" style="text-align:left">${counted(l).every((i) => i.done) ? 'Tout est pris : clôturer la liste ?' : 'Courses passées : clôturer la liste ?'}</span>${I('chev', 's')}</button>` : ''}${ticketsBox(ticketsDue(l))}${presence}<div class="cols"><div>${segs}
       ${grouped ? activeStores().map((s) => { const mine = todo.filter((i) => storeOf(i) === s); if (!mine.length) return ''; const tot = mine.reduce((n, i) => n + (price(i.pid, s) ?? 0) * qtyOf(i), 0), unk = mine.filter((i) => price(i.pid, s) == null).length;
-        return `<div class="storehead">${dotS(s)}<b>${STORES[s].n}</b><span class="muted">${plural(mine.length, 'article')}</span><span class="tot num">≈ ${eur(tot)}${unk ? '+' : ''}</span></div>` + ORDER[s].map((cc) => [cc, mine.filter((i) => P[i.pid].cat === cc)]).filter(([, xs]) => xs.length).map(([cc, xs]) => rayonBlock(cc, xs, s, (i) => itemRow(i, l, ro))).join(''); }).join('')
-      : byCat.map(([c, xs]) => rayonBlock(c, xs, f === 'all' ? null : f, (i) => itemRow(i, l, ro))).join('')}
+        return `<div class="storehead">${dotS(s)}<b>${STORES[s].n}</b><span class="muted">${plural(mine.length, 'article')}</span><span class="tot num">≈ ${eur(tot)}${unk ? '+' : ''}</span></div>` + ORDER[s].map((cc) => [cc, mine.filter((i) => P[i.pid].cat === cc)]).filter(([, xs]) => xs.length).map(([cc, xs]) => rayonBlock(cc, xs, s, (i) => itemRow(i, l, ro), true)).join(''); }).join('')
+      : byCat.map(([c, xs]) => rayonBlock(c, xs, f === 'all' ? null : f, (i) => itemRow(i, l, ro), true)).join('')}
       ${!todo.length && !cart.length ? `<div class="empty">${I('basket', 'l')}<p>Rien à acheter${f === 'all' ? '' : ' dans ce magasin'}.</p></div>` : ''}
       ${unav.length ? `<div class="rayon">Indisponibles<span class="n">${unav.length}</span></div><div class="group">${unav.map((i) => itemRow(i, l, ro)).join('')}</div>` : ''}
       ${cart.length ? `<button class="rayon" style="width:100%" data-a="cart-toggle" data-id="${l.id}">${I('cart', 's')} Dans le caddie<span class="n">${cart.length} ${I(S.q['cart' + l.id] ? 'up' : 'down', 's')}</span></button>
         ${S.q['cart' + l.id] ? `<div class="group">${cart.map((i) => itemRow(i, l, ro)).join('')}</div>` : ''}` : ''}
       </div><div class="side-col">${scen}
-      ${meals.length ? `<div class="sh"><span>Repas couverts</span><button data-a="tab" data-t="menu">Menu</button></div>
-        <div class="hscroll">${meals.map((m) => `<button class="card tap" style="width:150px;text-align:left;padding:12px" data-a="meal-open" data-id="${m.id}"><span class="sub">${fmtD(m.date, { weekday: 'short', day: 'numeric' })} · ${SLOTS[m.slot]}</span><div class="b" style="line-height:1.25;margin-top:2px">${DISHES[m.dish].n}</div></button>`).join('')}</div>
-        <div class="card" style="margin-top:8px"><div class="b small">Ingrédients de base à vérifier</div><div class="sub" style="margin:2px 0 8px">Sel, huile, épices : pas ajoutés d’office.</div>
-        <div class="hstack">${['hui', 'cum', 'sel'].map((pid) => `<button class="chip" data-a="add-pid" data-id="${l.id}" data-pid="${pid}">${I('plus', 's')} ${P[pid].n}</button>`).join('')}</div></div>` : ''}
+      ${meals.length ? `<div class="group" style="margin-top:10px"><button class="row tap" data-a="cov-t" data-id="${l.id}"><span class="ico">${I('calendar')}</span><span class="grow"><b>Repas couverts</b><span class="sub" style="display:block">${plural(meals.length, 'repas', 'repas')} · ingrédients de base à vérifier</span></span>${I(S.q['cov' + l.id] ? 'up' : 'down', 's chev')}</button>
+        ${S.q['cov' + l.id] ? `<div style="padding:4px 12px 12px"><div class="hscroll">${meals.map((m) => `<button class="card tap" style="width:150px;text-align:left;padding:12px" data-a="meal-open" data-id="${m.id}"><span class="sub">${fmtD(m.date, { weekday: 'short', day: 'numeric' })} · ${SLOTS[m.slot]}</span><div class="b" style="line-height:1.25;margin-top:2px">${DISHES[m.dish].n}</div></button>`).join('')}</div>
+        <div class="sub" style="margin:10px 0 6px">Sel, huile, épices : pas ajoutés d’office.</div>
+        <div class="hstack">${['hui', 'cum', 'sel'].map((pid) => `<button class="chip" data-a="add-pid" data-id="${l.id}" data-pid="${pid}">${I('plus', 's')} ${P[pid].n}</button>`).join('')}</div></div>` : ''}</div>` : ''}
       </div></div>`,
     dock: ro ? null : `<button class="addbar" data-a="add-sheet" data-id="${l.id}">${I('plus')} <span class="grow">${isM() ? 'Ajouter un article' : 'Suggérer un article'}</span>${I('search', 's')}</button>
       ${l.type === 'dated' ? `<button class="btn" data-a="shop-pick" data-id="${l.id}" aria-label="Mode courses">${I('cart')}</button>` : ''}`,
@@ -188,21 +190,17 @@ VIEWS.list = (t) => {
 };
 function itemRow(i, l, ro) {
   const p = P[i.pid], st = storeOf(i), pr = price(i.pid, st), promo = promoOf(i.pid, st);
-  const meta = [
-    i.from.length ? `<span>${I('bowl', 's')} ${i.from.length > 1 ? `${i.from[0]} +${i.from.length - 1}` : i.from[0]}</span>` : '',
-    i.need ? `<span>${i.need}</span>` : '',
-    i.note ? `<span>${I('note', 's')} ${esc(i.note)}</span>` : '',
-    p.rec ? `<span>${I('repeat', 's')} récurrent</span>` : '',
-    i.sugg ? `<span style="color:var(--warn)">${I('bulb', 's')} suggéré par ${i.sugg}</span>` : '',
-    i.unav ? `<span>${I('ban', 's')} indisponible</span>` : '',
-  ].join('');
+  // Un seul détail sous le nom (le reste est dans la fiche) : suggestion, indisponible, repas, besoin ou note.
+  const meta = i.sugg ? `<span style="color:var(--warn)">${I('bulb', 's')} suggéré par ${i.sugg}</span>` : i.unav ? `<span>${I('ban', 's')} indisponible</span>`
+    : i.from.length ? `<span>${I('bowl', 's')} ${i.from.length > 1 ? `${i.from[0]} +${i.from.length - 1}` : i.from[0]}</span>` : i.need ? `<span>${i.need}</span>` : i.note ? `<span>${I('note', 's')} ${esc(i.note)}</span>` : '';
   // Pas de prix ni de magasin sur chaque ligne : le magasin est le groupe, le prix est dans la fiche.
   const right = l.type === 'backlog' || (l.type === 'dated' && !ro) ? (promo ? '<span class="pill warn">promo</span>' : '') : `<span class="px"><b class="num small" ${promo ? 'style="color:var(--warn)"' : ''}>${eur(pr == null ? null : pr * qtyOf(i))}</b></span>`;
   const ck = i.sugg && isM() ? `<button class="ib solid" style="color:var(--accent)" data-a="sugg-ok-row" data-id="${i.id}" aria-label="Accepter">${I('check')}</button>`
     : `<button class="ck ${i.done ? 'on' : ''}" data-a="check" data-id="${i.id}" ${ro || i.sugg ? 'disabled' : ''} aria-label="Acheté">${I('check')}</button>`;
   return `<div class="item ${i.done ? 'done' : ''} ${i.sugg ? 'sugg' : ''} ${i.unav ? 'unav' : ''}" id="it${i.id}">${ck}
-    <button class="grow" style="text-align:left" data-a="item-open" data-id="${i.id}"><div class="nm">${p.n} <span class="faint small" style="font-weight:500">${qtyOf(i) > 1 ? '× ' + qtyOf(i) : ''}</span></div><div class="meta">${meta || `<span>${p.u}</span>`}</div></button>${right}</div>`;
+    <button class="grow" style="text-align:left" data-a="item-open" data-id="${i.id}"><div class="nm">${p.n} <span class="faint small" style="font-weight:500">${qtyOf(i) > 1 ? '× ' + qtyOf(i) : ''}</span></div>${meta ? `<div class="meta">${meta}</div>` : ''}</button>${right}</div>`;
 }
+A['cov-t'] = (el) => { S.q['cov' + el.dataset.id] = !S.q['cov' + el.dataset.id]; render(); };
 A.lfilter = (el) => { S.q['ls' + el.dataset.id] = el.dataset.f; render(); };
 A['cart-toggle'] = (el) => { S.q['cart' + el.dataset.id] = !S.q['cart' + el.dataset.id]; render(); };
 A.check = (el) => {
@@ -283,8 +281,9 @@ A['item-open'] = (el) => {
     ${!S.q.itemMore ? '' : `${i.from.length ? `<div class="sh"><span>Pour les repas</span></div><div class="group">${i.from.map((d) => `<div class="row">${I('bowl')}<span class="grow">${d}</span></div>`).join('')}
       <button class="row tap" data-a="in-stock" data-id="${i.id}"><span class="ico">${I('box')}</span><span class="grow"><b>Déjà en réserve</b><span class="sub" style="display:block">Retiré des repas, il ne reviendra pas</span></span></button></div>` : ''}
     <div class="sh"><span>Prix</span><button data-a="go" data-v="product" data-id="${p.id}">Fiche produit</button></div>
-    <div class="cmp">${activeStores().map((s) => `<div style="--c:${STORES[s].c};--cs:${STORES[s].cs}" class="${advised(p.id) === s ? 'best' : ''}"><div class="small b">${STORES[s].n}</div><div class="big num" style="margin-top:4px">${eur(price(p.id, s))}</div>${promoOf(p.id, s) ? '<div class="xs b">promo</div>' : ''}</div>`).join('')}</div>`}
-    <div class="foot btn-row">${bI('doc', 'Fiche produit', `data-a="go" data-v="product" data-id="${p.id}"`)}${bI('tag', 'Promo', 'data-a="promo-add"')}${bI('move', 'Déplacer', `data-a="item-move" data-id="${i.id}"`)}${bI('trash', 'Retirer', `data-a="item-del" data-id="${i.id}"`, 'danger')}</div>`);
+    <div class="cmp">${activeStores().map((s) => `<div style="--c:${STORES[s].c};--cs:${STORES[s].cs}" class="${advised(p.id) === s ? 'best' : ''}"><div class="small b">${STORES[s].n}</div><div class="big num" style="margin-top:4px">${eur(price(p.id, s))}</div>${promoOf(p.id, s) ? '<div class="xs b">promo</div>' : ''}</div>`).join('')}</div>
+    <div class="btn-row" style="margin-top:10px">${bI('tag', 'Ajouter une promo', 'data-a="promo-add"')}${bI('move', 'Déplacer', `data-a="item-move" data-id="${i.id}"`)}</div>`}
+    <div class="foot btn-row">${bI('doc', 'Fiche produit', `data-a="go" data-v="product" data-id="${p.id}"`)}${bI('trash', 'Retirer', `data-a="item-del" data-id="${i.id}"`, 'danger')}</div>`);
 };
 A['item-more'] = () => { S.q.itemMore = !S.q.itemMore; refresh(); };
 A.qty = (el) => { const { i } = findItem(el.dataset.id); i.q = Math.max(0, i.q + Number(el.dataset.d)); if (qtyOf(i) < 1) i.q = 1 - i.mq > 0 ? 1 - i.mq : 0; queued(); refresh(); render(); };
