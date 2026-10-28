@@ -108,7 +108,7 @@ VIEWS.lists = () => {
     <span class="grow"><b>${listName(l)}</b><span class="sub" style="display:block">${plural(counted(l).length, 'article')}${l.status === 'closed' ? '' : ` · ≈ ${eur(scenarios(l).plan.total)}`}</span></span>${statusPill(l)}${I('chev', 's chev')}</button>`;
   return {
     title: 'Listes', sub: 'À prévoir et prochaine liste', large: true,
-    body: `${ticketsBox(LISTS.flatMap(ticketsDue))}<div class="home-grid"><div>
+    body: `<div class="home-grid"><div>
         <div class="sh"><span>À prévoir</span><button data-a="go" data-v="list" data-id="ap">Ouvrir</button></div>
         ${backlogCard()}
         <div class="btn-row" style="margin-top:10px">${bI('plus', 'Ajouter à « À prévoir »', `data-a="add-sheet" data-id="ap"`)}</div>
@@ -414,7 +414,7 @@ VIEWS.shop = (t) => {
   const order = st === 'all' ? Object.keys(CATS) : [...ORDER[st], ...Object.keys(CATS).filter((c) => !ORDER[st].includes(c))];
   const badge = (i) => (st === 'all' ? sp(storeOf(i)) : storeOf(i) !== st ? sp(storeOf(i), 'conseillé chez ' + STORES[storeOf(i)].n) : '');
   return {
-    title: shopName(st), cls: 'shop', noTabs: true,
+    title: activeStores().length > 1 ? `<button style="display:inline-flex;align-items:center;gap:4px;font:inherit;color:inherit" data-a="shop-pick" data-id="${l.id}" data-sw="1" aria-label="Changer de magasin">${shopName(st)} ${I('down', 's')}</button>` : shopName(st), cls: 'shop', noTabs: true,
     actions: activeStores().length > 1 ? `<button class="ib" data-a="shop-pick" data-id="${l.id}" data-sw="1" aria-label="Changer de magasin">${I('store')}</button>` : '',
     body: `<div class="shopbar2" style="--c:${col}"><span class="mid num">${cart.length}/${mine.length}</span><div class="prog"><i style="width:${pct}%"></i></div><b class="num small">≈ ${eur(est)}</b><span title="Léa est aussi sur cette liste">${avatar(MEMBERS[1], 's')}</span></div>
       ${others.length ? `<button class="fbar" data-a="shop-filters" data-id="${l.id}" data-st="${st}"><span class="dots">${others.filter((s) => !hidden.includes(s)).slice(0, 4).map(dotS).join('')}</span><span class="grow">${!hidden.length ? 'Articles des autres magasins affichés' : others.some((s) => !hidden.includes(s)) ? `${others.filter((s) => !hidden.includes(s)).length} autre(s) magasin(s) affiché(s) · ${real.filter((i) => !i.done && hidden.includes(storeOf(i)) && storeOf(i) !== st).length} masqué(s)` : `Seulement ce magasin · ${real.filter((i) => !i.done && hidden.includes(storeOf(i)) && storeOf(i) !== st).length} masqué(s)`}</span>${I('down', 's')}</button>` : ''}

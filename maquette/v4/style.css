@@ -437,3 +437,9 @@ ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;
 /* v4 : l'entrée Plats n'existe dans la barre qu'en mode PC (sur téléphone : dans le Menu et le menu ☰). */
 .nav .tab.pc-only{display:none}
 .device.pc .nav .tab.pc-only{display:flex}
+
+/* v4 : fiche plat, onglets en icônes sur téléphone (libellés sur PC) ; infos sous les onglets sur téléphone, sous la photo sur PC. */
+.seg.tabs .tl{display:none}
+.device.pc .seg.tabs .tl{display:inline}
+.ph-only{display:block}.pc-show{display:none}
+.device.pc .ph-only{display:none}.device.pc .pc-show{display:block}

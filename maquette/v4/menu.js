@@ -291,12 +291,23 @@ const fmtQ = (q) => String(Math.round(q * 10) / 10).replace('.', ',');
 const UNITS = { g: 'g', ml: 'ml', cc: 'CC', cs: 'CS', pc: 'pièce' };
 const ingText = ([pid, q, u], f = 1) => (q == null ? 'selon goût' : u ? (u === 'g' && q * f >= 1000 ? `${fmtQ((q * f) / 1000)} kg` : `${fmtQ(q * f)} ${UNITS[u]}${u === 'pc' && q * f > 1 ? 's' : ''}`) : `${fmtQ(q * f)} × ${P[pid].u}`);
 VIEWS.dish = (t) => {
-  const k = t.id, d = DISHES[k], tabK = S.q['dtab' + k] || (d.parts ? 'parts' : 'ing');
+  const k = t.id, d = DISHES[k];
   const canEdit = isM() || (d.draft === 'Thomas');
   const used = Object.keys(DISHES).filter((x) => (DISHES[x].parts || []).some(([p]) => p === k));
-  const tabs = [['ing', 'Ingrédients'], ['rec', 'Recette'], ...(d.parts ? [['parts', 'Composition']] : []), ['adv', 'Avancé']];
+  // Onglets en tête, icône seule sur téléphone ; « Général » (nom, portions, temps, repas, types, tags) seulement en modification.
+  const tabs = [...(t.edit ? [['gen', 'Général', 'sliders']] : []), ['ing', 'Ingrédients', 'basket'], ['rec', 'Recette', 'book'], ...(d.parts ? [['parts', 'Composition', 'puzzle']] : []), ['adv', 'Avancé', 'clock']];
+  const tabK = tabs.some(([x]) => x === S.q['dtab' + k]) ? S.q['dtab' + k] : t.edit && d.isNew ? 'gen' : d.parts ? 'parts' : 'ing';
+  const slotsTxt = (d.slots || ['midi', 'soir']).map((x) => SLOTS[x]).join(', ');
+  const infoRo = `<div class="group" style="margin-top:12px">${[['Portions', `${d.p} personne${d.p > 1 ? 's' : ''}`], ['Coût', dishCost(k).pp != null ? `${ppShort(k)} / pers.${dishCost(k).partial ? ` · ${plural(dishCost(k).missing, 'ingrédient')} sans prix` : ''}` : ''], ['Temps', d.t || ''], ['Repas', slotsTxt], ['Types', DTYPE[k] || ''], ['Tags', tagsOf(k).map((x) => '#' + x).join(' ')]].filter(([, v]) => v)
+    .map(([a, b]) => `<div class="row"><span class="muted" style="width:76px">${a}</span><span class="grow">${esc(b)}</span></div>`).join('')}</div>`;
+  const usedTxt = used.length ? `<p class="small" style="margin:8px 2px">${I('puzzle', 's')} Recette de ${used.map((x) => `<button style="color:var(--plum);font-weight:650" data-a="go" data-v="dish" data-id="${x}">${DISHES[x].n}</button>`).join(', ')}</p>` : '';
   const ingRow = (g, del) => `<div class="ing"><span class="grow">${P[g[0]].n}${P[g[0]].base ? ' <span class="pill">de base</span>' : ''}</span><span class="q">${ingText(g)}</span>${!t.edit && ingCostOf(g) != null ? `<span class="sub" style="min-width:52px;text-align:right">≈ ${eur(ingCostOf(g))}</span>` : ''}${del && t.edit ? `<button class="ib" data-a="noop" aria-label="Retirer">${I('x', 's')}</button>` : ''}</div>`;
   const body = {
+    gen: `<div class="stack"><label class="field"><span>Nom</span><input class="in" value="${esc(d.n)}" data-ch="dish-name" data-id="${k}"></label>
+        <div class="grid2"><label class="field"><span>Portions de référence</span><input class="in" type="number" value="${d.p}"></label><label class="field"><span>Temps</span><input class="in" value="${d.t || ''}" placeholder="45 min"></label></div>
+        <div class="field"><span>Repas possibles <span class="sub">génération du menu</span></span><div class="chips" style="flex-wrap:wrap">${Object.entries(SLOTS).map(([x, n]) => `<button class="chip ${(d.slots || ['midi', 'soir']).includes(x) ? 'on' : ''}" data-a="noop">${n}</button>`).join('')}</div></div>
+        <div class="field"><span>Types <span class="sub">modèles de semaine</span></span><div class="chips" style="flex-wrap:wrap">${DTYPES.map((x) => `<button class="chip ${DTYPE[k] === x ? 'on' : ''}" data-a="noop">${x}</button>`).join('')}</div></div>
+        <label class="field"><span>Tags</span><input class="in" value="${d.tags.join(', ')}" placeholder="rapide, végé, hiver…"><span class="sub">« Économique » est automatique : coût par personne sous le palier des réglages${isEco(k) ? ' (ce plat l’a)' : ''}.</span></label></div>`,
     ing: `<div class="card">${d.ings.map((g) => ingRow(g, true)).join('') || `<p class="muted" style="margin:6px 0">${d.parts ? 'Rien en plus des recettes.' : 'Aucun ingrédient : simple rappel dans la liste.'}</p>`}
         ${t.edit ? `<div class="search" style="margin-top:8px">${I('plus')}<input class="in" placeholder="Ajouter un ingrédient (produit)…" style="background:var(--raised);box-shadow:none"></div>` : ''}</div>
       ${(d.groups || []).map((g) => `<div class="sh"><span>Variante · ${g.g}</span><span class="xs" style="text-transform:none;letter-spacing:0">un choix au menu</span></div><div class="card">${g.o.map(([o, xs]) => `<div class="ing"><b class="grow">${o}</b><span class="sub">${xs.map(([pid]) => P[pid].n).join(', ') || 'rien en plus'}</span></div>`).join('')}</div>`).join('')}
@@ -315,21 +326,21 @@ VIEWS.dish = (t) => {
   }[tabK];
   return {
     title: d.n, sub: '',
-    actions: canEdit ? (t.edit ? `<button class="btn sm" data-a="dish-save" data-id="${k}">${d.draft && isM() ? 'Valider' : 'Enregistrer'}</button>` : `<button class="ib" data-a="dish-edit" data-id="${k}" aria-label="Modifier">${I('edit')}</button><button class="ib" data-a="dish-menu" data-id="${k}" aria-label="Actions">${I('more')}</button>`) : '',
+    actions: canEdit ? (t.edit ? `${k && isM() && !d.isNew ? `<button class="ib" data-a="dish-merge" data-id="${k}" aria-label="Fusionner avec un autre plat">${I('merge')}</button><button class="ib" data-a="dish-del" data-id="${k}" aria-label="Supprimer">${I('trash')}</button>` : ''}${d.isNew ? '' : `<button class="btn sm sec" data-a="dish-cancel" data-id="${k}">Annuler</button>`}<button class="btn sm" data-a="dish-save" data-id="${k}">${d.draft && isM() ? 'Valider la fiche' : 'Enregistrer'}</button>` : `<button class="ib" data-a="dish-edit" data-id="${k}" aria-label="Modifier">${I('edit')}</button><button class="ib" data-a="dish-menu" data-id="${k}" aria-label="Actions">${I('more')}</button>`) : '',
     body: `${d.draft ? `<div class="banner">${I('edit')}<span class="grow">Proposé par ${d.draft} · à valider par un gestionnaire</span></div>` : ''}
       <div class="cols"><div>${tile(k, 'dhero', `${d.parts ? `<span class="pill">${I('puzzle', 's')} plat composé</span>` : ''}${tagsOf(k).map((x) => `<span class="pill">#${x}</span>`).join('')}`)}
-      ${t.edit ? `<div class="stack" style="margin-top:14px"><label class="field"><span>Nom</span><input class="in" value="${esc(d.n)}" data-ch="dish-name" data-id="${k}"></label>
-        <div class="grid2"><label class="field"><span>Portions</span><input class="in" type="number" value="${d.p}"></label><label class="field"><span>Temps</span><input class="in" value="${d.t || ''}" placeholder="45 min"></label></div>
-        <label class="field"><span>Tags</span><input class="in" value="${d.tags.join(', ')}" placeholder="rapide, végé, hiver…"><span class="sub">« Économique » est automatique : coût par personne sous le palier des réglages${isEco(k) ? ' (ce plat l’a)' : ''}.</span></label></div>`
-      : `<h1 class="mid" style="font-size:26px;margin:14px 2px 4px">${d.n}</h1><div class="hstack small muted" style="margin:0 2px 4px">${I('people', 's')} ${d.p} pers.${dishCost(k).pp != null ? ` · <b>${ppShort(k)} / pers.</b>${dishCost(k).partial ? ` (${plural(dishCost(k).missing, 'ingrédient')} sans prix)` : ''}` : ''}${d.t ? ` · ${I('clock', 's')} ${d.t}` : ''}${used.length ? ` · dans ${used.map((x) => `<button style="color:var(--plum);font-weight:650" data-a="go" data-v="dish" data-id="${x}">${DISHES[x].n}</button>`).join(', ')}` : ''}</div>`}
+      ${t.edit ? `<div class="btn-row" style="margin-top:8px">${bI('camera', 'Ajouter une photo', 'data-a="noop"')}</div>` : `<div class="pc-show">${infoRo}</div>`}
+      ${usedTxt}
       </div><div>
-      <div class="seg" style="margin:14px 0 12px">${tabs.map(([x, n]) => `<button class="${tabK === x ? 'on' : ''}" data-a="dtab" data-id="${k}" data-k="${x}">${n}</button>`).join('')}</div>
-      ${body}</div></div>`,
+      <div class="seg tabs" style="margin:14px 0 12px">${tabs.map(([x, n, ic]) => `<button class="${tabK === x ? 'on' : ''}" data-a="dtab" data-id="${k}" data-k="${x}" aria-label="${n}" title="${n}">${I(ic, 's')}<span class="tl">${n}</span></button>`).join('')}</div>
+      ${body}
+      ${t.edit ? '' : `<div class="ph-only"><div class="sh"><span>Infos</span></div>${infoRo}</div>`}</div></div>`,
     dock: t.edit ? null : `<div class="btn-row" style="flex:1">${bI('book', 'Cuisiner', `data-a="go" data-v="cook" data-id="${k}" data-p="${d.p}"`)}${bI('calendar', isM() ? 'Ajouter au menu' : 'Suggérer au menu', `data-a="dish-plan" data-id="${k}"`, '')}</div>`,
   };
 };
 A.dtab = (el) => { S.q['dtab' + el.dataset.id] = el.dataset.k; render(); };
 A['dish-edit'] = (el) => replace('dish', { id: el.dataset.id, edit: true });
+A['dish-cancel'] = (el) => replace('dish', { id: el.dataset.id });
 CH['dish-name'] = (el) => { DISHES[el.dataset.id].n = el.value; };
 A['dish-save'] = (el) => { if (!needNet()) return; const d = DISHES[el.dataset.id], wasDraft = d.draft; if (isM()) d.draft = null; delete d.isNew; replace('dish', { id: el.dataset.id }); toast(wasDraft && isM() ? 'Fiche validée' : 'Plat enregistré · listes recalculées'); };
 A['dish-menu'] = (el) => sheet(`<h3>${DISHES[el.dataset.id].n}</h3><div class="menu-pop">

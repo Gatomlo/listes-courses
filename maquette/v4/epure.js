@@ -198,3 +198,11 @@ CH['rem-time'] = (el) => { S.q.rem.time = el.value; toast(`Rappel chaque soir à
 A['rem-test'] = () => toast('Notification d’essai envoyée');
 A.pwd = () => sheet(`<h3>Changer mon mot de passe</h3><div class="stack"><label class="field"><span>Mot de passe actuel</span><input class="in" type="password"></label><label class="field"><span>Nouveau mot de passe</span><input class="in" type="password"></label></div><div class="foot"><button class="btn" data-a="close">Enregistrer</button></div>`);
 { const ok = A['wish-ok']; A['wish-ok'] = (el) => { ok(el); refresh(); }; }
+
+// Fusion de plats (doublons) : repas, envies, compositions et historique passent sur le plat gardé.
+A['dish-merge'] = (el) => {
+  const k = el.dataset.id, d = DISHES[k];
+  live(() => `<h3>Fusionner « ${esc(d.n)} »</h3><p class="lead">Repas prévus, envies, compositions et historique passent sur le plat choisi ; « ${esc(d.n)} » est supprimé.</p>
+    <div class="group">${Object.keys(DISHES).filter((x) => x !== k && !DISHES[x].draft).map((x) => `<button class="row tap" data-a="dish-merge-ok" data-id="${k}" data-into="${x}"><span class="grow"><b>${DISHES[x].n}</b><span class="sub" style="display:block">${DISHES[x].times || 0} fois servi</span></span>${I('merge')}</button>`).join('')}</div>`);
+};
+A['dish-merge-ok'] = (el) => confirmSheet(`Fusionner dans « ${DISHES[el.dataset.into].n} » ?`, 'Cette action ne peut pas être annulée.', 'Fusionner', () => { MEALS.forEach((m) => { if (m.dish === el.dataset.id) m.dish = el.dataset.into; }); delete DISHES[el.dataset.id]; S.stack = S.stack.slice(0, -1); render(); toast('Plats fusionnés'); }, false);

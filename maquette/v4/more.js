@@ -8,6 +8,7 @@ A.menu = () => {
       ${isM() ? `${row('products', 'tag', 'Produits', `${Object.keys(P).length} produits · prix moyens`)}
       ${row('stores', 'store', 'Magasins', 'Couleurs, rayons et parcours')}
       ${row('promos', 'flame', 'Promos', `${PROMOS.filter((p) => p.until >= TODAY).length} en cours`)}
+      ${row('history', 'clock', 'Historique des listes', `${LISTS.filter((l) => l.status === 'closed').length} listes clôturées`)}
       ${row('house', 'users', 'Foyer', `${MEMBERS.length} membres · réglages · avancé`)}` : ''}
     </div><div class="handle"></div>`);
 };
@@ -167,14 +168,13 @@ VIEWS.house = () => {
       ${advRow('upload', 'Importer des produits (CSV)', 'Paniers transcrits, avec relevés de prix', 'data-a="csv"')}
       ${advRow('upload', 'Importer des plats (CSV)', 'Nom, ingrédients, variantes, étapes…', 'data-a="csv-dishes"')}
       ${advRow('link', 'Lien d’affichage du menu', 'Lecture seule, sans connexion', 'data-a="menu-share"')}
-      ${advRow('clock', 'Historique des listes', 'Listes clôturées, en lecture seule', 'data-a="go" data-v="history"')}
     </div>`;
   return {
     title: 'Foyer', sub: HOUSE.name,
     body: `${sec('m', 'users', 'Personnes', `${MEMBERS.length} membres${INVITES.length ? ` · ${INVITES.length} invitation en attente` : ''}`, members, true)}
       ${isM() ? sec('s', 'sliders', 'Réglages', 'rythme, seuils, palier économique', settings) : ''}
       ${sec('t', 'tag', 'Menus et plats', `${[...new Set(Object.keys(DISHES).flatMap(tagsOf))].length} tags`, tags)}
-      ${isM() ? sec('a', 'sliders', 'Avancé', 'modèles de semaine, imports, lien d’affichage, historique', advanced) : ''}
+      ${isM() ? sec('a', 'sliders', 'Avancé', 'modèles de semaine, imports, lien d’affichage', advanced) : ''}
       ${isM() ? `<button class="btn ghost" style="margin-top:12px;color:var(--danger)" data-a="noop">Supprimer le foyer</button>` : ''}`,
   };
 };
