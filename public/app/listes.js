@@ -342,10 +342,12 @@ function storeButton(i) {
 function priceHint(i) {
   const here = i.prices[i.at_store_id];
   const others = activeStores().filter((s) => s.id !== i.at_store_id)
-    .map((s) => (i.prices[s.id] == null ? `${esc(s.name)} : prix inconnu` : `${esc(s.name)} ${eur(i.prices[s.id])}`));
+    .map((s) => (i.prices[s.id] == null ? `${esc(s.name)} : prix inconnu` : `${esc(s.name)} ${packPrice(i, s.id)}`));
   if (here == null && others.every((o) => o.includes('inconnu'))) return 'Prix inconnu';
-  return [`${here == null ? 'prix inconnu' : eur(here)} / ${esc(i.unit)}`, ...others].join(' · ');
+  return [here == null ? 'prix inconnu' : (i.packs && i.packs[i.at_store_id] ? packPrice(i, i.at_store_id) : `${eur(here)} / ${esc(i.unit)}`), ...others].join(' · ');
 }
+// Format différent de la référence : coût réel de l'achat (« 8,00 € (1 × 400 g) »).
+const packPrice = (i, sid) => { const k = i.packs && i.packs[sid]; return k ? `${eur(i.prices[sid] * i.qty)} (${k.packs} × ${esc(k.size)})` : eur(i.prices[sid]); };
 function promoPills(i) {
   return i.promos.map((p) => `<span class="pill p-carrot click" data-a="promo" data-pid="${i.product_id}" data-sid="${p.store_id}">${I('tag', 's')} ${esc(storeName(p.store_id))} ${p.price_cents != null ? eur(p.price_cents) : 'promo'} · ${p.list_id ? 'ces courses' : `jusqu'au ${esc(fmtDate(p.valid_until))}`}</span>`).join('');
 }
