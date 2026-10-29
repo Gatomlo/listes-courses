@@ -626,3 +626,9 @@ details.more[open]>summary::after{content:'▴'}
 .sheet button.meal[data-a="pm-cell"] .sl{width:auto}
 .sheet button.meal.free{background:none}
 .sheet button.meal[data-a="pm-cell"].on{outline:2px solid var(--carrot);background:var(--carrot-soft)}
+
+/* Prix à l'unité par magasin : prix alignés à droite, pastille du moins cher dans une colonne fixe */
+.unitp .urow{display:flex;align-items:center;gap:8px;padding:8px 0}
+.unitp .uprice{min-width:92px;text-align:right;font-variant-numeric:tabular-nums}
+.unitp .uslot{width:32px;flex:none;display:flex;justify-content:center}
+.ubadge{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:24px;padding:0 6px;border-radius:12px;background:var(--leaf);color:var(--leaf-ink);font-size:12px;font-weight:700;line-height:1}
