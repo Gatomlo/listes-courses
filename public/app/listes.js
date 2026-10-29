@@ -278,6 +278,14 @@ on('click', 'list-create', async () => {
 // Une ligne par article : quantite × nom (· note), indicateurs courts, prix au magasin
 // retenu, promo, etiquette du magasin. Le detail est dans la fiche. Mode courses (o.shop) :
 // case a cocher, ni prix ni etiquette (magasin en indication si « Tous les magasins »).
+// Quantité à prendre : si le magasin (celui où l'on est en courses, sinon le magasin retenu) vend un autre format
+// que la référence du produit, le nombre d'emballages de ce format (« 1 × 250 g »), sinon « × quantité ».
+function qtyMark(i, o = {}) {
+  const sid = o.shop && !o.allStores && o.here ? o.here : i.at_store_id;
+  const k = i.packs && i.packs[sid];
+  if (k) return ` <span class="faint fw4" title="À prendre chez ${esc(storeName(sid))}">${k.packs} × ${esc(k.size)}</span>`;
+  return i.qty !== 1 ? ` <span class="faint fw4">× ${qtyText(i.qty)}</span>` : '';
+}
 function itemRow(i, l, o = {}) {
   const mgr = isManager(), open = l.status !== 'closed', dated = l.type === 'dated';
   const mine = i.suggestion && i.suggested_by === S.me.id;
@@ -312,7 +320,7 @@ function itemRow(i, l, o = {}) {
   const tap = open && !i.suggestion;
   const swipe = o.shop && open && mgr && i.status === 'todo' && !i.suggestion && !isTemp(i.id);
   const html = `<div class="item line1${i.suggestion ? ' pending' : ''}${i.status === 'bought' && open ? ' done' : ''}${i.deleted ? ' gone' : ''}" id="it${i.id}">${check}
-    <div class="grow nm${tap ? ' click' : ''}" ${tap ? `data-a="item" data-id="${i.id}"` : ''}><span class="t">${esc(i.name)}${i.qty !== 1 ? ` <span class="faint fw4">× ${qtyText(i.qty)}</span>` : ''}</span>
+    <div class="grow nm${tap ? ' click' : ''}" ${tap ? `data-a="item" data-id="${i.id}"` : ''}><span class="t">${esc(i.name)}${qtyMark(i, o)}</span>
       ${simple ? (one ? `<span class="meta">${one}</span>` : '') : `<span class="meta">${meta || `<span>${esc(i.unit)}</span>`}</span>`}</div>${right || (simple && i.promos && i.promos.length ? '<span class="pill p-carrot">promo</span>' : '')}</div>`;
   // Gestionnaire en courses : balayer vers la gauche pour retirer (swipe.js).
   return swipe ? `<div class="swipe"><button class="swipe-del" data-a="shop-del" data-id="${i.id}" tabindex="-1">${I('trash', 's')} Retirer</button>${html.replace('class="item line1', 'data-swipe="1" class="item line1')}</div>` : html;
