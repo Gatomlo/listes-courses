@@ -621,3 +621,8 @@ details.more>summary{list-style:none;cursor:pointer;padding:10px 0;font-weight:6
 details.more>summary::-webkit-details-marker{display:none}
 details.more>summary::after{content:'▾';margin-left:auto;color:var(--muted)}
 details.more[open]>summary::after{content:'▴'}
+/* Apercu du menu dans « Ajouter au menu » */
+.sheet button.meal[data-a="pm-cell"]{flex-direction:column;align-items:flex-start;gap:0;width:auto;flex:1 1 40%;min-height:44px;font-size:13px;box-shadow:none;outline:1px solid var(--line)}
+.sheet button.meal[data-a="pm-cell"] .sl{width:auto}
+.sheet button.meal.free{background:none}
+.sheet button.meal[data-a="pm-cell"].on{outline:2px solid var(--carrot);background:var(--carrot-soft)}

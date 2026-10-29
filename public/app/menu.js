@@ -426,23 +426,44 @@ on('click', 'close-nav', (el) => { closeSheet(); go(el.getAttribute('href')); })
 on('click', 'plan-dish', async (el) => {
   if (!menu) await loadMenu();
   pm = { dish_id: Number(el.dataset.id), date: today(), slot: 'soir', persons: 4, skip: [] };
+  pv = null;
   planSheet();
 });
-function planSheet() {
-  sheet(`<h3>${I('calendar', 's')} Ajouter au menu</h3><label class="muted">Date</label><input class="txt" type="date" value="${pm.date}" min="${today()}" data-ch="pm-date">
-    <div class="sec">Créneau</div><div class="seg">${SLOTS.map((s) => `<button class="${pm.slot === s ? 'on' : ''}" data-a="pm-slot" data-s="${s}">${SLOT[s]}</button>`).join('')}</div>
+// Apercu de 7 jours (a partir de pv.from) : cases libres ou occupees, a toucher pour choisir le creneau.
+let pv = null;
+async function loadPv(from) {
+  const r = await get(hp(`/menu?from=${from}&days=7`)).catch(() => null);
+  pv = { from, meals: r ? r.meals : [], outings: r ? r.outings || [] : [] };
+}
+function pvCell(d, s) {
+  const o = pv.outings.find((x) => x.date === d && x.slot === s);
+  const m = pv.meals.find((x) => x.date === d && x.slot === s && !x.suggestion) || pv.meals.find((x) => x.date === d && x.slot === s);
+  const sel = pm.date === d && pm.slot === s;
+  const txt = o ? `${I(o.rest ? 'repeat' : 'pin', 's')} ${esc(outLabel(o))}` : m ? esc(m.dish) : '<span class="muted">libre</span>';
+  return `<button class="meal${m || o ? '' : ' free'}${sel ? ' on' : ''}" data-a="pm-cell" data-date="${d}" data-s="${s}"><span class="sl">${SLOT[s]}</span><span class="nm">${txt}</span></button>`;
+}
+async function planSheet() {
+  if (!pv || pm.date < pv.from || pm.date > addDays(pv.from, 6)) await loadPv(pm.date);
+  const slots = slotsShown();
+  if (!slots.includes(pm.slot)) slots.push(pm.slot);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(pv.from, i));
+  sheet(`<h3>${I('calendar', 's')} Ajouter au menu</h3>
+    <div class="row gap" style="margin:8px 0"><button class="btn sm sec2" data-a="pm-week" data-d="-7" ${pv.from <= today() ? 'disabled' : ''}>‹</button><span class="grow c muted small">Semaine du ${esc(fmtDate(pv.from, { day: 'numeric', month: 'long' }))}</span><button class="btn sm sec2" data-a="pm-week" data-d="7">›</button></div>
+    <div class="group">${days.map((d) => `<div class="item" style="display:block"><b class="small">${esc(fmtDate(d, { weekday: 'long', day: 'numeric', month: 'short' }))}</b>${d < today() ? '' : `<div class="row gap" style="flex-wrap:wrap;margin-top:4px">${slots.map((s) => pvCell(d, s)).join('')}</div>`}</div>`).join('')}</div>
+    <label class="muted">Date</label><input class="txt" type="date" value="${pm.date}" min="${today()}" data-ch="pm-date">
     <p class="muted small" id="pm-warn"></p>
     <div class="row end"><button class="btn" data-a="pm-next">Continuer : personnes et ingrédients</button></div>`);
   warnSlot();
 }
-async function warnSlot() {
-  const r = await get(hp(`/menu?from=${pm.date}&days=1`)).catch(() => null);
-  const m = r && r.meals.find((x) => x.slot === pm.slot && !x.suggestion);
+function warnSlot() {
+  const m = pv && pv.meals.find((x) => x.date === pm.date && x.slot === pm.slot && !x.suggestion);
   const w = document.getElementById('pm-warn');
-  if (w) w.textContent = m ? `⚠ Créneau déjà occupé par « ${m.dish} »${isManager() ? ' : il sera remplacé.' : '.'}` : '';
+  if (w) w.textContent = m ? `⚠ ${SLOT[pm.slot]} déjà occupé par « ${m.dish} »${isManager() ? ' : il sera remplacé.' : '.'}` : '';
 }
-on('change', 'pm-date', (el) => { pm.date = el.value; warnSlot(); });
+on('change', 'pm-date', (el) => { if (el.value) { pm.date = el.value; planSheet(); } });
 on('click', 'pm-slot', (el) => { pm.slot = el.dataset.s; planSheet(); });
+on('click', 'pm-cell', (el) => { pm.date = el.dataset.date; pm.slot = el.dataset.s; planSheet(); });
+on('click', 'pm-week', async (el) => { const f = addDays(pv.from, Number(el.dataset.d)); await loadPv(f < today() ? today() : f); pm.date = pv.from; planSheet(); });
 on('click', 'pm-next', () => stockSheet());
 
 // Variantes, personnes et ingredients a acheter (decocher ce qui est encore en reserve).
