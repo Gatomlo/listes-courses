@@ -345,8 +345,9 @@ function unitPrices(i) {
   if (sids.length < 2) return '';
   const min = Math.min(...sids.map((s) => i.unit_prices[s]));
   const per = i.unit_per === 'pc' ? 'pièce' : i.unit_per;
-  return `<div class="unitp">${activeStores().filter((s) => i.unit_prices[s.id] != null).map((s) =>
-    `<div class="urow${i.unit_prices[s.id] === min ? ' best' : ''}"${i.unit_prices[s.id] === min ? ` title="Moins cher au ${per}"` : ''}><span class="grow">${esc(s.name)}<span class="muted block small">${i.prices[s.id] != null ? `${eur(i.prices[s.id] * i.qty)}${i.packs && i.packs[s.id] ? ` · ${i.packs[s.id].packs} × ${esc(i.packs[s.id].size)}` : ''}` : ''}</span></span><b class="uprice">${eur(i.unit_prices[s.id])}/${per}</b></div>`).join('')}</div>`;
+  const k = i.packs && i.packs[i.at_store_id];
+  return `<div class="unitp">${i.need && i.meal_qty > 0 ? `<p class="muted small" style="margin:0 10px 4px">Besoin des repas : <b>${esc(i.need)}</b></p>` : ''}${activeStores().filter((s) => i.unit_prices[s.id] != null).map((s) =>
+    `<div class="urow${i.unit_prices[s.id] === min ? ' best' : ''}"${i.unit_prices[s.id] === min ? ` title="Moins cher au ${per}"` : ''}><span class="grow">${esc(s.name)}<span class="muted block small">${i.prices[s.id] != null ? `${eur(i.prices[s.id] * i.qty)}${i.packs && i.packs[s.id] ? ` · ${i.packs[s.id].packs} × ${esc(i.packs[s.id].size)}` : ''}` : ''}</span></span><b class="uprice">${eur(i.unit_prices[s.id])}/${per}</b></div>`).join('')}${k && k.left ? `<p class="muted small" style="margin:4px 10px 0">Il en restera ${esc(k.left)} en réserve chez ${esc(storeName(i.at_store_id))}.</p>` : ''}</div>`;
 }
 function priceHint(i) {
   const here = i.prices[i.at_store_id];

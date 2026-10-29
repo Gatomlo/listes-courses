@@ -109,3 +109,26 @@ test('ticket : format par ligne et lu dans le libellé', async () => {
   assert.equal(sizeInLabel('PATES 6 X 33CL'), '6 x 33 cl');
   assert.equal(sizeInLabel('PAIN COMPLET'), '');
 });
+
+test('besoin exact des repas : emballages entiers comptés à partir de 210 g, pas des 300 g arrondis', async () => {
+  const f = (await thomas.get(h)).data;
+  const [im, co] = f.stores.map((s) => s.id);
+  const p = (await thomas.post(`${h}/products`, { name: 'Amandes entières', category_id: f.categories[0].id, contenance: '100 g' })).data;
+  await thomas.post(`${h}/products/${p.id}/records`, { store_id: im, price: '1,20' });
+  await thomas.post(`${h}/products/${p.id}/records`, { store_id: co, price: '3,00', cont_n: '250', cont_u: 'g' });
+  const l = (await thomas.post(`${h}/lists`, { date: '2030-07-01', recurring: false })).data;
+  const d = (await thomas.post(`${h}/dishes`, { name: 'Cake aux amandes', portions: 4, ingredients: [{ product_id: p.id, qty: 210, unit: 'g' }] })).data;
+  const mr = await thomas.post(`${h}/meals`, { date: '2030-07-02', slot: 'soir', dish_id: d.id, persons: 4, list_id: l.id });
+  assert.equal(mr.status, 201, JSON.stringify(mr.data) + JSON.stringify(d).slice(0, 200));
+  const it = (await thomas.get(`${h}/lists/${l.id}`)).data.items.find((i) => i.product_id === p.id);
+  assert.equal(it.qty, 3);                          // 210 g arrondis à 3 x 100 g
+  assert.equal(it.need, '210 g');
+  assert.equal(it.packs[co].packs, 1);              // 1 sachet de 250 g suffit
+  assert.equal(it.packs[co].left, '40 g');
+  assert.equal(it.prices[co] * it.qty, 300);
+  assert.equal(it.best_store_id, co);               // 3,00 € contre 3 x 1,20 € = 3,60 €
+  // + 1 emballage de référence saisi à la main : besoin 310 g -> 2 sachets
+  await thomas.patch(`${h}/items/${it.id}`, { qty: 4 });
+  const it2 = (await thomas.get(`${h}/lists/${l.id}`)).data.items.find((i) => i.product_id === p.id);
+  assert.equal(it2.packs[co].packs, 2);
+});

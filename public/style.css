@@ -628,7 +628,7 @@ details.more[open]>summary::after{content:'▴'}
 .sheet button.meal[data-a="pm-cell"].on{outline:2px solid var(--carrot);background:var(--carrot-soft)}
 
 /* Prix à l'unité par magasin : une ligne par magasin, le moins cher surligné en vert */
-.unitp .urow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px}
+.unitp .urow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;margin-bottom:4px}
 .unitp .urow.best{background:var(--leaf-soft)}
 .unitp .urow.best .uprice{color:var(--leaf)}
 .unitp .uprice{min-width:92px;text-align:right;font-variant-numeric:tabular-nums}
