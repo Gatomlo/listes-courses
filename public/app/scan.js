@@ -6,7 +6,7 @@ import { I } from './icons.js';
 import { get, sync, newOp, attempt } from './api.js';
 import { S, hp, render, go, loadProducts, activeStores, storeById, catName, categoryOrder } from './state.js';
 import { parseTicket, detectStore, matchLines } from './ticket.mjs';
-import { unitOptions, catOptions, contField } from './catalogue.js';
+import { unitOptions, catSubOptions, subName, contField } from './catalogue.js';
 
 const abs = (p) => new URL(p, document.baseURI).href;
 let scan = null; // { listId, storeId, date, status, progress, text, lines: [...] }
@@ -203,7 +203,7 @@ export function scanView() {
       <div class="grow"><input class="txt sm mono" value="${esc(l.label)}" data-ch="scan-label" data-i="${i}" aria-label="Libellé lu">
       <div class="row gap"><input class="txt w5 sm c" value="${esc(String(l.qty).replace('.', ','))}" data-ch="scan-qty" data-i="${i}" aria-label="Quantité"><span class="muted">×</span><input class="txt w5 sm c" value="${price(l.unit)}" data-ch="scan-unit" data-i="${i}" aria-label="Prix unitaire"><span class="muted small">€</span>
       <label class="row small"><input type="checkbox" class="cb" data-ch="scan-promo" data-i="${i}" ${l.promo ? 'checked' : ''}>promo</label></div>
-      ${l.create ? `<div class="pill p-carrot">＋ créer « ${esc(l.create.name)} » (${esc(catName(Number(l.create.category_id)))})</div>`
+      ${l.create ? `<div class="pill p-carrot">＋ créer « ${esc(l.create.name)} » (${esc(catName(Number(l.create.category_id)))}${l.create.subcategory_id ? ` › ${esc(subName(l.create.subcategory_id))}` : ''})</div>`
         : `<button class="txt sm pick-btn" data-a="scan-pick" data-i="${i}">${esc(pickLabel(l.product_id))} ▾</button>`}
       <div class="muted small">${l.how === 'alias' ? '<span class="pill p-plum">correspondance mémorisée</span> ' : l.how === 'guess' ? '<span class="pill p-grey">proposé</span> ' : ''}${avg != null ? `moyenne ${eur(avg)}` : ''}${delta && Math.abs(delta) >= 1 ? ` · <b class="${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '+' : ''}${delta} %</b>` : ''}</div>
       </div></div>`;
@@ -263,7 +263,7 @@ function createSheet(i) {
   const l = scan.lines[i];
   sheet(`<h3>Nouveau produit</h3><p class="muted small">Ligne du ticket : « ${esc(l.label)} »</p>
     <label class="muted">Nom</label><input class="txt" name="name" value="${esc(pretty(l.label))}">
-    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="category_id">${catOptions(categoryOrder()[0])}</select></label>
+    <div class="row gap"><label class="grow"><span class="muted">Rayon</span><select class="txt" name="rayon">${catSubOptions(l.create ? l.create.category_id : categoryOrder()[0], l.create && l.create.subcategory_id)}</select></label>
     <label class="grow"><span class="muted">Emballage</span><select class="txt" name="unit">${unitOptions('paquet')}</select></label></div>
     ${contField()}
     <p class="muted small">Créé à la validation du ticket.</p>
@@ -274,7 +274,8 @@ on('click', 'scan-create-ok', (el) => {
   const f = formData(document.querySelector('.sheet'));
   if (!f.name.trim()) return;
   const l = scan.lines[Number(el.dataset.i)];
-  l.create = { name: f.name.trim(), category_id: Number(f.category_id), unit: f.unit, cont_n: f.cont_n, cont_u: f.cont_u };
+  const [c, sb] = String(f.rayon).split(':');
+  l.create = { name: f.name.trim(), category_id: Number(c), subcategory_id: sb ? Number(sb) : null, unit: f.unit, cont_n: f.cont_n, cont_u: f.cont_u };
   l.product_id = null;
   closeSheet();
   render();
