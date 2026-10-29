@@ -292,7 +292,7 @@ function itemRow(i, l, o = {}) {
     i.promos && i.promos.length && open ? `<span style="color:var(--carrot)">${I('tag', 's')} promo</span>` : '',
     i.carried_label ? `<span>→ ${i.carried_label === 'À prévoir' ? 'À prévoir' : esc(fmtDate(i.carried_label))}</span>` : '',
     !o.shop && dated && open && i.status === 'bought' ? `<span style="color:var(--leaf)">${I('check', 's')} dans le caddie</span>` : '',
-    o.shop && storeById(i.at_store_id) && (o.allStores || (o.here && i.at_store_id !== o.here)) ? `<span style="color:${esc(storeById(i.at_store_id).color)}">● ${o.allStores ? '' : 'conseillé chez '}${esc(storeById(i.at_store_id).name)}</span>` : '',
+    o.shop && storeById(i.at_store_id) && (o.allStores || (o.here && i.at_store_id !== o.here)) ? `<span style="color:${esc(storeById(i.at_store_id).color)}" title="Conseillé chez ${esc(storeById(i.at_store_id).name)}">● ${esc(storeById(i.at_store_id).name)}</span>` : '',
   ].join('');
   // Preparation / « A prevoir » : un seul detail sous le nom (suggestion, indisponible, plat, besoin ou note) ; le reste est dans la fiche.
   const one = i.suggestion ? `<span style="color:var(--carrot)">${I('bulb', 's')} ${esc(i.suggested_by_name || '?')}</span>`
