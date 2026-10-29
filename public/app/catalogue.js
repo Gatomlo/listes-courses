@@ -113,6 +113,9 @@ export function contField(cur = '', dis = '') {
     <select class="txt w6" name="cont_u" ${dis}>${CONT_UNITS.map((x) => `<option ${x === u ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
     ${!m && c ? `<input type="hidden" name="contenance" value="${esc(c)}"><p class="muted small">⚠ Ancienne valeur « ${esc(c)} » : à ressaisir en nombre + unité.</p>` : ''}`;
 }
+// Format vendu (relevé, promo) : nombre + unité, facultatif ; `ref` = contenance du produit (en indice).
+export const contSold = (ref = null) => `<div class="row gap" style="margin-top:8px"><label class="grow"><span class="muted small">Format vendu (facultatif)</span><input class="txt" name="cont_n" inputmode="decimal" placeholder="${ref ? esc(ref.n >= 1000 && ref.u !== 'pc' ? ref.n / 1000 : ref.n) : 'ex. 400'}"></label>
+  <label><span class="muted small">Unité</span><select class="txt w6" name="cont_u">${CONT_UNITS.map((x) => `<option ${(ref ? (ref.u === 'pc' ? x === 'pièces' : ref.u === 'ml' ? x === 'ml' : x === 'g') : x === 'g') ? 'selected' : ''}>${x}</option>`).join('')}</select></label></div>`;
 // Emballage et contenance : facultatifs, replies (details natif : les champs restent dans le formulaire).
 export const packBlock = (unitHtml, contHtml, open = false) => `<details class="pack"${open ? ' open' : ''}><summary><b>Emballage et contenance</b> <span class="muted small">facultatif : pour comparer les prix et convertir les recettes</span></summary>${unitHtml}${contHtml}</details>`;
 // Liste unique « Rayon » / « Rayon › Sous-rayon » (valeur « cid » ou « cid:sid »).
@@ -236,8 +239,7 @@ on('click', 'rec-add', () => {
     <label class="muted">Magasin</label><select class="txt" name="store_id">${activeStores().map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
     <div class="row gap"><label class="grow"><span class="muted">Prix (€)</span><input class="txt" name="price" inputmode="decimal" placeholder="0,00"></label>
     <label class="grow"><span class="muted">Date</span><input class="txt" type="date" name="date" value="${localDay()}"></label></div>
-    <div class="row gap" style="margin-top:8px"><label class="grow"><span class="muted">Contenance vendue ici (facultatif)</span><input class="txt" name="cont_n" inputmode="decimal" placeholder="${current.size ? esc(sizeText(current.size)) : 'ex. 400'}"></label>
-    <label><span class="muted">Unité</span><select class="txt" name="cont_u">${['g', 'kg', 'ml', 'cl', 'L', 'pièces'].map((u) => `<option ${current.size && current.size.u === 'ml' ? (u === 'ml' ? 'selected' : '') : u === 'g' ? 'selected' : ''}>${u}</option>`).join('')}</select></label></div>
+    ${contSold(current.size)}
     <p class="muted small">Si ce magasin vend un autre format que celui du produit, le prix est ramené à la contenance du produit pour la comparaison.</p>
     <label class="row" style="margin-top:8px"><input type="checkbox" class="cb" name="promo"><span class="grow">Prix en promo (exclu de la moyenne)</span></label>
     <div class="row end"><button class="btn" data-a="rec-add-ok">Enregistrer</button></div>`);

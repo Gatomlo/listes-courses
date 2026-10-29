@@ -3,7 +3,7 @@
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
 import { get, post, put, patch, del, attempt, sync, newOp, setCached, net } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
-import { packBlock, unitOptions, catOptions, catSubOptions, subName, contField } from './catalogue.js';
+import { packBlock, unitOptions, catOptions, catSubOptions, subName, contField, contSold } from './catalogue.js';
 import { SLOT, tile, isAwake, syncWake } from './plats.js';
 import { startScan } from './scan.js';
 import { I, btnI } from './icons.js';
@@ -349,7 +349,7 @@ function priceHint(i) {
 // Format différent de la référence : coût réel de l'achat (« 8,00 € (1 × 400 g) »).
 const packPrice = (i, sid) => { const k = i.packs && i.packs[sid]; return k ? `${eur(i.prices[sid] * i.qty)} (${k.packs} × ${esc(k.size)})` : eur(i.prices[sid]); };
 function promoPills(i) {
-  return i.promos.map((p) => `<span class="pill p-carrot click" data-a="promo" data-pid="${i.product_id}" data-sid="${p.store_id}">${I('tag', 's')} ${esc(storeName(p.store_id))} ${p.price_cents != null ? eur(p.price_cents) : 'promo'} · ${p.list_id ? 'ces courses' : `jusqu'au ${esc(fmtDate(p.valid_until))}`}</span>`).join('');
+  return i.promos.map((p) => `<span class="pill p-carrot click" data-a="promo" data-pid="${i.product_id}" data-sid="${p.store_id}">${I('tag', 's')} ${esc(storeName(p.store_id))} ${p.price_cents != null ? eur(p.price_cents) : 'promo'}${p.cont ? ` (${esc(p.cont)})` : ''} · ${p.list_id ? 'ces courses' : `jusqu'au ${esc(fmtDate(p.valid_until))}`}</span>`).join('');
 }
 
 // Encadre en tete des articles : scenarios, economie de la repartition, « tout chez X ».
@@ -680,6 +680,7 @@ function promoSheet(i) {
     <div class="seg">${activeStores().map((s) => `<button class="${f.sid === s.id ? 'on' : ''}" data-a="promo-store" data-sid="${s.id}">${esc(s.name)}</button>`).join('')}</div>
     <label class="muted">Prix promo (facultatif) — moyenne ${eur((S.products.find((p) => p.id === i.product_id) || { prices: {} }).prices[f.sid]?.avg)}</label>
     <input class="txt" name="price" inputmode="decimal" value="${ex && ex.price_cents != null ? (ex.price_cents / 100).toFixed(2).replace('.', ',') : ''}" placeholder="ex. 3,49">
+    ${contSold((S.products.find((p) => p.id === i.product_id) || {}).size)}
     <div class="sec">Valable</div>
     ${dated ? `<label class="row line"><input type="radio" name="scope" value="list" ${scope === 'list' ? 'checked' : ''}><span class="grow">Uniquement pour les courses du ${esc(fmtDate(current.date, { day: 'numeric', month: 'long' }))}</span></label>` : ''}
     <label class="row line"><input type="radio" name="scope" value="until" ${scope === 'until' ? 'checked' : ''}><span class="grow">Jusqu'au</span><input class="txt w12" type="date" name="until" value="${until}"></label>
@@ -694,7 +695,7 @@ on('click', 'promo-save', async () => {
   const root = document.querySelector('.sheet');
   const f = formData(root);
   const scope = (root.querySelector('[name=scope]:checked') || {}).value || 'until';
-  const body = { product_id: promoForm.pid, store_id: promoForm.sid, price: f.price, note: f.note, ...(scope === 'list' ? { list_id: current.id } : { valid_until: f.until }) };
+  const body = { product_id: promoForm.pid, store_id: promoForm.sid, price: f.price, note: f.note, cont_n: f.cont_n, cont_u: f.cont_u, ...(scope === 'list' ? { list_id: current.id } : { valid_until: f.until }) };
   if (await attempt(() => post(hp('/promos'), body))) { closeSheet(); toast('Promo enregistrée · conseil recalculé'); refreshList(); }
 });
 on('click', 'promo-del', async (el) => {
@@ -820,6 +821,7 @@ function priceSheet(i, sid) {
   sheet(`<h3>${esc(i.name)}</h3><p class="muted">Prix payé (facultatif)${avg != null ? ` — moyenne ${eur(avg)} chez ${esc(storeName(sid))}` : ''}</p>
     <input class="txt big" name="price" inputmode="decimal" placeholder="${avg != null ? (avg / 100).toFixed(2).replace('.', ',') : '0,00'}" data-enter="price-ok" data-id="${i.id}">
     ${stores.length > 1 ? `<label class="row line"><span class="grow">Magasin</span><select class="txt w12" name="store_id">${stores.map((x) => `<option value="${x.id}" ${x.id === sid ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>` : `<input type="hidden" name="store_id" value="${sid}">`}
+    ${contSold((S.products.find((p) => p.id === i.product_id) || {}).size)}
     <label class="row line"><input type="checkbox" class="cb" name="promo"><span class="grow">Prix promo (hors moyenne)</span></label>
     <div class="row end"><button class="btn sec2" data-a="close">Passer</button><button class="btn" data-a="price-ok" data-id="${i.id}">Enregistrer le prix</button></div>`);
 }
@@ -833,7 +835,7 @@ on('click', 'price-ok', async (el) => {
   if (!String(f.price).trim()) return;
   const cents = Math.round(parseFloat(String(f.price).replace(',', '.')) * 100);
   if (cents > 0) { i.paid = cents; render(); }
-  const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'record.add', product_id: i.product_id, store_id: sid, price: f.price, promo: f.promo })]));
+  const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'record.add', product_id: i.product_id, store_id: sid, price: f.price, promo: f.promo, cont_n: f.cont_n, cont_u: f.cont_u })]));
   toast(r === null ? 'Prix gardé, envoyé au retour du réseau' : 'Relevé enregistré · moyenne recalculée');
 });
 on('click', 'sugg-ok', async (el) => { const l = await attempt(() => post(hp(`/items/${el.dataset.id}/accept`))); if (l) { toast('Suggestion acceptée'); refreshList(l); } });

@@ -4,6 +4,7 @@ import { esc, eur, fmtDate, on, sheet, topSheet, closeSheet, toast, formData, lo
 import { get, post, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadProducts, activeStores, storeById } from './state.js';
 import { I } from './icons.js';
+import { contSold } from './catalogue.js';
 import { isInstalled } from './install.js';
 import { rappelsSub } from './rappels.js';
 
@@ -54,7 +55,7 @@ export function promosView() {
     title: 'Promos', back: '#/plus', sub: 'Le prix promo remplace la moyenne pour le conseil, tant qu’il est valable',
     body: `<div class="group tiles">${promos.map((p) => { const s = storeById(p.store_id) || { name: '?', color: 'var(--muted)' };
       return `<div class="item"><span class="dot" style="background:${esc(s.color)}"></span><a class="grow" style="color:inherit;text-decoration:none" href="#/catalogue/${p.product_id}"><b>${esc(p.product)}</b>
-        <span class="muted block">${esc(s.name)} · ${until(p)}${p.note ? ` · ${esc(p.note)}` : ''}</span></a>
+        <span class="muted block">${esc(s.name)}${p.cont ? ` · ${esc(p.cont)}` : ''} · ${until(p)}${p.note ? ` · ${esc(p.note)}` : ''}</span></a>
         <b class="price" style="color:var(--carrot)">${p.price_cents != null ? eur(p.price_cents) : 'promo'}</b><button class="ib" data-a="promo-x" data-id="${p.id}" aria-label="Retirer">${I('x', 's')}</button></div>`; }).join('')
       || `<div class="empty">${I('tag', 'l')}<p>Aucune promo en cours.</p></div>`}</div>`,
     dock: `<button class="btn full" data-a="promo-new">${I('tag')} Signaler une promo</button>`,
@@ -75,6 +76,7 @@ function promoForm() {
     <div class="sec">Magasin</div><div class="seg">${activeStores().map((s) => `<button class="${pf.sid === s.id ? 'on' : ''}" data-a="pf-store" data-sid="${s.id}">${esc(s.name)}</button>`).join('')}</div>
     <div class="row gap"><label class="grow"><span class="muted small">Prix promo (facultatif)</span><input class="txt" name="price" inputmode="decimal" placeholder="ex. 1,99"></label>
     <label class="grow"><span class="muted small">Jusqu’au</span><input class="txt" type="date" name="until" value="${localDay(7)}"></label></div>
+    ${contSold(p && p.size)}
     <label class="muted small" style="display:block;margin-top:8px">Note</label><input class="txt" name="note" placeholder="ex. 2e à -50 %, dépliant">
     <div class="row end"><button class="btn" data-a="pf-save" ${p ? '' : 'disabled'}>Enregistrer</button></div>`);
   if (!p) { const i = document.getElementById('pf-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
@@ -86,7 +88,7 @@ on('click', 'pf-change', () => { pf.pid = null; promoForm(); });
 on('click', 'pf-store', (el) => { pf.sid = Number(el.dataset.sid); const f = formData(document.querySelector('.sheet')); promoForm(); Object.entries(f).forEach(([k, v]) => { const x = document.querySelector(`.sheet [name=${k}]`); if (x) x.value = v; }); });
 on('click', 'pf-save', async () => {
   const f = formData(document.querySelector('.sheet'));
-  const r = await attempt(() => post(hp('/promos'), { product_id: pf.pid, store_id: pf.sid, price: f.price, note: f.note, valid_until: f.until }));
+  const r = await attempt(() => post(hp('/promos'), { product_id: pf.pid, store_id: pf.sid, price: f.price, note: f.note, valid_until: f.until, cont_n: f.cont_n, cont_u: f.cont_u }));
   if (r) { promos = r; closeSheet(); toast('Promo enregistrée · conseil recalculé'); if (S.route[0] === 'promos') render(); }
 });
 

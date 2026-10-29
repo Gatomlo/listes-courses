@@ -43,3 +43,25 @@ test('liste : petite quantité moins chère dans le petit format, grande quantit
   assert.equal(it.best_store_id, co);              // 800 g : 2 sachets = 16,00 € contre 24,00 €
   assert.equal(it.prices[co] * it.qty, 1600);
 });
+
+test('promo avec format et relevé au cochage (opération hors-ligne) avec format', async () => {
+  const f = (await thomas.get(h)).data;
+  const [im, co] = f.stores.map((s) => s.id);
+  const p = (await thomas.get(`${h}/products`)).data.find((x) => x.name === 'Noix de pécan');
+  const l = (await thomas.post(`${h}/lists`, { date: '2030-02-01', recurring: false })).data;
+  await thomas.post(`${h}/lists/${l.id}/items`, { product_id: p.id, qty: 4 });
+  const get = async () => (await thomas.get(`${h}/lists/${l.id}`)).data.items.find((i) => i.product_id === p.id);
+  // 400 g : Intermarché 4 x 3,00 = 12,00 € ; Colruyt 1 sachet = 8,00 €
+  assert.equal((await get()).best_store_id, co);
+  // Promo Intermarché : 400 g à 5,00 € -> 5,00 € pour 4 x 100 g
+  await thomas.post(`${h}/promos`, { product_id: p.id, store_id: im, price: '5,00', cont_n: '400', cont_u: 'g', list_id: l.id });
+  let it = await get();
+  assert.equal(it.best_store_id, im);
+  assert.equal(Math.round(it.prices[im] * it.qty), 500);
+  assert.equal(it.promos.find((x) => x.store_id === im).cont, '400 g');
+  // Relevé au cochage chez Intermarché : 400 g à 7,00 € (hors promo) -> 1,75 € les 100 g
+  await thomas.post(`${h}/sync`, { ops: [{ op_id: 'rec-1', type: 'record.add', product_id: p.id, store_id: im, price: '7,00', cont_n: '400', cont_u: 'g' }] });
+  const pr = (await thomas.get(`${h}/products/${p.id}`)).data;
+  assert.equal(pr.records[0].cont, '400 g');
+  assert.equal(pr.prices[im].avg, 238); // moyenne de 300 (100 g) et 175 (400 g ramené à 100 g)
+});
