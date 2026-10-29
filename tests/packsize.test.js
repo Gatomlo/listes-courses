@@ -65,3 +65,16 @@ test('promo avec format et relevé au cochage (opération hors-ligne) avec forma
   assert.equal(pr.records[0].cont, '400 g');
   assert.equal(pr.prices[im].avg, 238); // moyenne de 300 (100 g) et 175 (400 g ramené à 100 g)
 });
+
+test('prix au kg par magasin sur les articles', async () => {
+  const f = (await thomas.get(h)).data;
+  const [im, co] = f.stores.map((s) => s.id);
+  const p = (await thomas.get(`${h}/products`)).data.find((x) => x.name === 'Noix de pécan');
+  const l = (await thomas.post(`${h}/lists`, { date: '2030-03-01', recurring: false })).data;
+  await thomas.post(`${h}/lists/${l.id}/items`, { product_id: p.id, qty: 1 });
+  const it = (await thomas.get(`${h}/lists/${l.id}`)).data.items.find((i) => i.product_id === p.id);
+  assert.equal(it.unit_per, 'kg');
+  assert.equal(it.unit_prices[co], 2000);              // 8,00 € les 400 g = 20 €/kg
+  assert.ok(it.unit_prices[co] < it.unit_prices[im]);   // moins cher au kg chez Colruyt (qui n'est pas conseillé pour 100 g)
+  assert.equal(it.best_store_id, im);
+});

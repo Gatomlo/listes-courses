@@ -339,6 +339,15 @@ function storeButton(i) {
   if (!s) return '';
   return `<button class="st${i.manual_store ? ' manual' : ''}" style="--c:${esc(s.color)}" title="Changer de magasin" data-a="store-cycle" data-id="${i.id}">${esc(s.name)}</button>`;
 }
+// Par magasin : coût de la quantité demandée (avec emballages entiers) et prix au kg / L / pièce, le moins cher marqué.
+function unitPrices(i) {
+  const sids = Object.keys(i.unit_prices || {}).map(Number);
+  if (sids.length < 1) return '';
+  const min = Math.min(...sids.map((s) => i.unit_prices[s]));
+  const per = i.unit_per === 'pc' ? 'pièce' : i.unit_per;
+  return `<div class="unitp">${activeStores().filter((s) => i.unit_prices[s.id] != null).map((s) =>
+    `<div class="row line"><span class="grow">${esc(s.name)}<span class="muted block small">${i.prices[s.id] != null ? `${eur(i.prices[s.id] * i.qty)}${i.packs && i.packs[s.id] ? ` · ${i.packs[s.id].packs} × ${esc(i.packs[s.id].size)}` : ''} pour la quantité` : ''}</span></span><b>${eur(i.unit_prices[s.id])}/${per}</b>${i.unit_prices[s.id] === min && sids.length > 1 ? `<span class="pill p-leaf">moins cher au ${per}</span>` : ''}</div>`).join('')}</div>`;
+}
 function priceHint(i) {
   const here = i.prices[i.at_store_id];
   const others = activeStores().filter((s) => s.id !== i.at_store_id)
@@ -860,7 +869,7 @@ on('click', 'item', async (el) => {
     <div class="row"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="${qtyText(i.qty)}"><button class="btn sm sec2" data-a="qty" data-d="1">＋</button></div>
     <button class="item click" data-a="item-more"><span class="grow">Plus de détails<span class="muted block">note, indisponible, récurrent, prix</span></span>${I('down', 's')}</button>
     <div id="item-more" hidden>
-    ${i.prices ? `<p class="muted small">${priceHint(i)}</p>` : ''}${i.promos && i.promos.length ? `<div class="pills">${promoPills(i)}</div>` : ''}
+    ${i.prices ? `<p class="muted small">${priceHint(i)}</p>${unitPrices(i)}` : ''}${i.promos && i.promos.length ? `<div class="pills">${promoPills(i)}</div>` : ''}
     ${current.type === 'dated' ? `<div class="btn-row" style="margin:8px 0">${btnI('tag', 'Ajouter une promo', `data-a="promo" data-pid="${i.product_id}" data-sid="${i.promos && i.promos[0] ? i.promos[0].store_id : i.at_store_id || ''}"`, 'sec2')}</div>` : ''}
     <label class="muted" style="display:block;margin-top:8px">Note</label><input class="txt" name="note" value="${esc(i.note || '')}" placeholder="ex. bio, grand format">
     ${current.type === 'dated' ? `<label class="row line" style="margin-top:8px"><input type="checkbox" class="cb" name="unavailable" ${i.status === 'unavailable' ? 'checked' : ''}><span class="grow">Indisponible en magasin</span></label>` : ''}
