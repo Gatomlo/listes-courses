@@ -142,20 +142,20 @@ on('click', 'prod-create', async () => {
 });
 
 // ---------- Import CSV (gestionnaire) : apercu puis import ----------
-const CSV_HEAD = 'nom;rayon;emballage;contenance;magasin;prix;promo;prix normal;date';
+const CSV_HEAD = 'nom;rayon;emballage;contenance;magasin;prix;promo;prix normal;date;format';
 let csvText = '';
 on('click', 'csv-open', () => {
   csvText = '';
   sheet(`<h3>⇪ Importer des produits</h3>
     <p class="muted small">Fichier CSV (séparateur « ; » ou « , »), une ligne d'en-tête puis un produit par ligne :<br><code>${CSV_HEAD}</code></p>
-    <p class="muted small">Seul <b>nom</b> est obligatoire. Produit déjà connu : seuls ses prix sont ajoutés. Rayon inconnu : créé. Prix : par emballage, avec le magasin ; <b>promo</b> = oui (hors moyenne) ; <b>prix normal</b> = prix hors promo s'il est connu ; date AAAA-MM-JJ ou JJ/MM/AAAA (défaut : aujourd'hui). Réimporter le même fichier ne double rien.</p>
+    <p class="muted small">Seul <b>nom</b> est obligatoire. Produit déjà connu : seuls ses prix sont ajoutés. Rayon inconnu : créé. Prix : par emballage, avec le magasin ; <b>promo</b> = oui (hors moyenne) ; <b>prix normal</b> = prix hors promo s'il est connu ; <b>format</b> = contenance vendue pour ce prix, si elle diffère de la contenance du produit (ex. 400 g) ; date AAAA-MM-JJ ou JJ/MM/AAAA (défaut : aujourd'hui). Réimporter le même fichier ne double rien.</p>
     <button class="btn sec2 sm" data-a="csv-model">Télécharger un modèle</button>
     <label class="muted" style="display:block;margin-top:10px">Fichier</label><input class="txt" type="file" accept=".csv,text/csv,text/plain" data-ch="csv-file">
     <div id="csv-res"></div>`);
 });
 on('click', 'csv-model', () => {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['\uFEFF' + CSV_HEAD + '\r\nBeurre doux;Frais;pièce;250 g;Colruyt;1,89;;;\r\nChips paprika;Épicerie;sachet;125 g;Colruyt;0,93;oui;1,39;\r\n'], { type: 'text/csv' }));
+  a.href = URL.createObjectURL(new Blob(['\uFEFF' + CSV_HEAD + '\r\nBeurre doux;Frais;pièce;250 g;Colruyt;1,89;;;;\r\nChips paprika;Épicerie;sachet;125 g;Colruyt;0,93;oui;1,39;;\r\nNoix de pécan;Épicerie;sachet;100 g;Colruyt;8,00;;;;400 g\r\n'], { type: 'text/csv' }));
   a.download = 'modele-produits.csv';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);

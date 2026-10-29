@@ -202,7 +202,7 @@ export function scanView() {
     return `<div class="item scanline${l.on ? '' : ' off'}"><button class="chk${l.on ? ' on' : ''}" data-a="scan-toggle" data-i="${i}">${l.on ? '✓' : ''}</button>
       <div class="grow"><input class="txt sm mono" value="${esc(l.label)}" data-ch="scan-label" data-i="${i}" aria-label="Libellé lu">
       <div class="row gap"><input class="txt w5 sm c" value="${esc(String(l.qty).replace('.', ','))}" data-ch="scan-qty" data-i="${i}" aria-label="Quantité"><span class="muted">×</span><input class="txt w5 sm c" value="${price(l.unit)}" data-ch="scan-unit" data-i="${i}" aria-label="Prix unitaire"><span class="muted small">€</span>
-      <label class="row small"><input type="checkbox" class="cb" data-ch="scan-promo" data-i="${i}" ${l.promo ? 'checked' : ''}>promo</label></div>
+      <input class="txt w6 sm c" value="${esc(l.cont || '')}" placeholder="format" data-ch="scan-cont" data-i="${i}" aria-label="Format vendu (ex. 400 g)"><label class="row small"><input type="checkbox" class="cb" data-ch="scan-promo" data-i="${i}" ${l.promo ? 'checked' : ''}>promo</label></div>
       ${l.create ? `<div class="pill p-carrot">＋ créer « ${esc(l.create.name)} » (${esc(catName(Number(l.create.category_id)))}${l.create.subcategory_id ? ` › ${esc(subName(l.create.subcategory_id))}` : ''})</div>`
         : `<button class="txt sm pick-btn" data-a="scan-pick" data-i="${i}">${esc(pickLabel(l.product_id))} ▾</button>`}
       <div class="muted small">${l.how === 'alias' ? '<span class="pill p-plum">correspondance mémorisée</span> ' : l.how === 'guess' ? '<span class="pill p-grey">proposé</span> ' : ''}${avg != null ? `moyenne ${eur(avg)}` : ''}${delta && Math.abs(delta) >= 1 ? ` · <b class="${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '+' : ''}${delta} %</b>` : ''}</div>
@@ -227,6 +227,7 @@ on('click', 'scan-toggle', (el) => { const l = line(el); l.on = !l.on; render();
 on('change', 'scan-label', (el) => { line(el).label = el.value; });
 on('change', 'scan-qty', (el) => { line(el).qty = num(el.value) || 1; render(); });
 on('change', 'scan-unit', (el) => { line(el).unit = num(el.value) || null; render(); });
+on('change', 'scan-cont', (el) => { line(el).cont = el.value.trim(); });
 on('change', 'scan-promo', (el) => { line(el).promo = el.checked; });
 on('change', 'scan-date', (el) => { scan.date = el.value; });
 on('change', 'scan-store', (el) => {
@@ -283,7 +284,7 @@ on('click', 'scan-create-ok', (el) => {
 
 on('click', 'scan-save', async () => {
   const lines = scan.lines.filter((l) => l.on).map((l) => ({
-    label: l.label, qty: l.qty, unit_price: l.unit, promo: !!l.promo,
+    label: l.label, qty: l.qty, unit_price: l.unit, promo: !!l.promo, cont: l.cont || null,
     ...(l.product_id === 'ignore' ? { ignore: true } : l.create ? { create: l.create } : { product_id: l.product_id }),
   }));
   const op = newOp({ type: 'receipt.save', store_id: scan.storeId, list_id: scan.listId, date: scan.date, raw_text: scan.text, lines });

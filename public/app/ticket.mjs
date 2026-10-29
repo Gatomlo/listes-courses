@@ -94,12 +94,19 @@ const tokens = (s) => normLabel(s).split(' ').filter((t) => t.length >= 3 && /^[
 // Rapprochement : correspondance memorisee pour ce magasin, sinon ressemblance des mots
 // (prefixes : « TOMAT CONC » ~ « Tomates concassées »), avec un bonus pour les articles
 // de la liste prevus dans ce magasin.
+// Format lu dans le libelle (« NOIX PECAN 400G » -> « 400 g »), ou ''.
+export function sizeInLabel(label) {
+  const m = String(label || '').toLowerCase().match(/(?:^|[\s,(])(?:(\d+)\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*(kg|gr|g|ml|cl|l)\b/);
+  return m ? `${m[1] ? m[1] + ' x ' : ''}${m[2].replace('.', ',')} ${m[3] === 'gr' ? 'g' : m[3] === 'l' ? 'L' : m[3]}` : '';
+}
+
 export function matchLines(items, { products, aliases = [], storeId, listItems = [] }) {
   const alias = new Map(aliases.filter((a) => a.store_id === storeId).map((a) => [a.label_norm, a.product_id]));
   const prods = products.map((p) => ({ p, toks: tokens(p.name) }));
   const here = new Set(listItems.filter((i) => i.at_store_id === storeId).map((i) => i.product_id));
   const inList = new Set(listItems.map((i) => i.product_id));
-  return items.map((it) => {
+  return items.map((it0) => {
+    const it = { ...it0, cont: it0.cont ?? sizeInLabel(it0.label) };
     const key = normLabel(it.label);
     if (alias.has(key) && products.some((p) => p.id === alias.get(key))) return { ...it, key, product_id: alias.get(key), how: 'alias' };
     const lt = tokens(it.label);

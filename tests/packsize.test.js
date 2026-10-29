@@ -78,3 +78,34 @@ test('prix au kg par magasin sur les articles', async () => {
   assert.ok(it.unit_prices[co] < it.unit_prices[im]);   // moins cher au kg chez Colruyt (qui n'est pas conseillé pour 100 g)
   assert.equal(it.best_store_id, im);
 });
+
+test('import CSV : colonne format', async () => {
+  const csv = 'nom;rayon;emballage;contenance;magasin;prix;format\nNoix de cajou;Épicerie;sachet;100 g;Colruyt;8,00;400 g\nNoix de cajou;Épicerie;sachet;100 g;Intermarché;3,00;\nPistaches;Épicerie;sachet;;Colruyt;4,00;beaucoup\n';
+  const f = (await thomas.get(h)).data;
+  const names = f.stores.map((s) => s.name);
+  const text = csv.replace('Colruyt', names[1]).replace('Intermarché', names[0]).replace('Colruyt', names[1]);
+  const r = (await thomas.post(`${h}/products/import`, { csv: text })).data;
+  assert.equal(r.errors.length, 1);
+  assert.match(r.errors[0].msg, /format/);
+  const p = (await thomas.get(`${h}/products`)).data.find((x) => x.name === 'Noix de cajou');
+  assert.equal(p.prices[f.stores[1].id].avg, 200);   // 8,00 € les 400 g = 2,00 € les 100 g
+  assert.equal(p.prices[f.stores[0].id].avg, 300);
+  const again = (await thomas.post(`${h}/products/import`, { csv: text })).data;
+  assert.equal(again.records, 0);                    // réimport : rien de doublé
+});
+
+test('ticket : format par ligne et lu dans le libellé', async () => {
+  const f = (await thomas.get(h)).data;
+  const co = f.stores[1].id;
+  const p = (await thomas.get(`${h}/products`)).data.find((x) => x.name === 'Noix de pécan');
+  const op = (lines) => ({ op_id: `t-${Math.random()}`, at: Date.now(), type: 'receipt.save', store_id: co, date: '2030-04-01', raw_text: 'x', lines });
+  await thomas.post(`${h}/sync`, { ops: [op([{ label: 'NOIX PECAN 400G', qty: 1, unit_price: '4,00', product_id: p.id, cont: '400 g' }])] });
+  const pr = (await thomas.get(`${h}/products/${p.id}`)).data;
+  assert.equal(pr.records[0].cont, '400 g');
+  assert.equal(pr.records[0].source, 'ocr');
+  const { sizeInLabel } = await import('../public/app/ticket.mjs');
+  assert.equal(sizeInLabel('NOIX PECAN 400G'), '400 g');
+  assert.equal(sizeInLabel('LAIT DEMI ECR 1L'), '1 L');
+  assert.equal(sizeInLabel('PATES 6 X 33CL'), '6 x 33 cl');
+  assert.equal(sizeInLabel('PAIN COMPLET'), '');
+});
