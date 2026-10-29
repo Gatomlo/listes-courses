@@ -638,7 +638,7 @@ function importSheet() {
         <div class="row" style="margin-top:4px"><input class="txt sm grow" autocomplete="off" value="${esc(g.label)}" data-ch="imp-name" data-in="imp-search" data-i="${i}" aria-label="Produit">
         <span class="pill ${g.product_id ? 'p-leaf' : 'p-carrot'}" id="imp-st-${i}">${g.product_id ? 'existant' : 'nouveau'}</span></div>
         <div id="imp-ac-${i}"></div>
-        <select class="txt sm" id="imp-cat-${i}" data-ch="imp-cat" data-i="${i}" style="margin-top:4px" ${g.product_id ? 'hidden' : ''} aria-label="Rayon du nouveau produit">${catOptions(g.create ? g.create.category_id : categoryOrder()[0])}</select>
+        <select class="txt sm" id="imp-cat-${i}" data-ch="imp-cat" data-i="${i}" style="margin-top:4px" ${g.product_id ? 'hidden' : ''} aria-label="Rayon du nouveau produit">${catSubOptions(g.create ? g.create.category_id : categoryOrder()[0], g.create && g.create.subcategory_id)}</select>
         <div class="row gap" style="margin-top:4px"><input class="txt w5 sm c" value="${g.q != null ? fmtQ(g.q) : ''}" placeholder="—" data-ch="imp-q" data-i="${i}" aria-label="Quantité"><select class="txt sm w6" data-ch="imp-u" data-i="${i}" aria-label="Unité">${[['', 'emballage'], ...IUNITS].map(([v, l]) => `<option value="${v}" ${(g.u || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${g.note ? `<span class="muted small">· ${esc(g.note)}</span>` : ''}</div></div></div>`).join('')}
     <p class="muted small">Les quantités en g, ml, pièces, cuillères sont converties en emballages dans les listes (contenance du produit).</p>
     <div class="row end"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="imp-ok">Appliquer au plat</button></div>`);
@@ -671,7 +671,7 @@ on('click', 'imp-pick', (el) => {
   document.getElementById(`imp-ac-${k}`).innerHTML = '';
   inp.dispatchEvent(new Event('change', { bubbles: true }));
 });
-on('change', 'imp-cat', (el) => { const g = imp.ing[Number(el.dataset.i)]; if (g.create) g.create.category_id = Number(el.value); });
+on('change', 'imp-cat', (el) => { const g = imp.ing[Number(el.dataset.i)]; if (g.create) { const [c, sb] = el.value.split(':'); g.create.category_id = Number(c); g.create.subcategory_id = sb ? Number(sb) : null; } });
 on('click', 'imp-ok', async () => {
   const m = imp;
   if (m.f.name && m.name) ed.name = m.name;
