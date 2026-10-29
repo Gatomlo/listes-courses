@@ -188,7 +188,7 @@ export async function loadProduct(id) { current = await get(hp(`/products/${id}`
 
 const SRC = { check: 'coché en magasin', manual: 'saisie manuelle', ocr: 'ticket scanné' };
 
-const recRow = (r) => `<div class="item"><span class="muted w5">${fmtDate(r.date)}</span>${stTag(r.store_id)}<span class="grow muted">${SRC[r.source]}${r.promo ? ` · ${I('tag', 's')} promo` : ''}${r.user ? ' · ' + esc(r.user) : ''}</span><span class="price">${eur(r.price_cents)}</span>${isManager() ? `<button class="ic" title="Supprimer ce relevé" data-a="rec-del" data-id="${r.id}">✕</button>` : ''}</div>`;
+const recRow = (r) => `<div class="item"><span class="muted w5">${fmtDate(r.date)}</span>${stTag(r.store_id)}<span class="grow muted">${SRC[r.source]}${r.cont ? ` · ${esc(r.cont)}` : ''}${r.promo ? ` · ${I('tag', 's')} promo` : ''}${r.user ? ' · ' + esc(r.user) : ''}</span><span class="price">${eur(r.price_cents)}</span>${isManager() ? `<button class="ic" title="Supprimer ce relevé" data-a="rec-del" data-id="${r.id}">✕</button>` : ''}</div>`;
 export function productView() {
   const p = current, mgr = isManager(), dis = mgr ? '' : 'disabled';
   const stores = activeStores();
@@ -236,6 +236,9 @@ on('click', 'rec-add', () => {
     <label class="muted">Magasin</label><select class="txt" name="store_id">${activeStores().map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
     <div class="row gap"><label class="grow"><span class="muted">Prix (€)</span><input class="txt" name="price" inputmode="decimal" placeholder="0,00"></label>
     <label class="grow"><span class="muted">Date</span><input class="txt" type="date" name="date" value="${localDay()}"></label></div>
+    <div class="row gap" style="margin-top:8px"><label class="grow"><span class="muted">Contenance vendue ici (facultatif)</span><input class="txt" name="cont_n" inputmode="decimal" placeholder="${current.size ? esc(sizeText(current.size)) : 'ex. 400'}"></label>
+    <label><span class="muted">Unité</span><select class="txt" name="cont_u">${['g', 'kg', 'ml', 'cl', 'L', 'pièces'].map((u) => `<option ${current.size && current.size.u === 'ml' ? (u === 'ml' ? 'selected' : '') : u === 'g' ? 'selected' : ''}>${u}</option>`).join('')}</select></label></div>
+    <p class="muted small">Si ce magasin vend un autre format que celui du produit, le prix est ramené à la contenance du produit pour la comparaison.</p>
     <label class="row" style="margin-top:8px"><input type="checkbox" class="cb" name="promo"><span class="grow">Prix en promo (exclu de la moyenne)</span></label>
     <div class="row end"><button class="btn" data-a="rec-add-ok">Enregistrer</button></div>`);
 });
