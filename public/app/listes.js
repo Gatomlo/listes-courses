@@ -278,11 +278,11 @@ on('click', 'list-create', async () => {
 // Une ligne par article : quantite × nom (· note), indicateurs courts, prix au magasin
 // retenu, promo, etiquette du magasin. Le detail est dans la fiche. Mode courses (o.shop) :
 // case a cocher, ni prix ni etiquette (magasin en indication si « Tous les magasins »).
-// Quantité à prendre : si le magasin (celui où l'on est en courses, sinon le magasin retenu) vend un autre format
-// que la référence du produit, le nombre d'emballages de ce format (« 1 × 250 g »), sinon « × quantité ».
+// Liste : quantité réelle (« × 3 »). Mode courses : si le magasin (celui où l'on est, ou le magasin retenu en « Tous les
+// magasins ») vend un autre format que la référence du produit, le nombre d'emballages de ce format (« 1 × 250 g »).
 function qtyMark(i, o = {}) {
   const sid = o.shop && !o.allStores && o.here ? o.here : i.at_store_id;
-  const k = i.packs && i.packs[sid];
+  const k = o.shop && i.packs && i.packs[sid];
   if (k) return ` <span class="faint fw4" title="À prendre chez ${esc(storeName(sid))}">${k.packs} × ${esc(k.size)}</span>`;
   return i.qty !== 1 ? ` <span class="faint fw4">× ${qtyText(i.qty)}</span>` : '';
 }
