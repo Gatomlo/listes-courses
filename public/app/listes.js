@@ -344,9 +344,9 @@ function unitPrices(i) {
   const sids = Object.keys(i.unit_prices || {}).map(Number);
   if (sids.length < 2) return '';
   const min = Math.min(...sids.map((s) => i.unit_prices[s]));
-  const per = i.unit_per === 'pc' ? 'pièce' : i.unit_per, tag = i.unit_per === 'pc' ? 'U' : i.unit_per;
+  const per = i.unit_per === 'pc' ? 'pièce' : i.unit_per;
   return `<div class="unitp">${activeStores().filter((s) => i.unit_prices[s.id] != null).map((s) =>
-    `<div class="urow"><span class="grow">${esc(s.name)}<span class="muted block small">${i.prices[s.id] != null ? `${eur(i.prices[s.id] * i.qty)}${i.packs && i.packs[s.id] ? ` · ${i.packs[s.id].packs} × ${esc(i.packs[s.id].size)}` : ''}` : ''}</span></span><b class="uprice">${eur(i.unit_prices[s.id])}/${per}</b><span class="uslot">${i.unit_prices[s.id] === min ? `<span class="ubadge" title="Moins cher au ${per}" aria-label="Moins cher au ${per}">${tag}</span>` : ''}</span></div>`).join('')}</div>`;
+    `<div class="urow${i.unit_prices[s.id] === min ? ' best' : ''}"${i.unit_prices[s.id] === min ? ` title="Moins cher au ${per}"` : ''}><span class="grow">${esc(s.name)}<span class="muted block small">${i.prices[s.id] != null ? `${eur(i.prices[s.id] * i.qty)}${i.packs && i.packs[s.id] ? ` · ${i.packs[s.id].packs} × ${esc(i.packs[s.id].size)}` : ''}` : ''}</span></span><b class="uprice">${eur(i.unit_prices[s.id])}/${per}</b></div>`).join('')}</div>`;
 }
 function priceHint(i) {
   const here = i.prices[i.at_store_id];
