@@ -62,6 +62,20 @@ test('contenu : menu du lendemain puis a faire a l avance, un seul message (comp
   assert.equal(P.content(hid, 'ahead', '2030-03-12'), null);
 });
 
+test('remarque propre a un repas : delai en jours, ce repas seulement', async () => {
+  const salade = (await thomas.post(`${h}/dishes`, { name: 'Salade verte' })).data.id;
+  const mid = (await thomas.post(`${h}/meals`, { date: '2031-05-12', slot: 'soir', dish_id: salade, note: 'Acheter une salade fraîche', note_days: 1 })).data.id;
+  assert.equal(P.content(hid, 'menu', '2031-05-12').body, 'Soir : Salade verte\nÀ préparer : Salade verte (soir) : Acheter une salade fraîche');
+  assert.equal(P.content(hid, 'menu', '2031-05-11'), null);
+  await thomas.patch(`${h}/meals/${mid}`, { note_days: 2 });
+  assert.equal(P.content(hid, 'menu', '2031-05-12').body, 'Soir : Salade verte');
+  const m = P.content(hid, 'menu', '2031-05-11');
+  assert.equal(m.title, 'À préparer pour demain');
+  assert.match(m.body, /^Salade verte \(\S+ soir\) : Acheter une salade fraîche$/);
+  await thomas.patch(`${h}/meals/${mid}`, { note: '' });
+  assert.equal(P.content(hid, 'menu', '2031-05-11'), null);
+});
+
 test('planificateur : a l heure, une fois par jour, abonnements expires oublies', async () => {
   sent.length = 0;
   await thomas.post(`${h}/push/subscribe`, sub('thomas-tel'));

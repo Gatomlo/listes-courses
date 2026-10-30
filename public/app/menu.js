@@ -491,6 +491,10 @@ async function stockSheet() {
         ${base.length ? `<div class="sec">Ingrédients de base</div><p class="muted small">Cocher ceux à ajouter à la liste.</p>
         ${base.map((i) => `<label class="row line"><input type="checkbox" class="cb" data-ch="pm-extra" data-pid="${i.product_id}" ${(pm.extra || []).includes(i.product_id) ? 'checked' : ''}><span class="grow">${esc(i.name)}</span></label>`).join('')}` : ''}`}</div>`;
     })()}
+    <div class="sec">${I('bell', 's')} Rappel pour ce repas</div>
+    <p class="muted small">Pour ce plat à cette date seulement, ajouté au rappel de la veille (ex. acheter une salade fraîche).</p>
+    <textarea class="txt" id="pm-note" rows="2" maxlength="300" placeholder="ex. acheter une salade fraîche">${esc(pm.note || '')}</textarea>
+    <label class="row line"><span class="grow">Rappel</span><select class="txt" id="pm-note-days">${[1, 2, 3, 7].map((n) => `<option value="${n}" ${(pm.note_days || 1) === n ? 'selected' : ''}>${n === 1 ? 'La veille' : n === 7 ? '1 semaine avant' : `${n} jours avant`}</option>`).join('')}</select></label>
     <div class="row end"><button class="btn" data-a="pm-save">${pm.id ? 'Enregistrer' : isManager() ? 'Ajouter au menu' : 'Suggérer ce plat'}</button></div>`);
 }
 // Ingredients a acheter : plat (variantes) + recettes non ecartees, un par produit.
@@ -533,8 +537,9 @@ on('change', 'pm-skip', (el) => {
   if (all) { all.dataset.on = none ? '' : '1'; all.textContent = none ? 'Tout décocher' : 'Tout cocher'; }
 });
 on('click', 'pm-save', async () => {
-  const body = { date: pm.date, slot: pm.slot, dish_id: pm.dish_id, persons: pm.persons, skip: pm.skip, extra: pm.extra || [], options: pm.options, part_skip: pm.part_skip };
-  const r = await attempt(() => (pm.id ? patch(hp(`/meals/${pm.id}`), { persons: pm.persons, skip: pm.skip, extra: pm.extra || [], options: pm.options, part_skip: pm.part_skip }) : post(hp('/meals'), body)));
+  const note = (document.getElementById('pm-note')?.value || '').trim(), note_days = Number(document.getElementById('pm-note-days')?.value) || 1;
+  const body = { date: pm.date, slot: pm.slot, dish_id: pm.dish_id, persons: pm.persons, skip: pm.skip, extra: pm.extra || [], options: pm.options, part_skip: pm.part_skip, note, note_days };
+  const r = await attempt(() => (pm.id ? patch(hp(`/meals/${pm.id}`), { persons: pm.persons, skip: pm.skip, extra: pm.extra || [], options: pm.options, part_skip: pm.part_skip, note, note_days }) : post(hp('/meals'), body)));
   if (!r) return;
   closeSheet();
   toast(pm.id ? 'Repas mis à jour · liste recalculée' : isManager() ? `${pm.dish.name} ajouté · ingrédients ajoutés à la liste de la période` : 'Plat suggéré au gestionnaire');
@@ -607,6 +612,7 @@ async function mealSheet(m) {
     <div class="row"><span class="grow">Personnes</span><b>${m.persons}</b></div>
     ${m.cost != null ? `<div class="row"><span class="grow">Coût estimé</span><b>${m.cost_partial ? 'dès ' : '≈ '}${eur(m.cost)}</b><span class="muted small">· ${eur(Math.round(m.cost / m.persons))} / pers.</span></div>` : ''}
     ${m.parts.length ? `<div class="sec">Recettes</div>${m.parts.map((x) => `<a class="item click${x.skipped ? ' skipped' : ''}" href="#/plats/${x.dish_id}" data-a="close-nav"><span class="ico plum">${I('puzzle')}</span><span class="grow">${esc(x.name)}${x.skipped ? ' <span class="muted small">· pas cette fois</span>' : ''}</span>${I('chev', 's chev')}</a>`).join('')}` : ''}
+    ${m.note ? `<div class="card ahead"><div class="row small" style="margin-bottom:4px">${I('bell', 's')}<b>Rappel</b><span class="muted">· ${m.note_days > 1 ? `${m.note_days} jours avant` : 'la veille'}</span></div><div class="pre">${esc(m.note)}</div></div>` : ''}
     ${m.skip.length ? `<p class="muted small">${I('box', 's')} ${m.skip.length} ingrédient${m.skip.length > 1 ? 's' : ''} en réserve (non acheté${m.skip.length > 1 ? 's' : ''})</p>` : ''}
     ${mgr && !m.suggestion ? `<label class="row line"><span>Liste</span><select class="txt grow" data-ch="meal-list" data-id="${m.id}">
       <option value="">Automatique (période)</option>${lists.map((l) => `<option value="${l.id}" ${m.list_id === l.id ? 'selected' : ''}>Liste du ${esc(fmtDate(l.date))}</option>`).join('')}</select></label>` : ''}
@@ -634,7 +640,7 @@ on('click', 'meal-edit', async (el) => {
   const r = await attempt(() => get(hp(`/menu?from=${el.dataset.date}&days=1`)));
   const m = r && r.meals.find((x) => x.id === Number(el.dataset.id));
   if (!m) return;
-  pm = { id: m.id, date: m.date, slot: m.slot, dish_id: m.dish_id, persons: m.persons, skip: [...m.skip], extra: [...(m.extra || [])], options: [...m.options], part_skip: [...m.part_skip] };
+  pm = { id: m.id, date: m.date, slot: m.slot, dish_id: m.dish_id, persons: m.persons, skip: [...m.skip], extra: [...(m.extra || [])], options: [...m.options], part_skip: [...m.part_skip], note: m.note || '', note_days: m.note_days || 1 };
   stockSheet();
 });
 on('click', 'meal-change', (el) => {
