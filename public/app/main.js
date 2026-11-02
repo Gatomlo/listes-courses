@@ -15,7 +15,7 @@ import './recherche.js';
 import './install.js'; // tot : retient l'invite d'installation du navigateur
 import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
-import { platsView, dishView, cookView, loadDishes, loadDish } from './plats.js';
+import { platsView, dishView, cookView, loadDishes, loadDish, publicRecipeView, loadPublicRecipe } from './plats.js';
 import { menuView, exportView, publicView, loadMenu, loadExport, loadPublic } from './menu.js';
 import { listesView, accueilView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList, todayMeals, closeCount, todoCount, rememberShop } from './listes.js';
 
@@ -117,6 +117,14 @@ async function route() {
     shell(publicView());
     return;
   }
+  // Recette partagee : sans connexion non plus.
+  if (parts[0] === 'recette' && parts[1]) {
+    S.route = ['recette', parts[1]];
+    if (S.q.rpTok !== parts[1]) { S.q.rpTok = parts[1]; delete S.q.rp; }
+    await loadPublicRecipe(parts[1]);
+    shell(publicRecipeView());
+    return;
+  }
   if (!S.me || resetPending()) { S.route = ['login']; shell(loginView()); return; }
   if (!S.me.householdId) { S.route = ['foyers']; shell(foyersView()); return; }
   let [name, arg] = parts;
@@ -165,7 +173,8 @@ setRenderer(() => {
   // Re-rendu sans recharger (sauf changement d'adresse) : on garde le defilement.
   const y = window.scrollY;
   const [name, arg] = S.route;
-  if (!S.me || resetPending()) shell(loginView());
+  if (name === 'recette') shell(publicRecipeView());
+  else if (!S.me || resetPending()) shell(loginView());
   else if (!S.me.householdId) shell(foyersView());
   else if (name === 'affichage') shell(publicView());
   else if ((name === 'catalogue' && !S.products) || ((name === 'listes' || name === 'accueil') && listNeedsLoad()) || (name === 'plats' && !S.dishes)) { route(); return; }

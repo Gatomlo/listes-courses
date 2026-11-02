@@ -236,3 +236,21 @@ test('import depuis un lien (page servie en local) ; page sans recette', async (
   assert.equal((await thomas.post(`${h}/recipe-import`, { text: ' ' })).status, 400);
   page.close();
 });
+
+test('recette partagee : lecture sans connexion, sans donnees privees, revocable', async () => {
+  assert.equal((await lea.post(`${h}/dishes/${D.lasa}/share`, {})).status, 403);
+  const { token } = (await thomas.post(`${h}/dishes/${D.lasa}/share`, {})).data;
+  assert.ok(token);
+  const anon = client();
+  let r = await anon.get(`/api/public/recipe/${token}`);
+  assert.equal(r.status, 200);
+  assert.equal(r.data.name, 'Lasagnes');
+  assert.equal(r.data.household, 'Foyer Phoenix');
+  assert.ok(r.data.ingredients.length > 0);
+  assert.ok(!('upcoming' in r.data) && !('past' in r.data) && !('id' in r.data));
+  assert.ok(!('product_id' in r.data.ingredients[0]));
+  assert.equal((await thomas.get(`${h}/dishes/${D.lasa}`)).data.share_token, token);
+  await thomas.post(`${h}/dishes/${D.lasa}/share`, { action: 'revoke' });
+  assert.equal((await anon.get(`/api/public/recipe/${token}`)).status, 404);
+  assert.equal((await anon.get('/api/public/recipe/inconnu')).status, 404);
+});

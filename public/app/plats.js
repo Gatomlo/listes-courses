@@ -303,8 +303,8 @@ export function dishView() {
   return {
     title: ed.id ? ed.name : 'Nouveau plat', back: !ed.id && S.dishReturn ? '#/menu' : '#/plats',
     sub: ed.draft ? 'Proposition à valider par un gestionnaire' : !canEdit ? 'Lecture seule (membre)' : !ro && ed.id ? 'Modification' : '',
-    right: ro ? (canEdit ? `<button class="btn sm sec2" data-a="dish-edit">${I('edit', 's')} Modifier</button>` : '')
-      : `${ed.id && mgr ? `<button class="ib" data-a="dish-merge" aria-label="Fusionner avec un autre plat" title="Fusionner">${I('merge')}</button><button class="ib" data-a="dish-del" aria-label="Supprimer">${I('trash')}</button>` : ''}${ed.id ? '<button class="btn sm sec2" data-a="dish-cancel">Annuler</button>' : ''}<button class="btn sm" data-a="dish-save">${ed.draft && mgr ? 'Valider la fiche' : 'Enregistrer'}</button>`,
+    right: ro ? (canEdit ? `${ed.id && mgr && !ed.draft ? `<button class="ib" data-a="rcp-open" aria-label="Partager la recette" title="Partager">${I('link')}</button>` : ''}<button class="btn sm sec2" data-a="dish-edit">${I('edit', 's')} Modifier</button>` : '')
+      : `${ed.id && mgr && !ed.draft ? `<button class="ib" data-a="rcp-open" aria-label="Partager la recette" title="Partager">${I('link')}</button>` : ''}${ed.id && mgr ? `<button class="ib" data-a="dish-merge" aria-label="Fusionner avec un autre plat" title="Fusionner">${I('merge')}</button><button class="ib" data-a="dish-del" aria-label="Supprimer">${I('trash')}</button>` : ''}${ed.id ? '<button class="btn sm sec2" data-a="dish-cancel">Annuler</button>' : ''}<button class="btn sm" data-a="dish-save">${ed.draft && mgr ? 'Valider la fiche' : 'Enregistrer'}</button>`,
     // Telephone en lecture : onglets juste sous la photo, informations en bas.
     body: ro && !isPc() ? `${banner}${hero}${tabsHtml}${usedIn}<div class="sec">Infos</div>${infoRo}`
       : `${banner}<div class="split dish"><div>${hero}
@@ -765,6 +765,62 @@ on('click', 'ck-ings', () => {
   const { p, list } = cookParts();
   sheet(`<h3>${I('bowl', 's')} Ingrédients · ${p} personne${p > 1 ? 's' : ''}</h3>${allIngs(list)}`);
 });
+
+// Recette ajustee a p personnes (mode cuisine et page publique) : ingredients, etapes, composants.
+function recipeBlocks(d, p) {
+  const f = p / d.portions;
+  const stepsOf = (x) => String(x || '').split('\n').map((t) => t.trim()).filter(Boolean);
+  const ings = (list, g) => (list.length ? `<div class="card">${list.map((i) => `<div class="ing"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}</span><span class="q">${i.qty == null ? '<span class="muted">selon goût</span>' : esc(amountText(i.qty * g, i))}</span></div>`).join('')}</div>` : '');
+  const block = (x, g) => { const st = stepsOf(x.steps); return `${ings(x.ingredients || [], g)}${st.length ? `<div class="card"><ol class="steps">${st.map((t) => `<li>${esc(t)}</li>`).join('')}</ol></div>` : ''}${x.notes ? `<p class="muted pre" style="margin:0 4px 10px">${esc(x.notes)}</p>` : ''}${x.url ? `<a class="btn sec2 sm" href="${esc(x.url)}" target="_blank" rel="noopener">${I('link', 's')} Recette en ligne</a>` : ''}`; };
+  return `${block({ ...d, ingredients: dishIngredients(d, null) }, f)}
+      ${(d.groups || []).length ? `<p class="muted small" style="margin:0 4px 10px">Variantes : ${d.groups.map((g) => `${esc(g.name)} (${g.options.map((o) => esc(o.name)).join(' / ')})`).join(' ; ')}. Quantités de la 1re option.</p>` : ''}
+      ${(d.parts || []).map((x) => { const g = (f * x.portions) / x.dish_portions; return `<div class="part"><div class="mid">${esc(x.name)}${x.variant ? ` · ${esc(x.variant)}` : ''}</div>
+        <p class="muted small" style="margin:2px 0 8px">${x.time_text ? `⏱ ${esc(x.time_text)} · ` : ''}${fmtQ(g * x.dish_portions)} portions (recette pour ${x.dish_portions})</p>${block(x, g)}</div>`; }).join('')}`;
+}
+const stepperCard = (p) => `<div class="card row"><span class="grow"><b>Pour ${p} personne${p > 1 ? 's' : ''}</b><span class="muted block">quantités ajustées</span></span>
+      <span class="stepper"><button data-a="rcp-p" data-d="-1" aria-label="Moins">${I('minus')}</button><b>${p}</b><button data-a="rcp-p" data-d="1" aria-label="Plus">${I('plus')}</button></span></div>`;
+// ---------- Recette partagee : page publique sans connexion (#/recette/:token) ----------
+let pubRecipe = null;
+export async function loadPublicRecipe(token) {
+  const res = await fetch(`api/public/recipe/${encodeURIComponent(token)}`);
+  pubRecipe = res.ok ? await res.json() : { error: (await res.json().catch(() => ({}))).error || 'Lien inconnu.' };
+}
+export function publicRecipeView() {
+  const d = pubRecipe;
+  if (!d || d.error) return { noNav: true, title: 'Recette', body: `<div class="card error">${esc(d ? d.error : 'Chargement…')}</div>` };
+  const p = Number(S.q.rp || d.portions);
+  const meta = `<p class="row small muted" style="margin:0 2px 10px;flex-wrap:wrap">${I('users', 's')} ${p} pers.${d.time_text ? ` · ${I('clock', 's')} ${esc(d.time_text)}` : ''}${d.tags.length ? ` · ${d.tags.map((t) => `#${esc(t)}`).join(' ')}` : ''}</p>`;
+  const photo = d.photo ? `<img class="rcp-photo" src="api/${esc(d.photo)}" alt="">` : '';
+  const sheetHtml = `<div class="rcp-print"><h1 class="mid">${esc(d.name)}</h1>${meta}${photo}${recipeBlocks(d, p)}<p class="rcp-foot muted small">Recette partagée par ${esc(d.household)} · Le Cabas</p></div>`;
+  return {
+    noNav: true, title: d.name, sub: `Partagée par ${d.household}`,
+    right: `<button class="btn sm" data-a="rcp-print">${I('doc', 's')} Imprimer</button>`,
+    body: stepperCard(p) + `<div id="print-src">${sheetHtml}</div>`,
+  };
+}
+on('click', 'rcp-p', (el) => { S.q.rp = Math.max(1, Number(S.q.rp || pubRecipe.portions) + Number(el.dataset.d)); render(); });
+on('click', 'rcp-print', () => {
+  let area = document.getElementById('print-area');
+  if (!area) { area = document.createElement('div'); area.id = 'print-area'; document.body.appendChild(area); }
+  area.innerHTML = document.getElementById('print-src').innerHTML;
+  window.print();
+});
+
+// ---------- Partage d'une recette (gestionnaire) ----------
+const shareUrl = (t) => new URL(`#/recette/${t}`, document.baseURI).href;
+function shareSheet() {
+  const t = ed.share_token, mgr = isManager();
+  const s = sheet(`<h3>Partager la recette</h3><p class="muted small">Toute personne qui a ce lien peut lire et imprimer la recette, sans compte. Ni le menu, ni les courses, ni l’historique ne sont visibles. Révocable à tout moment.</p>
+    ${t ? `<input class="txt" readonly value="${esc(shareUrl(t))}" id="rcp-url"><div class="row end"><button class="btn sec2" data-a="rcp-copy">${I('link', 's')} Copier</button><a class="btn sec2" href="${esc(shareUrl(t))}" target="_blank" rel="noopener">Ouvrir</a>${mgr ? '<button class="btn sec2 danger-t" data-a="rcp-share" data-act="revoke">Révoquer</button>' : ''}</div>`
+      : mgr ? '<div class="row end"><button class="btn" data-a="rcp-share">Créer le lien</button></div>' : '<p class="muted">Aucun lien (à créer par un gestionnaire).</p>'}`);
+  return s;
+}
+on('click', 'rcp-open', () => shareSheet());
+on('click', 'rcp-share', async (el) => {
+  const r = await attempt(() => post(hp(`/dishes/${ed.id}/share`), { action: el.dataset.act }));
+  if (r) { ed.share_token = r.token; toast(r.token ? 'Lien créé' : 'Lien révoqué'); shareSheet(); }
+});
+on('click', 'rcp-copy', async () => { const i = document.getElementById('rcp-url'); try { await navigator.clipboard.writeText(i.value); toast('Lien copié'); } catch { i.select(); } });
 // Glisser horizontalement sur l'etape : suivante / precedente.
 let swipe = null;
 document.addEventListener('touchstart', (e) => {

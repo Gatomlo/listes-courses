@@ -632,3 +632,15 @@ details.more[open]>summary::after{content:'▴'}
 .unitp .urow.best{background:var(--leaf-soft)}
 .unitp .urow.best .uprice{color:var(--leaf)}
 .unitp .uprice{min-width:92px;text-align:right;font-variant-numeric:tabular-nums}
+/* Recette partagee (page publique, impression A4 portrait) */
+.rcp-photo{display:block;width:100%;max-height:320px;object-fit:cover;border-radius:14px;margin:0 0 12px}
+.rcp-foot{margin-top:18px;text-align:center}
+@page recipe{size:A4 portrait;margin:15mm}
+@media print{
+  #print-area .rcp-print{page:recipe;color:#000;font-size:13px}
+  #print-area .rcp-print h1{font-size:28px;margin:0 0 4px}
+  #print-area .rcp-photo{max-height:70mm}
+  #print-area .rcp-print .card{box-shadow:none;border:1px solid #999;break-inside:avoid;margin-bottom:10px}
+  #print-area .rcp-print .btn{display:none}
+  #print-area .rcp-print .part{break-inside:avoid-page;margin-top:14px}
+}
