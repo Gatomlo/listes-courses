@@ -188,7 +188,20 @@ function scrollStart() {
   const d = S.route?.[0] === 'menu' && !isPc() && document.querySelector('.agenda .day.today');
   window.scrollTo(0, d ? d.getBoundingClientRect().top + window.scrollY - 70 : 0);
 }
-window.addEventListener('hashchange', () => { closeSheet(); route().then(scrollStart); });
+// Retour du navigateur : on retrouve le defilement de l'ecran quitte (liste des plats...).
+const scrollMem = {};
+let lastY = 0, backNav = false;
+window.addEventListener('scroll', () => { lastY = window.scrollY; }, { passive: true });
+window.addEventListener('popstate', () => { backNav = true; });
+window.addEventListener('hashchange', (e) => {
+  try { scrollMem[new URL(e.oldURL).hash] = lastY; } catch { /* ignore */ }
+  const back = backNav; backNav = false;
+  closeSheet();
+  route().then(() => {
+    const y = back ? scrollMem[location.hash] : undefined;
+    if (y != null) window.scrollTo(0, y); else scrollStart();
+  });
+});
 // Passage mobile <-> PC : la mise en page et l'etat des accordeons changent.
 window.matchMedia('(min-width: 900px)').addEventListener('change', () => render());
 
