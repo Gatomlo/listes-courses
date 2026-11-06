@@ -311,9 +311,12 @@ function itemRow(i, l, o = {}) {
   const check = o.shop && open && !i.suggestion
     ? `<button class="chk${i.status === 'bought' ? ' on' : ''}" data-a="item-check" data-id="${i.id}" aria-label="Acheté">${I('check')}</button>` : '';
   const priced = open && !i.deleted;
+  const toNext = summary && summary.upcoming.find((x) => !overdue(x));
   const right = i.suggestion && open
     ? (mgr ? `<button class="ib" data-a="sugg-no" data-id="${i.id}" aria-label="Refuser">${I('x')}</button><button class="btn sm" data-a="sugg-ok" data-id="${i.id}" aria-label="Accepter">${I('check', 's')}</button>`
       : mine ? `<button class="ib" data-a="item-del" data-id="${i.id}" aria-label="Retirer">${I('x')}</button>` : '')
+    : l.type === 'backlog' && open && mgr && toNext && !isTemp(i.id)
+      ? `<button class="ib" data-a="item-move" data-id="${i.id}" data-to="${toNext.id}" aria-label="Ajouter à la liste du ${esc(fmtDate(toNext.date))}" title="Ajouter à la liste du ${esc(fmtDate(toNext.date))}">${I('plus')}</button>`
     : o.shop && open && mgr && i.status === 'todo' && !isTemp(i.id) ? ''
     : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click" data-a="item-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid != null ? esc(eur(i.paid)) : `${I('plus', 's')} prix`}</button>`
     : '';
