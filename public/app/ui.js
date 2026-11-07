@@ -120,3 +120,7 @@ export function formData(root) {
   });
   return out;
 }
+
+// Reglage de l'appareil : proposer de verifier le menu apres une cloture de liste (actif par defaut).
+export const closeCheckOn = () => { try { return localStorage.getItem('cabas-close-check') !== '0'; } catch { return true; } };
+export const setCloseCheck = (on) => { try { localStorage.setItem('cabas-close-check', on ? '1' : '0'); } catch { /* ignore */ } };

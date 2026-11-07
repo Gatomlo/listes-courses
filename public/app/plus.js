@@ -1,6 +1,6 @@
 // Onglet Plus (produits, magasins, promos, foyer, compte, outils), écran Promos et
 // bouton ＋ d'ajout rapide (article, repas, envie, plat, promo, ticket).
-import { esc, eur, fmtDate, on, sheet, topSheet, closeSheet, toast, formData, localDay } from './ui.js';
+import { esc, eur, fmtDate, on, sheet, topSheet, closeSheet, toast, formData, localDay, closeCheckOn, setCloseCheck } from './ui.js';
 import { get, post, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadProducts, activeStores, storeById } from './state.js';
 import { I } from './icons.js';
@@ -26,11 +26,16 @@ function plusBody() {
         ${row('#/foyer', 'users', 'Foyer', `${H.members.length} membre${H.members.length > 1 ? 's' : ''} · réglages · avancé`)}
       </div>` : ''}`;
 }
+on('click', 'close-check', (el) => {
+  const on_ = !closeCheckOn(); setCloseCheck(on_);
+  const sub = el.querySelector('.muted'); if (sub) sub.textContent = on_ ? 'Activé · touchez pour désactiver' : 'Désactivé · touchez pour activer';
+});
 // Profil : rappel de la veille, installation, foyers, mot de passe, quitter le foyer, deconnexion.
 on('click', 'profile', () => {
   const H = S.house, me = H.members.find((m) => m.me) || { name: S.me.name };
   sheet(`<div class="row gap" style="margin-bottom:10px"><span class="avatar">${esc((me.name || '?')[0])}</span><span class="grow"><b>${esc(S.me.name)}</b><span class="muted block">${isManager() ? 'Gestionnaire' : 'Membre'} · ${esc(H.household.name)}</span></span></div>
     <div class="group tiles">
+      ${isManager() ? act('close-check', 'check', 'Vérifier le menu après une clôture', closeCheckOn() ? 'Activé · touchez pour désactiver' : 'Désactivé · touchez pour activer') : ''}
       ${act('push-open', 'bell', 'Rappel de la veille', rappelsSub())}
       ${isInstalled() ? '' : act('install', 'phone', 'Installer l’app', 'Sur l’écran d’accueil, utilisable sans réseau', 'leaf')}
       ${row('#/foyers', 'users', 'Mes foyers', 'Changer de foyer')}

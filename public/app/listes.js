@@ -1,6 +1,6 @@
 // Listes : accueil (A prevoir, prochaines courses, historique), detail d'une liste
 // (articles par rayon, ajout, suggestions, fiche article, actions), creation, cloture.
-import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
+import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay, closeCheckOn } from './ui.js';
 import { get, post, put, patch, del, attempt, sync, newOp, setCached, net } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
 import { packBlock, unitOptions, catOptions, catSubOptions, subName, contField, contSold } from './catalogue.js';
@@ -755,9 +755,41 @@ function matches(q) {
   if (!n) return [];
   return S.products.filter((p) => norm(p.name).includes(n)).sort((a, b) => norm(a.name).indexOf(n) - norm(b.name).indexOf(n)).slice(0, 6);
 }
-on('click', 'add-open', () => sheet(`<h3>${isManager() ? 'Ajouter un article' : 'Suggérer un article'}</h3>
+const addSheet = () => sheet(`<h3>${isManager() ? 'Ajouter un article' : 'Suggérer un article'}</h3>
   <div class="addbox"><div class="row"><input class="txt grow" id="add-q" autocomplete="off" autofocus placeholder="Rechercher un produit ou en saisir plusieurs : lait, 2 beurre…" data-in="add-q" data-enter="add-first">${micButton('add-q')}</div><div id="add-ac"></div></div>
-  <div class="row" style="margin-top:10px"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1" aria-label="Moins">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="1"><button class="btn sm sec2" data-a="qty" data-d="1" aria-label="Plus">＋</button></div>`));
+  <div class="row" style="margin-top:10px"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1" aria-label="Moins">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="1"><button class="btn sm sec2" data-a="qty" data-d="1" aria-label="Plus">＋</button></div>`);
+// Liste datee passee et non cloturee : demander s'il faut la cloturer (nouvelle liste) ou continuer dessus.
+// Resout { list_id } (nouvelle liste), {} (continuer) ou null (annule / echec).
+export function askPastList(l) {
+  return new Promise((resolve) => {
+    const s = sheet(`<h3>La liste du ${esc(fmtDate(l.date, { day: 'numeric', month: 'long' }))} est passée</h3>
+      <p class="muted">Elle n’a pas été clôturée. Où ajouter ?</p>
+      <button class="btn full" data-r="new">Clôturer et utiliser une nouvelle liste</button>
+      <p class="muted small">Les articles non achetés passent dans la nouvelle liste.</p>
+      <button class="btn sec2 full" data-r="old">Continuer sur l’ancienne liste</button>`);
+    s.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-r]');
+      if (!b) return;
+      if (b.dataset.r === 'old') { closeSheet(); resolve({}); return; }
+      const r = await attempt(() => post(hp(`/lists/${l.id}/close`), { fates: {} }));
+      closeSheet();
+      if (!r) { resolve(null); return; }
+      summary = null;
+      toast(r.created ? `Liste clôturée · liste du ${fmtDate(r.created_date, { day: 'numeric', month: 'long' })} créée` : 'Liste clôturée');
+      resolve({ list_id: r.next || undefined });
+    });
+  });
+}
+on('click', 'add-open', async () => {
+  const l = current;
+  if (isManager() && l && l.type === 'dated' && l.status !== 'closed' && l.date < localDay() && S.route[0] !== 'magasin' && !S.q[`pastok${l.id}`]) {
+    const r = await askPastList(l);
+    if (!r) return;
+    if (r.list_id) { go(`#/listes/${r.list_id}`); setTimeout(() => document.querySelector('[data-a="add-open"]')?.click(), 600); return; }
+    S.q[`pastok${l.id}`] = true;
+  }
+  addSheet();
+});
 on('input', 'add-q', (el) => {
   const q = el.value.trim(), ms = q.includes(',') ? [] : matches(q);
   if (q.includes(',')) { const n = q.split(',').filter((x) => x.trim()).length; document.getElementById('add-ac').innerHTML = `<div class="ac"><button data-a="add-first"><b>Ajouter ${n} article${n > 1 ? 's' : ''}</b></button></div>`; return; }
@@ -980,9 +1012,21 @@ function closeListSheet() {
 on('click', 'list-close-ok', async () => {
   const fates = {};
   document.querySelectorAll('.sheet [data-fate]').forEach((s) => { fates[s.dataset.fate] = s.value; });
+  const nx = current.next ? current.next.date : null;
   const r = await attempt(() => post(hp(`/lists/${current.id}/close`), { fates }));
-  if (r) { closeSheet(); summary = null; toast(r.created ? `Liste clôturée · liste du ${fmtDate(r.created_date, { day: 'numeric', month: 'long' })} créée (prochain menu)` : 'Liste clôturée'); await refreshList(); if (S.route[0] === 'magasin') go(`#/listes/${current.id}`); }
+  if (r) {
+    closeSheet(); summary = null; toast(r.created ? `Liste clôturée · liste du ${fmtDate(r.created_date, { day: 'numeric', month: 'long' })} créée (prochain menu)` : 'Liste clôturée');
+    await refreshList(); if (S.route[0] === 'magasin') go(`#/listes/${current.id}`);
+    if (closeCheckOn()) setTimeout(() => menuCheckSheet(r.created_date || nx), 350);
+  }
 });
+// Apres une cloture : proposer de relire le menu pour ne rien oublier (reglage dans le profil).
+function menuCheckSheet(date) {
+  sheet(`<h3>Rien oublié ?</h3><p class="muted">Voulez-vous vérifier le menu pour voir si vous n’avez rien oublié ?</p>
+    <div class="row end"><button class="btn sec2" data-a="close">Non merci</button><button class="btn" data-a="menu-check-go" data-date="${date || ''}">${I('bowl', 's')} Voir le menu</button></div>
+    <p class="muted small">Cette proposition se désactive dans le profil.</p>`);
+}
+on('click', 'menu-check-go', (el) => { closeSheet(); S.menuAt = el.dataset.date || null; go('#/menu'); });
 on('click', 'list-copy', async () => {
   const r = await attempt(() => post(hp(`/lists/${current.id}/copy-to-backlog`)));
   if (r) toast(`${r.copied} article${r.copied > 1 ? 's' : ''} copié${r.copied > 1 ? 's' : ''} dans « À prévoir »`);

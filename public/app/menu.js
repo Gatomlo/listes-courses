@@ -6,6 +6,7 @@ import { S, hp, isManager, render, go, loadHouse } from './state.js';
 import { SLOT, allTags, loadDishes, newDishFrom, chosenOf, dishIngredients, tile, ppShort } from './plats.js';
 import { I, btnI } from './icons.js';
 import { ruleText, copyRules } from './modeles.js';
+import { askPastList } from './listes.js';
 
 const SLOTS = ['pdj', 'midi', 'soir', 'coll'];
 const today = () => localDay();
@@ -336,12 +337,28 @@ document.addEventListener('touchcancel', touchEnd);
 document.addEventListener('click', (e) => { if (touch.swallow) { touch.swallow = false; e.stopPropagation(); e.preventDefault(); } }, true);
 document.addEventListener('contextmenu', (e) => { if (e.target.closest && e.target.closest('[data-drag]') && !isPc()) e.preventDefault(); });
 
+// Repas ajoute alors que sa liste datee est passee et non cloturee : cloturer (nouvelle liste) ou continuer.
+// Resout { list_id? } ou null (annule).
+async function pastGuard(date) {
+  if (!isManager() || !menu || date < localDay()) return {};
+  const ls = menu.lists, rhythm = S.house.household.rhythm_days;
+  const add = (iso, n) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };
+  let found = null;
+  ls.forEach((l, i) => { if (date >= l.date && date <= (ls[i + 1] ? add(ls[i + 1].date, -1) : add(l.date, rhythm - 1))) found = l; });
+  const open = ls.filter((l) => l.status !== 'closed');
+  const past = found ? (found.status !== 'closed' && found.date < localDay() ? found : null)
+    : (open.length && !open.some((l) => l.date >= localDay()) ? open[open.length - 1] : null);
+  if (!past) return {};
+  return askPastList(past);
+}
 // Lacher : repas deplace (id numerique) ou envie posee sur un creneau libre (id « w<plat> »).
 async function dropOn(id, date, slot) {
   if (String(id).startsWith('w')) {
     if (mealAt(date, slot) || outAt(date, slot)) { toast('Ce créneau est déjà pris : glissez l’envie sur un créneau libre.', true); return; }
     const dish_id = Number(String(id).slice(1)), w = (S.wishes || []).find((x) => x.dish_id === dish_id);
-    if (await attempt(() => post(hp('/meals'), { date, slot, dish_id, persons: 4 }))) { toast(`${w ? w.name : 'Plat'} au menu`); afterChange(); }
+    const g = await pastGuard(date);
+    if (!g) return;
+    if (await attempt(() => post(hp('/meals'), { date, slot, dish_id, persons: 4, ...(g.list_id ? { list_id: g.list_id } : {}) }))) { toast(`${w ? w.name : 'Plat'} au menu`); afterChange(); }
     return;
   }
   if (String(id).startsWith('o')) {
@@ -539,6 +556,7 @@ on('change', 'pm-skip', (el) => {
 on('click', 'pm-save', async () => {
   const note = (document.getElementById('pm-note')?.value || '').trim(), note_days = Number(document.getElementById('pm-note-days')?.value) || 1;
   const body = { date: pm.date, slot: pm.slot, dish_id: pm.dish_id, persons: pm.persons, skip: pm.skip, extra: pm.extra || [], options: pm.options, part_skip: pm.part_skip, note, note_days };
+  if (!pm.id) { const g = await pastGuard(pm.date); if (!g) return; if (g.list_id) body.list_id = g.list_id; }
   const r = await attempt(() => (pm.id ? patch(hp(`/meals/${pm.id}`), { persons: pm.persons, skip: pm.skip, extra: pm.extra || [], options: pm.options, part_skip: pm.part_skip, note, note_days }) : post(hp('/meals'), body)));
   if (!r) return;
   closeSheet();
