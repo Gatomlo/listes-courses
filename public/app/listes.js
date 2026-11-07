@@ -32,6 +32,7 @@ export async function loadSummary() {
     get(hp(`/menu?from=${localDay()}&days=${isPc() ? 7 : 2}`)).catch(() => null)]);
 }
 export async function loadList(id, shop) {
+  if (shop) get(menuUrl()).catch(() => {}); // menu garde sur l'appareil avec la liste
   current = await get(hp(`/lists/${id}`));
   if (!S.products) await loadProducts();
   // Entrer dans le mode courses = partir faire les courses : la liste passe « En courses »
@@ -525,6 +526,23 @@ on('click', 'close-go', (el) => { closeSheet(); go(el.getAttribute('href')); });
 
 // Magasins dont les articles sont masques en mode courses (par liste, sur l'appareil).
 const hiddenStores = (l) => S.q[`shopf${l.id}`] || [];
+// Menu consultable sans quitter le mode courses (lecture seule ; la copie locale sert hors-ligne,
+// prechargee avec la liste et par offline.js).
+const menuUrl = () => hp(`/menu?from=${localDay()}&days=7`);
+on('click', 'shop-menu', async () => {
+  const body = (m) => {
+    const days = [...new Set([...m.meals.map((x) => x.date), ...(m.outings || []).map((x) => x.date)])].sort();
+    const sl = ['pdj', 'midi', 'soir', 'coll'];
+    return days.length ? days.map((d) => `<div class="sec">${esc(fmtDate(d, { weekday: 'long', day: 'numeric', month: 'short' }))}</div>${sl.map((k) => {
+      const o = (m.outings || []).find((x) => x.date === d && x.slot === k);
+      const r = m.meals.filter((x) => x.date === d && x.slot === k && !x.suggestion);
+      if (!o && !r.length) return '';
+      return `<div class="row line"><span class="muted" style="min-width:5.5em">${esc(SLOT[k])}</span><span class="grow">${o ? esc(o.rest ? `Restes${o.dish ? ' · ' + o.dish : ''}` : 'À l’extérieur') + (o.note ? ` — ${esc(o.note)}` : '') : r.map((x) => esc(x.dish) + (x.persons !== 4 ? ` <span class="muted small">${x.persons} p.</span>` : '')).join('<br>')}</span></div>`;
+    }).join('')}`).join('') : '<p class="muted">Aucun repas prévu.</p>';
+  };
+  const m = await get(menuUrl()).catch(() => null);
+  sheet(`<h3>Menu</h3>${m ? body(m) : '<p class="muted">Menu indisponible (jamais chargé sur cet appareil).</p>'}`);
+});
 on('click', 'shop-switch', () => shopPickSheet(current));
 function shopFilterSheet() {
   const l = current, sid = Number(S.route[2]), real = l.items.filter((i) => !i.suggestion);
@@ -574,7 +592,7 @@ export function storeListView(sid) {
   const endLbl = all ? 'Terminer les courses' : `Terminer chez ${s.name}`;
   return {
     title: s.name, titleAct: stores.length > 1 ? 'shop-switch' : '', titleLabel: 'Changer de magasin', back: `#/listes/${l.id}`, noNav: true, sub: `Courses du ${shortTitle(l)}${isAwake() ? ' · écran allumé' : ''}`,
-    right: stores.length > 1 ? `<button class="ib" data-a="shop-switch" aria-label="Changer de magasin" title="Changer de magasin">${I('store')}</button>` : '',
+    right: `<button class="ib" data-a="shop-menu" aria-label="Voir le menu" title="Voir le menu">${I('bowl')}</button>${stores.length > 1 ? `<button class="ib" data-a="shop-switch" aria-label="Changer de magasin" title="Changer de magasin">${I('store')}</button>` : ''}`,
     body: `<div class="shop">
       <div class="shopbar2" style="--c:${esc(s.color)}"><b>${done.length}/${items.length}</b><div class="prog"><i style="width:${pct}%"></i></div><span class="price muted small">≈ ${eur(total)}</span>
         ${others(l).length ? `<span class="avatar sm" style="--c:var(--plum)" title="${esc(others(l).join(', '))} ${others(l).length > 1 ? 'sont' : 'est'} aussi sur cette liste">${esc(others(l)[0][0])}</span>` : ''}</div>
