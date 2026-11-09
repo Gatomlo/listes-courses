@@ -124,7 +124,7 @@ function filterSheet() {
       <div class="sec">Afficher</div><div class="opt wrap">${FILTERS.map(([k, t]) => `<button class="${(S.q.dishFilter || 'all') === k ? 'on' : ''}" data-a="fs-set" data-k="dishFilter" data-v="${k}">${t}</button>`).join('')}</div>
       <div class="sec">Repas</div><div class="seg">${SLOT_ORDER.map((k) => `<button class="${S.q.dishSlot === k ? 'on' : ''}" data-a="fs-set" data-k="dishSlot" data-v="${k}">${SLOT[k]}</button>`).join('')}</div>
       <div class="sec">Prix par personne</div><div class="opt wrap">${PRICES.filter(([k]) => k).map(([k, t]) => `<button class="${S.q.dishPrice === k ? 'on' : ''}" data-a="fs-set" data-k="dishPrice" data-v="${k}">${t}</button>`).join('')}</div>
-      <div class="group" style="margin-top:14px">${pick('Type', 'type', S.q.dishType, 'Tous les types')}${pick('Tag', 'tag', S.q.dishTag && `#${S.q.dishTag}`, 'Tous les tags')}</div>
+      <div class="group" style="margin-top:14px">${S.house.household.adv_menu ? pick('Type', 'type', S.q.dishType, 'Tous les types') : ''}${pick('Tag', 'tag', S.q.dishTag && `#${S.q.dishTag}`, 'Tous les tags')}</div>
       <div class="row gap" style="margin-top:14px">${activeFilters().length ? `<button class="btn sec2" data-a="fs-clear">Effacer</button>` : ''}<button class="btn grow" data-a="close">Voir ${n} plat${n > 1 ? 's' : ''}</button></div>`;
   } else {
     html = `<div class="row"><button class="ib" data-a="fs-view" data-v="main" aria-label="Retour">${I('back')}</button><h3 style="margin:0">${fview === 'type' ? 'Type' : 'Tag'}</h3></div>
@@ -288,9 +288,9 @@ export function dishView() {
       <label class="grow"><span class="muted small">Temps</span><input class="txt" value="${esc(ed.time_text)}" placeholder="ex. 45 min" data-ch="ed" data-f="time_text"></label></div>
       <label class="muted small">Repas possibles <span class="fw4">(génération du menu)</span></label>
       <div class="opt" style="margin:4px 0 8px;padding:2px 0;flex-wrap:wrap">${SLOT_ORDER.map((k) => `<button class="${ed.slots.includes(k) ? 'on' : ''}" data-a="ed-slot" data-s="${k}">${SLOT[k]}</button>`).join('')}</div>
-      <label class="muted small">Types <span class="fw4">(modèles de semaine)</span></label>
+      ${S.house.household.adv_menu ? `      <label class="muted small">Types <span class="fw4">(modèles de semaine)</span></label>
       <div class="opt" style="margin:4px 0 4px;padding:2px 0;flex-wrap:wrap">${allTypes().map((t) => `<button class="${ed.types.includes(t) ? 'on' : ''}" data-a="ed-type" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div>
-      <div class="row gap" style="margin-bottom:8px"><input class="txt grow" id="type-new" placeholder="Autre type (ex. poisson, pâtes…)" data-enter="type-new"><button class="btn sm sec2" data-a="type-new">＋</button></div>
+      <div class="row gap" style="margin-bottom:8px"><input class="txt grow" id="type-new" placeholder="Autre type (ex. poisson, pâtes…)" data-enter="type-new"><button class="btn sm sec2" data-a="type-new">＋</button></div>` : ''}
       <label class="muted small">Tags</label>
       <div class="pills">${ed.tags.map((t, k) => (norm(t) === 'economique' ? `<span class="pill p-leaf" title="Automatique : coût par personne sous le palier des réglages">#${esc(t)} · auto</span>` : `<span class="pill p-grey">#${esc(t)} <button class="x" data-a="tag-rm" data-i="${k}" aria-label="Retirer">✕</button></span>`)).join('')}</div>
       <div class="row gap" style="margin-top:6px"><input class="txt grow" id="tag-in" autocomplete="off" placeholder="Chercher ou créer un tag…" data-in="tag-q" data-enter="tag-add"><button class="btn sm sec2" data-a="tag-add">＋</button></div>

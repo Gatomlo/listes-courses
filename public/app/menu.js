@@ -176,9 +176,9 @@ function genSheet() {
     <div class="sec">Tags${gen.tags.length ? ` · ${gen.tags.length}` : ''}</div>
     ${tags.length ? `<div class="opt tags">${tags.map((t) => `<button class="${gen.tags.includes(t) ? 'on' : ''}" data-a="gen-tag" data-t="${esc(t)}">#${esc(t)}</button>`).join('')}</div>
       <p class="muted small">D’abord les plats qui ont tous les tags choisis, puis ceux qui en ont au moins un, sinon les autres (le délai est toujours respecté).</p>` : '<p class="muted small">Aucun tag : ajoutez-en sur les fiches des plats.</p>'}
-    <div class="sec">Modèle de semaine</div>
+    ${S.house.household.adv_menu ? `    <div class="sec">Modèle de semaine</div>
     <select class="txt" data-ch="gen-model"><option value="none" ${gen.model === 'none' ? 'selected' : ''}>Aucun modèle (repas libres)</option>${(S.house.models || []).map((m) => `<option value="${m.id}" ${String(m.id) === gen.model ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>
-    <p class="muted small">${gen.model !== 'none' ? (gen.rules.length ? `Par semaine : ${gen.rules.map(ruleText).join(' · ')}.` : 'Ce modèle n’a pas de règle.') : 'Seuls le délai et les tags guident le choix.'} Les modèles se créent et se modifient dans Foyer → Modèles de semaine.</p>
+    <p class="muted small">${gen.model !== 'none' ? (gen.rules.length ? `Par semaine : ${gen.rules.map(ruleText).join(' · ')}.` : 'Ce modèle n’a pas de règle.') : 'Seuls le délai et les tags guident le choix.'} Les modèles se créent et se modifient dans Foyer → Modèles de semaine.</p>` : ''}
     <p class="muted small">${I('bulb', 's')} Les envies passent en premier, même sans tag ni type (seuls le repas, le délai et les règles du modèle comptent). Un plat n’est proposé que pour ses repas possibles (fiche du plat ; par défaut midi et soir).</p>
     <div class="row end"><button class="btn" data-a="gen-go">${I('spark', 's')} Proposer</button></div>`);
 }
@@ -626,12 +626,14 @@ async function mealSheet(m) {
   m = { parts: [], part_skip: [], ...m };
   const mgr = isManager();
   const lists = (await get(hp('/lists')).catch(() => ({ upcoming: [] }))).upcoming;
+  const nextL = lists.find((l) => l.status !== 'closed' && l.date >= localDay());
   sheet(`<h3>${esc(m.dish)}</h3><p class="muted">${esc(fmtDate(m.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[m.slot]}${m.suggestion ? ` · suggéré par ${esc(m.suggested_by_name || '?')}` : ''}</p>
     <div class="row"><span class="grow">Personnes</span><b>${m.persons}</b></div>
     ${m.cost != null ? `<div class="row"><span class="grow">Coût estimé</span><b>${m.cost_partial ? 'dès ' : '≈ '}${eur(m.cost)}</b><span class="muted small">· ${eur(Math.round(m.cost / m.persons))} / pers.</span></div>` : ''}
     ${m.parts.length ? `<div class="sec">Recettes</div>${m.parts.map((x) => `<a class="item click${x.skipped ? ' skipped' : ''}" href="#/plats/${x.dish_id}" data-a="close-nav"><span class="ico plum">${I('puzzle')}</span><span class="grow">${esc(x.name)}${x.skipped ? ' <span class="muted small">· pas cette fois</span>' : ''}</span>${I('chev', 's chev')}</a>`).join('')}` : ''}
     ${m.note ? `<div class="card ahead"><div class="row small" style="margin-bottom:4px">${I('bell', 's')}<b>Rappel</b><span class="muted">· ${m.note_days > 1 ? `${m.note_days} jours avant` : 'la veille'}</span></div><div class="pre">${esc(m.note)}</div></div>` : ''}
     ${m.skip.length ? `<p class="muted small">${I('box', 's')} ${m.skip.length} ingrédient${m.skip.length > 1 ? 's' : ''} en réserve (non acheté${m.skip.length > 1 ? 's' : ''})</p>` : ''}
+    ${mgr && !m.suggestion && nextL && m.list_id !== nextL.id ? `<button class="btn sec2 full" style="margin:6px 0" data-a="meal-to-next" data-id="${m.id}" data-to="${nextL.id}">${I('basket', 's')} Ajouter les ingrédients à la liste du ${esc(fmtDate(nextL.date))}</button>` : ''}
     ${mgr && !m.suggestion ? `<label class="row line"><span>Liste</span><select class="txt grow" data-ch="meal-list" data-id="${m.id}">
       <option value="">Automatique (période)</option>${lists.map((l) => `<option value="${l.id}" ${m.list_id === l.id ? 'selected' : ''}>Liste du ${esc(fmtDate(l.date))}</option>`).join('')}</select></label>` : ''}
     <a class="btn full" style="margin-top:12px" href="#/plats/${m.dish_id}" data-a="close-nav">${I('book', 's')} Fiche du plat</a>
@@ -641,6 +643,9 @@ async function mealSheet(m) {
       ${mgr || (m.suggestion && m.suggested_by === S.me.id) ? btnI('trash', m.suggestion ? 'Refuser / retirer' : 'Retirer du menu', `data-a="meal-del" data-id="${m.id}"`, 'sec2 danger-t') : ''}
     </div>`);
 }
+on('click', 'meal-to-next', async (el) => {
+  if (await attempt(() => patch(hp(`/meals/${el.dataset.id}`), { list_id: el.dataset.to }))) { toast('Ingrédients ajoutés à la liste'); closeSheet(); afterChange(); }
+});
 on('change', 'meal-list', async (el) => {
   if (await attempt(() => patch(hp(`/meals/${el.dataset.id}`), { list_id: el.value }))) { toast('Repas rattaché · ingrédients déplacés'); closeSheet(); afterChange(); }
 });

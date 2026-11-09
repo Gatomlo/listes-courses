@@ -27,27 +27,31 @@ export function foyerView() {
     right: '<button class="btn sm sec2" data-a="go" data-to="#/foyers">Mes foyers</button>',
     body: `${acc('mem', { icon: `${I('users', 's')} `, title: 'Membres', sum: ` · ${H.members.length} personne${H.members.length > 1 ? 's' : ''}`, def: true,
         body: members + (mgr ? '<button class="btn sec2 full" style="margin:8px 0" data-a="invite">＋ Inviter un membre</button>' : '') })}
-      ${acc('set', { icon: `${I('sliders', 's')} `, title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, ${h.avg_records} relevés, courses ${h.rhythm_days} j, menu ${h.menu_days} j dès le ${DOW[h.menu_start_dow]}, plat ≥ ${h.menu_gap_days} j`,
+      ${acc('set', { icon: `${I('sliders', 's')} `, title: 'Réglages', sum: ` · seuil ${eur(h.threshold_cents)}, courses ${h.rhythm_days} j, menu ${h.menu_days} j`,
         body: `<div class="form">
           <label class="row"><span class="grow"><b>Nom du foyer</b></span><input class="txt w12" name="name" value="${esc(h.name)}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Seuil « 2 magasins »</b><span class="muted block">Économie minimale (€) pour conseiller de faire les deux</span></span><input class="txt w5" name="threshold" inputmode="decimal" value="${(h.threshold_cents / 100).toFixed(2).replace('.', ',')}" ${mgr ? '' : 'disabled'}></label>
-          <label class="row"><span class="grow"><b>Palier « Économique » (€ par personne)</b><span class="muted block">Un plat dont le coût par personne est en dessous reçoit automatiquement le tag Économique. Vide : pas de tag.</span></span><input class="txt w5" name="eco" inputmode="decimal" placeholder="—" value="${h.eco_cents ? (h.eco_cents / 100).toFixed(2).replace('.', ',') : ''}" ${mgr ? '' : 'disabled'}></label>
-          <label class="row"><span class="grow"><b>Prix moyen</b><span class="muted block">Nombre de derniers relevés pris en compte</span></span><input class="txt w5" type="number" min="1" max="20" name="avg_records" value="${h.avg_records}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Rythme des courses</b><span class="muted block">Jours entre deux listes (date proposée)</span></span><input class="txt w5" type="number" min="1" max="90" name="rhythm_days" value="${h.rhythm_days}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Durée d'un menu</b><span class="muted block">Jours proposés pour un nouveau menu</span></span><input class="txt w5" type="number" min="1" max="62" name="menu_days" value="${h.menu_days}" ${mgr ? '' : 'disabled'}></label>
+          <details class="more"><summary>Plus de réglages <span class="muted fw4">prix moyen, premier jour du menu, délai des plats, palier économique</span></summary>
+          <label class="row"><span class="grow"><b>Palier « Économique » (€ par personne)</b><span class="muted block">Un plat dont le coût par personne est en dessous reçoit automatiquement le tag Économique. Vide : pas de tag.</span></span><input class="txt w5" name="eco" inputmode="decimal" placeholder="—" value="${h.eco_cents ? (h.eco_cents / 100).toFixed(2).replace('.', ',') : ''}" ${mgr ? '' : 'disabled'}></label>
+          <label class="row"><span class="grow"><b>Prix moyen</b><span class="muted block">Nombre de derniers relevés pris en compte</span></span><input class="txt w5" type="number" min="1" max="20" name="avg_records" value="${h.avg_records}" ${mgr ? '' : 'disabled'}></label>
           <label class="row"><span class="grow"><b>Premier jour d'un menu</b><span class="muted block">Quand aucun menu n'est enregistré avant</span></span><select class="txt w8" name="menu_start_dow" ${mgr ? '' : 'disabled'}>${[1, 2, 3, 4, 5, 6, 0].map((i) => `<option value="${i}" ${i === h.menu_start_dow ? 'selected' : ''}>${DOW[i]}</option>`).join('')}</select></label>
           <label class="row"><span class="grow"><b>Délai avant de reproposer un plat</b><span class="muted block">Génération du menu : jours sans ce plat avant de le proposer à nouveau</span></span><input class="txt w5" type="number" min="0" max="365" name="menu_gap_days" value="${h.menu_gap_days}" ${mgr ? '' : 'disabled'}></label>
+          </details>
+          <label class="row"><span class="grow"><b>Fonctions avancées du menu</b><span class="muted block">Types de plats et modèles de semaine (génération du menu)</span></span><input type="checkbox" class="cb" name="adv_menu" ${h.adv_menu ? 'checked' : ''} ${mgr ? '' : 'disabled'}></label>
           ${mgr ? '<div class="row end"><button class="btn" data-a="settings-save">Enregistrer</button></div>' : ''}</div>` })}
       ${acc('tags', { icon: `${I('tag', 's')} `, title: 'Tags des plats', sum: ` · ${H.tags.length}`,
         body: H.tags.map((t) => `<div class="ord"><span class="grow">#${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}${t.auto ? ` · automatique${H.household.eco_cents ? `, sous ${eur(H.household.eco_cents)} par personne` : ' (palier à fixer dans les réglages)'}` : ''}</span></span>
           ${mgr && !t.auto ? `<button class="ic" title="Renommer" data-a="tag-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="tag-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="tag-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
           || '<p class="muted">Aucun tag : ajoutez-en depuis la fiche d’un plat.</p>' })}
-      ${mgr ? acc('adv', { icon: `${I('sliders', 's')} `, title: 'Avancé', sum: ` · modèles de semaine, types, imports, lien d’affichage`,
-        body: `<div class="sec" style="margin-top:0">Modèles de semaine · ${H.models.length}</div>${modelsBody}
-          <div class="sec">Types de plats · ${H.types.length}</div>${typesBody}
-          <div class="sec">Imports et affichage</div><div class="group tiles">
+      ${mgr ? acc('adv', { icon: `${I('sliders', 's')} `, title: 'Avancé', sum: ` · imports, lien d’affichage${h.adv_menu ? ', modèles, types' : ''}`,
+        body: `${h.adv_menu ? `<div class="sec" style="margin-top:0">Modèles de semaine · ${H.models.length}</div>${modelsBody}
+          <div class="sec">Types de plats · ${H.types.length}</div>${typesBody}` : ''}
+          <div class="sec"${h.adv_menu ? '' : ' style="margin-top:0"'}>Imports et affichage</div><div class="group tiles">
             <button class="item click" data-a="csv-open"><span class="ico">${I('upload')}</span><span class="grow"><b>Importer des produits</b><span class="muted block">Fichier CSV, avec relevés de prix</span></span>${I('chev', 's chev')}</button>
             <button class="item click" data-a="dish-csv-open"><span class="ico">${I('upload')}</span><span class="grow"><b>Importer des plats</b><span class="muted block">Fichier CSV : repas, tags, ingrédients</span></span>${I('chev', 's chev')}</button>
+            <a class="item click" href="api/h/${S.me.householdId}/export" download><span class="ico">${I('doc')}</span><span class="grow"><b>Sauvegarde complète</b><span class="muted block">Télécharger toutes les données du foyer (JSON)</span></span>${I('chev', 's chev')}</a>
             <a class="item click" href="#/menu/export"><span class="ico">${I('link')}</span><span class="grow"><b>Lien d’affichage du menu</b><span class="muted block">Page publique en lecture seule, export A4</span></span>${I('chev', 's chev')}</a></div>` }) : ''}`,
   };
 }
@@ -59,7 +63,7 @@ on('click', 'settings-save', async () => {
   const threshold_cents = Math.round(parseFloat(String(f.threshold).replace(',', '.')) * 100);
   const eco = parseFloat(String(f.eco || '').replace(',', '.'));
   const eco_cents = eco > 0 ? Math.round(eco * 100) : '';
-  if (await attempt(() => patch(hp(), { name: f.name, threshold_cents, avg_records: f.avg_records, rhythm_days: f.rhythm_days, menu_days: f.menu_days, menu_start_dow: f.menu_start_dow, menu_gap_days: f.menu_gap_days, eco_cents }))) {
+  if (await attempt(() => patch(hp(), { name: f.name, threshold_cents, avg_records: f.avg_records, rhythm_days: f.rhythm_days, menu_days: f.menu_days, menu_start_dow: f.menu_start_dow, menu_gap_days: f.menu_gap_days, eco_cents, adv_menu: !!f.adv_menu }))) {
     toast('Réglages enregistrés'); await refresh();
   }
 });

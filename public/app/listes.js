@@ -207,13 +207,16 @@ export function listesView() {
   const listRow = (l) => `<a class="item click" href="#/listes/${l.id}"><span class="ico ${l.status === 'shopping' ? 'leaf' : ''}">${I(l.status === 'closed' ? 'check' : 'basket')}</span>
     <span class="grow"><b>${esc(shortTitle(l))}</b><span class="muted block">${plural(l.items, 'article')}${l.estimate != null && l.items ? ` · ≈ ${eur(l.estimate)}` : ''}${l.pending ? ` · ${plural(l.pending, 'suggestion')}` : ''}</span></span>${l.status !== 'closed' ? statusPill(l) : ''}${I('chev', 's chev')}</a>`;
   const b = s.backlog, open = S.q.otherOpen || isPc();
+  const tab = S.q.listsTab === 'backlog' ? 'backlog' : 'next';
   const empty = (t) => `<p class="muted small" style="margin:4px 0 0">${t}</p>`;
   return {
     title: 'Listes', sub: 'À prévoir et prochaine liste',
     body: `<div class="home-grid${isPc() ? ' three' : ''}"><div>
-      ${next ? heroCard(next) : box('Prochaines courses', '', `<p class="muted">Aucune liste de courses prévue.</p>${mgr ? '<button class="btn" data-a="list-new">＋ Nouvelle liste</button>' : ''}`, 'hero-c')}
-      ${box('À prévoir', `<a href="#/listes/${b.id}">Ouvrir</a>`, `<a class="item click" href="#/listes/${b.id}"><span class="grow"><b>${plural(b.items, 'article')}</b>${b.pending ? ` <span class="pill p-carrot">${plural(b.pending, 'suggestion')}</span>` : ''}
-        <span class="muted block">Sans date : à importer dans une prochaine liste${b.estimate != null && b.items ? ` · ≈ ${eur(b.estimate)}` : ''}.</span></span>${I('chev', 's chev')}</a>`)}
+      <div class="seg" role="tablist"><button class="${tab === 'next' ? 'on' : ''}" data-a="lists-tab" data-t="next">Prochaine liste</button><button class="${tab === 'backlog' ? 'on' : ''}" data-a="lists-tab" data-t="backlog">À prévoir · ${b.items}${b.pending ? ' ●' : ''}</button></div>
+      ${tab === 'backlog'
+        ? box('À prévoir', `<a href="#/listes/${b.id}">Ouvrir</a>`, `<a class="item click" href="#/listes/${b.id}"><span class="grow"><b>${plural(b.items, 'article')}</b>${b.pending ? ` <span class="pill p-carrot">${plural(b.pending, 'suggestion')}</span>` : ''}
+          <span class="muted block">Sans date : à importer dans une prochaine liste${b.estimate != null && b.items ? ` · ≈ ${eur(b.estimate)}` : ''}.</span></span>${I('chev', 's chev')}</a>`)
+        : next ? heroCard(next) : box('Prochaines courses', '', `<p class="muted">Aucune liste de courses prévue.</p>${mgr ? '<button class="btn" data-a="list-new">＋ Nouvelle liste</button>' : ''}`, 'hero-c')}
       </div>${isPc() ? `<div>${nextPreview()}</div>` : ''}<div>
       <button class="fold" data-a="other-toggle">${I(open ? 'up' : 'down', 's')}<span>Autres listes</span><span class="n">${later.length ? `${later.length} à venir · ` : ''}${s.closed.length} clôturée${s.closed.length > 1 ? 's' : ''}</span></button>
       ${open ? `${box('Listes à venir', mgr ? '<button data-a="list-new">＋ Nouvelle liste</button>' : '', later.map(listRow).join('') || empty('Pas d’autre liste prévue.'))}
@@ -221,6 +224,7 @@ export function listesView() {
       </div></div>`,
   };
 }
+on('click', 'lists-tab', (el) => { S.q.listsTab = el.dataset.t; render(); });
 on('click', 'other-toggle', () => { S.q.otherOpen = !S.q.otherOpen; render(); });
 // PC : articles a prendre de la prochaine liste, par magasin retenu.
 function nextPreview() {
