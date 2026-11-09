@@ -1,6 +1,6 @@
 // Menu : planning des repas (jours x creneaux ; grille semaine sur PC), ajout d'un plat
 // avec ingredients en reserve, fiche repas, export / impression, lien d'affichage.
-import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, isPc, localDay } from './ui.js';
+import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, toastUndo, isPc, localDay } from './ui.js';
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
 import { SLOT, allTags, loadDishes, newDishFrom, chosenOf, dishIngredients, tile, ppShort } from './plats.js';
@@ -651,8 +651,15 @@ on('click', 'meal-wish', async (el) => {
 });
 on('click', 'meal-accept', async (el) => { if (await attempt(() => post(hp(`/meals/${el.dataset.id}/accept`)))) { closeSheet(); toast('Plat ajouté au menu'); afterChange(); } });
 on('click', 'meal-del', async (el) => {
-  if (!(await confirmSheet({ title: 'Retirer ce repas ?', text: 'Ses ingrédients sont retirés de la liste (sauf ce qui a été ajouté à la main).', ok: 'Retirer', danger: true }))) return;
-  if (await attempt(() => del(hp(`/meals/${el.dataset.id}`)))) { toast('Repas retiré'); afterChange(); }
+  const m = menu && menu.meals.find((x) => String(x.id) === el.dataset.id);
+  if (!m) { if (!(await confirmSheet({ title: 'Retirer ce repas ?', text: 'Ses ingrédients sont retirés de la liste.', ok: 'Retirer', danger: true }))) return; }
+  if (await attempt(() => del(hp(`/meals/${el.dataset.id}`)))) {
+    closeSheet(); afterChange();
+    // Annuler : le repas est recree avec les memes reglages.
+    if (m) toastUndo(`${m.dish_name || m.dish} retiré`, async () => {
+      if (await attempt(() => post(hp('/meals'), { date: m.date, slot: m.slot, dish_id: m.dish_id, persons: m.persons, skip: m.skip || [], extra: m.extra || [], options: m.options || [], part_skip: m.part_skip || [], note: m.note || '', note_days: m.note_days || 1, list_id: m.list_id || undefined }))) { toast('Repas remis'); afterChange(); }
+    }); else toast('Repas retiré');
+  }
 });
 on('click', 'meal-edit', async (el) => {
   const r = await attempt(() => get(hp(`/menu?from=${el.dataset.date}&days=1`)));

@@ -124,3 +124,12 @@ export function formData(root) {
 // Reglage de l'appareil : proposer de verifier le menu apres une cloture de liste (actif par defaut).
 export const closeCheckOn = () => { try { return localStorage.getItem('cabas-close-check') !== '0'; } catch { return true; } };
 export const setCloseCheck = (on) => { try { localStorage.setItem('cabas-close-check', on ? '1' : '0'); } catch { /* ignore */ } };
+
+// « Annuler » generique : fn est appelee si l'on touche la notification (4,5 s).
+let undoFn = null;
+export function toastUndo(msg, fn) { undoFn = fn; toast(msg, false, { label: 'Annuler', a: 'undo-last' }); }
+on('click', 'undo-last', async () => {
+  document.querySelector('.toast')?.remove();
+  const f = undoFn; undoFn = null;
+  if (f) await f();
+});

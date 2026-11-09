@@ -10,6 +10,7 @@ import { loginView, foyersView, setInvite, setReset, loadOptions, loadInvitation
 import { foyerView } from './foyer.js';
 import { magasinsView } from './magasins.js';
 import './swipe.js';
+import './hold.js';
 import './pick.js';
 import './recherche.js';
 import './install.js'; // tot : retient l'invite d'installation du navigateur

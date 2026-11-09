@@ -1,6 +1,6 @@
 // Listes : accueil (A prevoir, prochaines courses, historique), detail d'une liste
 // (articles par rayon, ajout, suggestions, fiche article, actions), creation, cloture.
-import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay, closeCheckOn } from './ui.js';
+import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay, closeCheckOn, toastUndo } from './ui.js';
 import { get, post, put, patch, del, attempt, sync, newOp, setCached, net } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder, activeStores, storeById } from './state.js';
 import { packBlock, unitOptions, catOptions, catSubOptions, subName, contField, contSold } from './catalogue.js';
@@ -317,23 +317,31 @@ function itemRow(i, l, o = {}) {
     ? (mgr ? `<button class="ib" data-a="sugg-no" data-id="${i.id}" aria-label="Refuser">${I('x')}</button><button class="btn sm" data-a="sugg-ok" data-id="${i.id}" aria-label="Accepter">${I('check', 's')}</button>`
       : mine ? `<button class="ib" data-a="item-del" data-id="${i.id}" aria-label="Retirer">${I('x')}</button>` : '')
     : l.type === 'backlog' && open && mgr && toNext && !isTemp(i.id)
-      ? `<button class="ib" data-a="item-move" data-id="${i.id}" data-to="${toNext.id}" aria-label="Ajouter à la liste du ${esc(fmtDate(toNext.date))}" title="Ajouter à la liste du ${esc(fmtDate(toNext.date))}">${I('plus')}</button>`
+      ? `<button class="ib" data-a="item-move" data-hold="item-move-pick" data-id="${i.id}" data-to="${toNext.id}" aria-label="Ajouter à la liste du ${esc(fmtDate(toNext.date))}" title="Ajouter à la liste du ${esc(fmtDate(toNext.date))} (appui long : autre liste)">${I('plus')}</button>`
     : o.shop && open && mgr && i.status === 'todo' && !isTemp(i.id) ? ''
     : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click" data-a="item-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid != null ? esc(eur(i.paid)) : `${I('plus', 's')} prix`}</button>`
     : '';
   const tap = open && !i.suggestion;
   const swipe = o.shop && open && mgr && i.status === 'todo' && !i.suggestion && !isTemp(i.id);
   const html = `<div class="item line1${i.suggestion ? ' pending' : ''}${i.status === 'bought' && open ? ' done' : ''}${i.deleted ? ' gone' : ''}" id="it${i.id}">${check}
-    <div class="grow nm${tap ? ' click' : ''}" ${tap ? `data-a="item" data-id="${i.id}"` : ''}><span class="t">${esc(i.name)}${qtyMark(i, o)}</span>
+    <div class="grow nm${tap ? ' click' : ''}" ${tap ? `data-a="item" data-id="${i.id}"` : ''}${o.shop && open && tap && i.status === 'todo' && !isTemp(i.id) ? ` data-hold="item-store-pick" data-id="${i.id}"` : ''}><span class="t">${esc(i.name)}${qtyMark(i, o)}</span>
       ${simple ? (one ? `<span class="meta">${one}</span>` : '') : `<span class="meta">${meta || `<span>${esc(i.unit)}</span>`}</span>`}</div>${right || (simple && i.promos && i.promos.length ? '<span class="pill p-carrot">promo</span>' : '')}</div>`;
   // Gestionnaire en courses : balayer vers la gauche pour retirer (swipe.js).
   return swipe ? `<div class="swipe"><button class="swipe-del" data-a="shop-del" data-id="${i.id}" tabindex="-1">${I('trash', 's')} Retirer</button>${html.replace('class="item line1', 'data-swipe="1" class="item line1')}</div>` : html;
 }
+// Ouvre le menu sur la periode du repas, puis la fiche du repas.
+on('click', 'meal-from', (el) => {
+  closeSheet(); S.menuAt = el.dataset.date;
+  go('#/menu');
+  setTimeout(() => document.querySelector(`[data-a="meal-open"][data-id="${el.dataset.id}"]`)?.click(), 700);
+});
 on('click', 'meals-menu', () => { closeSheet(); go('#/menu'); });
 on('click', 'item-meals', (el) => {
   const i = current.items.find((x) => String(x.id) === el.dataset.id);
   if (!i) return;
-  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Nécessaire pour :</p>${i.from.map((d) => `<div class="item">${I('bowl', 's')} ${esc(d)}</div>`).join('')}
+  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Nécessaire pour :</p>${(i.from_meals && i.from_meals.length ? i.from_meals : i.from.map((n) => ({ name: n }))).map((m) => m.id
+      ? `<button class="item click" data-a="meal-from" data-id="${m.id}" data-date="${m.date}"><span class="ico">${I('bowl', 's')}</span><span class="grow">${esc(m.name)}<span class="muted block small">${esc(fmtDate(m.date, { weekday: 'long', day: 'numeric', month: 'short' }))}</span></span>${I('chev', 's chev')}</button>`
+      : `<div class="item">${I('bowl', 's')} ${esc(m.name)}</div>`).join('')}
     ${i.meal_qty > 0 ? `<p class="muted small">Dont ${qtyText(i.meal_qty)} ${esc(i.unit)} pour les repas${i.need ? ` (${esc(i.need)} au total)` : ''}.</p>` : ''}
     <div class="row end"><button class="btn sec2" data-a="meals-menu">Ouvrir le menu</button></div>`);
 });
@@ -760,17 +768,22 @@ const addSheet = () => sheet(`<h3>${isManager() ? 'Ajouter un article' : 'Suggé
   <div class="row" style="margin-top:10px"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1" aria-label="Moins">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="1"><button class="btn sm sec2" data-a="qty" data-d="1" aria-label="Plus">＋</button></div>`);
 // Liste datee passee et non cloturee : demander s'il faut la cloturer (nouvelle liste) ou continuer dessus.
 // Resout { list_id } (nouvelle liste), {} (continuer) ou null (annule / echec).
+const pastOkGet = (id) => { try { return (JSON.parse(localStorage.getItem('cabas-past-ok') || '[]')).includes(id); } catch { return false; } };
+const pastOkSet = (id) => { try { const a = JSON.parse(localStorage.getItem('cabas-past-ok') || '[]'); localStorage.setItem('cabas-past-ok', JSON.stringify([...a.filter((x) => x !== id), id].slice(-30))); } catch { /* ignore */ } };
 export function askPastList(l) {
+  // « Continuer » est retenu pour cette liste (sur l'appareil) : plus de question tant qu'elle reste ouverte.
+  if (pastOkGet(l.id)) return Promise.resolve({});
   return new Promise((resolve) => {
     const s = sheet(`<h3>La liste du ${esc(fmtDate(l.date, { day: 'numeric', month: 'long' }))} est passée</h3>
       <p class="muted">Elle n’a pas été clôturée. Où ajouter ?</p>
       <button class="btn full" data-r="new">Clôturer et utiliser une nouvelle liste</button>
       <p class="muted small">Les articles non achetés passent dans la nouvelle liste.</p>
-      <button class="btn sec2 full" data-r="old">Continuer sur l’ancienne liste</button>`);
+      <button class="btn sec2 full" data-r="old">Continuer sur l’ancienne liste</button>
+      <p class="muted small">Ce choix est retenu pour cette liste : vous pourrez la clôturer plus tard depuis l’Accueil.</p>`);
     s.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-r]');
       if (!b) return;
-      if (b.dataset.r === 'old') { closeSheet(); resolve({}); return; }
+      if (b.dataset.r === 'old') { pastOkSet(l.id); closeSheet(); resolve({}); return; }
       const r = await attempt(() => post(hp(`/lists/${l.id}/close`), { fates: {} }));
       closeSheet();
       if (!r) { resolve(null); return; }
@@ -782,11 +795,10 @@ export function askPastList(l) {
 }
 on('click', 'add-open', async () => {
   const l = current;
-  if (isManager() && l && l.type === 'dated' && l.status !== 'closed' && l.date < localDay() && S.route[0] !== 'magasin' && !S.q[`pastok${l.id}`]) {
+  if (isManager() && l && l.type === 'dated' && l.status !== 'closed' && l.date < localDay() && S.route[0] !== 'magasin') {
     const r = await askPastList(l);
     if (!r) return;
     if (r.list_id) { go(`#/listes/${r.list_id}`); setTimeout(() => document.querySelector('[data-a="add-open"]')?.click(), 600); return; }
-    S.q[`pastok${l.id}`] = true;
   }
   addSheet();
 });
@@ -912,8 +924,16 @@ on('click', 'price-ok', async (el) => {
 on('click', 'sugg-ok', async (el) => { const l = await attempt(() => post(hp(`/items/${el.dataset.id}/accept`))); if (l) { toast('Suggestion acceptée'); refreshList(l); } });
 on('click', 'sugg-no', async (el) => { const l = await attempt(() => post(hp(`/items/${el.dataset.id}/refuse`))); if (l) { toast('Suggestion refusée'); refreshList(l); } });
 on('click', 'item-del', async (el) => {
+  const i = current.items.find((x) => String(x.id) === el.dataset.id), listId = current.id;
   const l = await attempt(() => del(hp(`/items/${el.dataset.id}`)));
-  if (l) { closeSheet(); toast('Article retiré'); refreshList(l); }
+  if (!l) return;
+  closeSheet(); refreshList(l);
+  if (!i || i.suggestion) { toast('Article retiré'); return; }
+  toastUndo(`${i.name} retiré`, async () => {
+    await attempt(() => post(hp(`/lists/${listId}/items`), { product_id: i.product_id, qty: i.manual_qty || i.qty, note: i.note }));
+    if (current && current.id === listId) await refreshList(); else render();
+    toast(`${i.name} remis dans la liste`);
+  });
 });
 
 // ---------- Fiche article ----------
@@ -958,8 +978,40 @@ on('click', 'item-save', async (el) => {
   itemUpdate(i, body);
 });
 on('click', 'item-move', async (el) => {
-  const l = await attempt(() => post(hp(`/items/${el.dataset.id}/move`), { list_id: Number(el.dataset.to) }));
-  if (l) { closeSheet(); toast('Article déplacé'); summary = null; refreshList(l); }
+  const from = current.id, id = el.dataset.id, i = current.items.find((x) => String(x.id) === id);
+  const l = await attempt(() => post(hp(`/items/${id}/move`), { list_id: Number(el.dataset.to) }));
+  if (!l) return;
+  closeSheet(); summary = null; refreshList(l);
+  // Annuler : remettre l'article dans la liste d'origine (retrouve par produit dans la liste de destination).
+  toastUndo(`${i ? i.name : 'Article'} déplacé`, async () => {
+    if (!i) return;
+    const dest = await attempt(() => get(hp(`/lists/${el.dataset.to}`)));
+    const moved = dest && dest.items.find((x) => x.product_id === i.product_id && !x.suggestion);
+    if (!moved) return;
+    await attempt(() => post(hp(`/items/${moved.id}/move`), { list_id: from }));
+    summary = null; await loadSummary().catch(() => {});
+    if (current && current.id === from) await refreshList(); else render();
+    toast('Article remis');
+  });
+});
+// Mode courses, appui long sur un article : le prendre dans un autre magasin (choix manuel, comme l'etiquette).
+on('click', 'item-store-pick', (el) => {
+  const i = current.items.find((x) => String(x.id) === el.dataset.id);
+  if (!i) return;
+  const here = i.at_store_id;
+  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Prendre cet article chez :</p><div class="opt">${activeStores().map((st) => `<button data-a="item-store-set" data-id="${i.id}" data-sid="${st.id}"><span class="dot" style="background:${esc(st.color)}"></span> ${esc(st.name)}${st.id === here ? ' ✓' : ''}${i.prices && i.prices[st.id] != null ? ` · ≈ ${eur(i.prices[st.id] * i.qty)}` : ''}</button>`).join('')}</div>`);
+});
+on('click', 'item-store-set', (el) => {
+  const i = current.items.find((x) => String(x.id) === el.dataset.id);
+  closeSheet();
+  if (i) itemUpdate(i, { store_id: Number(el.dataset.sid) });
+});
+// Appui long sur le ＋ : choisir une autre liste.
+on('click', 'item-move-pick', (el) => {
+  const i = current.items.find((x) => String(x.id) === el.dataset.id);
+  const others = summary ? [...summary.upcoming].filter((x) => x.id !== current.id && x.status !== 'closed') : [];
+  if (!i) return;
+  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Ajouter à quelle liste ?</p><div class="opt">${others.map((o) => `<button data-a="item-move" data-id="${i.id}" data-to="${o.id}">Liste du ${esc(fmtDate(o.date))}</button>`).join('') || '<p class="muted">Aucune liste datée ouverte.</p>'}</div>`);
 });
 on('click', 'item-rec', async (el) => {
   const p = await attempt(() => patch(hp(`/products/${el.dataset.pid}`), { recurrence: el.dataset.rec || null }));
