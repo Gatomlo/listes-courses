@@ -22,7 +22,7 @@ const fmtQ = (q) => String(Math.round(q * 10) / 10).replace('.', ',');
 const IUNITS = [['g', 'g'], ['kg', 'kg'], ['ml', 'ml'], ['cl', 'cl'], ['l', 'L'], ['pc', 'pièce'], ['cc', 'CC'], ['cs', 'CS']];
 const BASEU = { g: 'g', kg: 'g', ml: 'ml', cl: 'ml', l: 'ml', pc: 'pc', cc: 'ml', cs: 'ml' };
 const iunitLabel = (i) => (i.iunit ? IUNITS.find(([k]) => k === i.iunit)[1] : i.unit);
-const amountText = (q, i) => (i.iunit === 'g' && q >= 1000 ? `${fmtQ(q / 1000)} kg` : i.iunit === 'ml' && q >= 1000 ? `${fmtQ(q / 1000)} L` : `${fmtQ(q)} ${iunitLabel(i)}${i.iunit === 'pc' && q > 1 ? 's' : ''}`);
+export const amountText = (q, i) => (i.iunit === 'g' && q >= 1000 ? `${fmtQ(q / 1000)} kg` : i.iunit === 'ml' && q >= 1000 ? `${fmtQ(q / 1000)} L` : `${fmtQ(q)} ${iunitLabel(i)}${i.iunit === 'pc' && q > 1 ? 's' : ''}`);
 // Conversion possible en emballages (meme regle que lib/units.js, g et ml equivalents).
 function convertible(i) {
   if (!i.iunit) return true;

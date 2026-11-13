@@ -646,3 +646,5 @@ details.more[open]>summary::after{content:'▴'}
   #print-area .rcp-print .btn{display:none}
   #print-area .rcp-print .part{break-inside:avoid-page;margin-top:14px}
 }
+
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--leaf);text-decoration:underline;cursor:pointer}

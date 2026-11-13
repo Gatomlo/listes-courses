@@ -3,7 +3,7 @@
 import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, toastUndo, isPc, localDay } from './ui.js';
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse } from './state.js';
-import { SLOT, allTags, loadDishes, newDishFrom, chosenOf, dishIngredients, tile, ppShort } from './plats.js';
+import { SLOT, amountText, allTags, loadDishes, newDishFrom, chosenOf, dishIngredients, tile, ppShort } from './plats.js';
 import { I, btnI } from './icons.js';
 import { ruleText, copyRules } from './modeles.js';
 import { askPastList } from './listes.js';
@@ -622,27 +622,106 @@ on('click', 'meal-open', async (el) => {
   const m = r && r.meals.find((x) => x.id === Number(el.dataset.id));
   if (m) mealSheet(m);
 });
+// Fiche repas simplifiée : convives et ingrédients d'abord (modifiés et enregistrés au fil de l'eau) ;
+// changer de plat, liste, rappel et retrait sont rangés derrière « Plus ».
+let ms = null, msTimer = null; // ms = état du repas ouvert
 async function mealSheet(m) {
   m = { parts: [], part_skip: [], ...m };
-  const mgr = isManager();
+  const dish = await attempt(() => get(hp(`/dishes/${m.dish_id}`)));
+  if (!dish) return;
+  dish.parts = dish.parts || [];
+  ms = { m, dish, persons: m.persons, skip: [...(m.skip || [])], extra: [...(m.extra || [])], options: chosenOf(dish, m.options || []), part_skip: [...(m.part_skip || [])], base: false };
+  mealView();
+}
+const redrawMeal = (html) => { const y = document.querySelector('.sheet')?.scrollTop || 0; const s = sheet(html); if (s) s.scrollTop = y; };
+// Ingrédients du repas avec quantités pour le nombre de convives (variantes et recettes non écartées), un par produit et unité.
+function mealNeeds() {
+  const { dish: d, persons } = ms, f = persons / (d.portions || 1), out = [];
+  const add = (list, g) => list.forEach((i) => {
+    const o = out.find((x) => x.product_id === i.product_id && (x.iunit || '') === (i.iunit || ''));
+    if (o) { if (i.qty != null) o.q = (o.q || 0) + i.qty * g; } else out.push({ ...i, q: i.qty == null ? null : i.qty * g });
+  });
+  add(dishIngredients(d, ms.options), f);
+  d.parts.filter((x) => !ms.part_skip.includes(x.dish_id)).forEach((x) => add(x.ingredients || [], (f * x.portions) / (x.dish_portions || 1)));
+  return out;
+}
+function mealView() {
+  const { m, dish: d } = ms, mgr = isManager(), edit = mgr && !m.suggestion;
+  const all = mealNeeds(), buy = all.filter((i) => !i.is_base), base = all.filter((i) => i.is_base);
+  const nBuy = buy.filter((i) => !ms.skip.includes(i.product_id)).length;
+  const row = (i, isBase) => {
+    const off = isBase ? !ms.extra.includes(i.product_id) : ms.skip.includes(i.product_id);
+    const qty = i.q == null ? 'selon goût' : amountText(i.q, i);
+    const inner = `${edit ? `<span class="chk sq${off ? '' : ' on'}">${I('check')}</span>` : ''}<span class="grow${off && !isBase ? ' muted' : ''}"${off && !isBase ? ' style="text-decoration:line-through"' : ''}>${esc(i.name)}</span><span class="muted small">${off && !isBase ? 'en réserve' : esc(qty)}</span>`;
+    return edit ? `<button class="item click" data-a="mm-ing" data-pid="${i.product_id}" data-base="${isBase ? 1 : ''}">${inner}</button>` : `<div class="item">${inner}</div>`;
+  };
+  redrawMeal(`<h3>${esc(m.dish_name || d.name)}</h3><p class="muted">${esc(fmtDate(m.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[m.slot]}${m.suggestion ? ` · suggéré par ${esc(m.suggested_by_name || '?')}` : ''}</p>
+    <div class="row"><span class="grow"><b>Convives</b></span>${edit ? `<button class="btn sm sec2" data-a="mm-p" data-d="-1" aria-label="Moins">−</button><b class="w3 c" id="mm-persons">${ms.persons}</b><button class="btn sm sec2" data-a="mm-p" data-d="1" aria-label="Plus">＋</button>` : `<b>${ms.persons}</b>`}</div>
+    ${edit ? d.groups.map((g) => `<div class="opt" style="margin-top:8px">${g.options.map((o) => `<button class="${ms.options.includes(o.id) ? 'on' : ''}" data-a="mm-opt" data-id="${o.id}">${esc(o.name)}</button>`).join('')}</div>`).join('') : ''}
+    ${d.parts.length ? `<div class="opt" style="margin-top:8px">${d.parts.map((x) => `<button class="${ms.part_skip.includes(x.dish_id) ? '' : 'on'}" ${edit ? `data-a="mm-part" data-id="${x.dish_id}"` : ''}>${I('puzzle', 's')} ${esc(x.name)}</button>`).join('')}</div>` : ''}
+    <div class="sec"><span>Ingrédients</span>${buy.length ? `<span class="muted small" id="mm-sum" style="text-transform:none;letter-spacing:0;font-weight:400"> · ${nBuy} à acheter${m.cost != null ? ` · ${m.cost_partial ? 'dès ' : '≈ '}${eur(m.cost)}` : ''}</span>` : ''}</div>
+    <div class="group">${buy.map((i) => row(i, false)).join('') || '<p class="muted small" style="padding:8px 12px">Plat sans ingrédients détaillés : simple rappel dans la liste.</p>'}
+      ${base.length ? `<button class="item click" data-a="mm-base"><span class="ico">${I('box')}</span><span class="grow muted small">Ingrédients de base (${base.length})${ms.extra.length ? ` · ${ms.extra.length} ajouté${ms.extra.length > 1 ? 's' : ''}` : ''}</span>${I('chev', 's chev')}</button>${ms.base ? base.map((i) => row(i, true)).join('') : ''}` : ''}</div>
+    ${edit && buy.length ? '<p class="muted small">Touchez un ingrédient déjà en réserve : il ne sera pas acheté.</p>' : ''}
+    ${m.note ? `<div class="card ahead"><div class="row small" style="margin-bottom:4px">${I('bell', 's')}<b>Rappel</b><span class="muted">· ${m.note_days > 1 ? `${m.note_days} jours avant` : 'la veille'}</span></div><div class="pre">${esc(m.note)}</div></div>` : ''}
+    ${m.suggestion && mgr ? `<div class="row end" style="margin-top:12px"><button class="btn sec2 danger-t" data-a="meal-del" data-id="${m.id}">Refuser</button><button class="btn" data-a="meal-accept" data-id="${m.id}">Accepter</button></div>`
+      : `<div class="row" style="margin-top:12px"><a class="btn grow" href="#/plats/${m.dish_id}" data-a="close-nav">${I('book', 's')} Fiche du plat</a>${mgr || (m.suggestion && m.suggested_by === S.me.id) ? `<button class="btn sec2" data-a="mm-more">${I('more', 's')} Plus</button>` : ''}</div>`}
+    ${edit ? `<p class="muted small c" style="margin-top:10px">${m.list_id ? 'Liste choisie' : 'Liste : automatique (période)'} · <button class="linkbtn" data-a="mm-more">modifier</button></p>` : ''}`);
+}
+// Enregistrement au fil de l'eau (regroupé) : le repas et ses ingrédients sont recalculés par le serveur.
+function mmSave() {
+  clearTimeout(msTimer);
+  msTimer = setTimeout(async () => {
+    if (!ms) return;
+    const body = { persons: ms.persons, skip: ms.skip, extra: ms.extra, options: ms.options, part_skip: ms.part_skip }, id = ms.m.id;
+    if (!(await attempt(() => patch(hp(`/meals/${id}`), body)))) return;
+    await afterChange();
+    const r = await get(hp(`/menu?from=${ms.m.date}&days=1`)).catch(() => null), n = r && r.meals.find((x) => x.id === id);
+    if (n && ms && ms.m.id === id) { ms.m.cost = n.cost; ms.m.cost_partial = n.cost_partial; const t = document.getElementById('mm-sum'); if (t && !S.q.mmMore) mealView(); }
+  }, 600);
+}
+on('click', 'mm-p', (el) => { ms.persons = Math.max(1, ms.persons + Number(el.dataset.d)); mealView(); mmSave(); });
+on('click', 'mm-opt', (el) => {
+  const id = Number(el.dataset.id), g = ms.dish.groups.find((x) => x.options.some((o) => o.id === id));
+  ms.options = [...ms.options.filter((o) => !g.options.some((x) => x.id === o)), id]; mealView(); mmSave();
+});
+on('click', 'mm-part', (el) => { const id = Number(el.dataset.id); ms.part_skip = ms.part_skip.includes(id) ? ms.part_skip.filter((x) => x !== id) : [...ms.part_skip, id]; mealView(); mmSave(); });
+on('click', 'mm-base', () => { ms.base = !ms.base; mealView(); });
+on('click', 'mm-ing', (el) => {
+  const pid = Number(el.dataset.pid), k = el.dataset.base ? 'extra' : 'skip';
+  ms[k] = ms[k].includes(pid) ? ms[k].filter((x) => x !== pid) : [...ms[k], pid]; mealView(); mmSave();
+});
+// « Plus » : tout le reste, rangé au même endroit.
+async function mealMore() {
+  const { m } = ms, mgr = isManager();
   const lists = (await get(hp('/lists')).catch(() => ({ upcoming: [] }))).upcoming;
   const nextL = lists.find((l) => l.status !== 'closed' && l.date >= localDay());
-  sheet(`<h3>${esc(m.dish)}</h3><p class="muted">${esc(fmtDate(m.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[m.slot]}${m.suggestion ? ` · suggéré par ${esc(m.suggested_by_name || '?')}` : ''}</p>
-    <div class="row"><span class="grow">Personnes</span><b>${m.persons}</b></div>
-    ${m.cost != null ? `<div class="row"><span class="grow">Coût estimé</span><b>${m.cost_partial ? 'dès ' : '≈ '}${eur(m.cost)}</b><span class="muted small">· ${eur(Math.round(m.cost / m.persons))} / pers.</span></div>` : ''}
-    ${m.parts.length ? `<div class="sec">Recettes</div>${m.parts.map((x) => `<a class="item click${x.skipped ? ' skipped' : ''}" href="#/plats/${x.dish_id}" data-a="close-nav"><span class="ico plum">${I('puzzle')}</span><span class="grow">${esc(x.name)}${x.skipped ? ' <span class="muted small">· pas cette fois</span>' : ''}</span>${I('chev', 's chev')}</a>`).join('')}` : ''}
-    ${m.note ? `<div class="card ahead"><div class="row small" style="margin-bottom:4px">${I('bell', 's')}<b>Rappel</b><span class="muted">· ${m.note_days > 1 ? `${m.note_days} jours avant` : 'la veille'}</span></div><div class="pre">${esc(m.note)}</div></div>` : ''}
-    ${m.skip.length ? `<p class="muted small">${I('box', 's')} ${m.skip.length} ingrédient${m.skip.length > 1 ? 's' : ''} en réserve (non acheté${m.skip.length > 1 ? 's' : ''})</p>` : ''}
-    ${mgr && !m.suggestion && nextL && m.list_id !== nextL.id ? `<button class="btn sec2 full" style="margin:6px 0" data-a="meal-to-next" data-id="${m.id}" data-to="${nextL.id}">${I('basket', 's')} Ajouter les ingrédients à la liste du ${esc(fmtDate(nextL.date))}</button>` : ''}
-    ${mgr && !m.suggestion ? `<label class="row line"><span>Liste</span><select class="txt grow" data-ch="meal-list" data-id="${m.id}">
-      <option value="">Automatique (période)</option>${lists.map((l) => `<option value="${l.id}" ${m.list_id === l.id ? 'selected' : ''}>Liste du ${esc(fmtDate(l.date))}</option>`).join('')}</select></label>` : ''}
-    <a class="btn full" style="margin-top:12px" href="#/plats/${m.dish_id}" data-a="close-nav">${I('book', 's')} Fiche du plat</a>
-    <div class="btn-row" style="margin-top:8px">
-      ${m.suggestion && mgr ? btnI('check', 'Accepter', `data-a="meal-accept" data-id="${m.id}"`, '') : ''}
-      ${mgr && !m.suggestion ? `${btnI('sliders', m.variant || m.parts.length ? (m.parts.length ? 'Recettes, personnes…' : 'Variantes, personnes…') : 'Personnes et réserve', `data-a="meal-edit" data-id="${m.id}" data-date="${m.date}"`)}${btnI('repeat', 'Changer de plat', `data-a="meal-change" data-id="${m.id}" data-date="${m.date}" data-slot="${m.slot}"`)}${btnI('bulb', 'Remettre en envie', `data-a="meal-wish" data-id="${m.id}"`, 'sec2')}` : ''}
-      ${mgr || (m.suggestion && m.suggested_by === S.me.id) ? btnI('trash', m.suggestion ? 'Refuser / retirer' : 'Retirer du menu', `data-a="meal-del" data-id="${m.id}"`, 'sec2 danger-t') : ''}
-    </div>`);
+  redrawMeal(`<h3>${esc(m.dish_name || m.dish)}</h3><p class="muted">${esc(fmtDate(m.date, { weekday: 'long', day: 'numeric', month: 'long' }))} · ${SLOT[m.slot]}</p>
+    ${mgr && !m.suggestion ? `<div class="group">
+      <button class="item click" data-a="meal-change" data-id="${m.id}" data-date="${m.date}" data-slot="${m.slot}"><span class="ico">${I('repeat')}</span><span class="grow">Changer de plat</span>${I('chev', 's chev')}</button>
+      <button class="item click" data-a="meal-wish" data-id="${m.id}"><span class="ico">${I('bulb')}</span><span class="grow">Remettre en envie</span>${I('chev', 's chev')}</button>
+      <label class="row line"><span class="ico">${I('basket')}</span><span>Liste</span><select class="txt grow" data-ch="meal-list" data-id="${m.id}"><option value="">Automatique (période)</option>${lists.map((l) => `<option value="${l.id}" ${m.list_id === l.id ? 'selected' : ''}>Liste du ${esc(fmtDate(l.date))}</option>`).join('')}</select></label>
+      ${nextL && m.list_id !== nextL.id ? `<button class="item click" data-a="meal-to-next" data-id="${m.id}" data-to="${nextL.id}"><span class="ico">${I('basket')}</span><span class="grow">Ajouter les ingrédients à la liste du ${esc(fmtDate(nextL.date))}</span></button>` : ''}
+    </div>
+    <div class="sec">${I('bell', 's')} Rappel pour ce repas</div>
+    <textarea class="txt" id="mm-note" rows="2" maxlength="300" placeholder="ex. acheter une salade fraîche">${esc(m.note || '')}</textarea>
+    <label class="row line"><select class="txt grow" id="mm-note-days" aria-label="Rappel">${[1, 2, 3, 7].map((n) => `<option value="${n}" ${(m.note_days || 1) === n ? 'selected' : ''}>${n === 1 ? 'La veille' : n === 7 ? '1 semaine avant' : `${n} jours avant`}</option>`).join('')}</select></label>` : ''}
+    <div class="row end" style="margin-top:12px"><button class="btn sec2 danger-t" data-a="meal-del" data-id="${m.id}">${I('trash', 's')} ${m.suggestion ? 'Retirer' : 'Retirer du menu'}</button><button class="btn" data-a="mm-back">${mgr && !m.suggestion ? 'Enregistrer' : 'Retour'}</button></div>`);
+  S.q.mmMore = true;
 }
+on('click', 'mm-more', () => mealMore());
+on('click', 'mm-back', async () => {
+  S.q.mmMore = false;
+  const n = document.getElementById('mm-note');
+  if (n) {
+    const note = n.value.trim(), note_days = Number(document.getElementById('mm-note-days').value) || 1;
+    if (note !== (ms.m.note || '') || note_days !== (ms.m.note_days || 1)) {
+      if (!(await attempt(() => patch(hp(`/meals/${ms.m.id}`), { note, note_days })))) return;
+      Object.assign(ms.m, { note, note_days }); afterChange();
+    }
+  }
+  mealView();
+});
 on('click', 'meal-to-next', async (el) => {
   if (await attempt(() => patch(hp(`/meals/${el.dataset.id}`), { list_id: el.dataset.to }))) { toast('Ingrédients ajoutés à la liste'); closeSheet(); afterChange(); }
 });
