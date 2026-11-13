@@ -79,7 +79,7 @@ export const del = (u) => api('DELETE', u);
 // Deconnexion : rien ne doit rester sur l'appareil.
 export function clearLocal() {
   try {
-    Object.keys(localStorage).filter((k) => k.startsWith('cabas-get:') || k === 'cabas-outbox').forEach((k) => localStorage.removeItem(k));
+    Object.keys(localStorage).filter((k) => k.startsWith('cabas-get:') || k === 'cabas-outbox' || k === 'cabas-shop-active').forEach((k) => localStorage.removeItem(k));
   } catch { /* ignore */ }
 }
 

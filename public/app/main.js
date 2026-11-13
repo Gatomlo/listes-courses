@@ -149,7 +149,12 @@ async function route() {
     if (name === 'produit') await loadProduct(arg);
     if (name === 'listes' || name === 'accueil') await Promise.all([loadSummary(), loadSuggestions()]);
     if (name === 'liste' || name === 'magasin') await loadList(arg, name === 'magasin');
-    if (name === 'magasin') rememberShop(parts[3]);
+    if (name === 'magasin') {
+      rememberShop(parts[3]);
+      const cl = currentList();
+      if (cl && cl.status === 'closed') { shopActive(null); go(`#/listes/${arg}`); return; }
+      shopActive(location.hash); // courses en cours : l'app les rouvre si elle a ete fermee
+    } else shopActive(null); // ecran quitte volontairement
     // Liste « En courses » rouverte depuis un autre ecran : retour au mode courses (sauf depuis le mode courses lui-meme, via la fleche retour).
     if (name === 'liste' && !(prev && prev[0] === 'magasin' && String(prev[1]) === String(arg))) {
       const to = resumeShopUrl(currentList());
@@ -260,6 +265,20 @@ if ('serviceWorker' in navigator) {
 on('click', 'go', (el) => go(el.dataset.to));
 on('click', 'topmenu', () => topMenu());
 
+// ---------- Courses en cours ----------
+// Fermer l'app en plein mode courses : a la reouverture (sans adresse precise, ou sur l'accueil), retour dans
+// le mode courses ; quitter l'ecran volontairement (fleche, onglet) ou terminer l'oublie. Valable 12 h.
+function shopActive(hash) {
+  try { if (hash) localStorage.setItem('cabas-shop-active', JSON.stringify({ hash, at: Date.now() })); else localStorage.removeItem('cabas-shop-active'); } catch { /* stockage indisponible */ }
+}
+function resumeShopping() {
+  if (location.hash && location.hash !== '#/accueil' && location.hash !== '#/') return;
+  try {
+    const v = JSON.parse(localStorage.getItem('cabas-shop-active') || 'null');
+    if (v && v.hash && Date.now() - v.at < 12 * 3600 * 1000) history.replaceState(null, '', v.hash);
+  } catch { /* ignore */ }
+}
+
 // ---------- Demarrage ----------
 async function boot() {
   const params = new URLSearchParams(location.search);
@@ -274,6 +293,7 @@ async function boot() {
   }
   if (!S.me) S.me = await get('me').catch(() => null);
   await loadInvitation();
+  if (S.me && S.me.householdId) resumeShopping();
   await route();
   scrollStart();
   if (loginError && !S.me) toast(loginError, true);
