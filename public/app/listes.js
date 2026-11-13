@@ -32,8 +32,8 @@ export async function loadSummary() {
     get(hp(`/menu?from=${localDay()}&days=${isPc() ? 7 : 2}`)).catch(() => null)]);
 }
 export async function loadList(id, shop) {
-  if (shop) get(menuUrl()).catch(() => {}); // menu garde sur l'appareil avec la liste
   current = await get(hp(`/lists/${id}`));
+  if (shop) get(menuUrl(current)).catch(() => {}); // menu de la liste garde sur l'appareil avec elle
   if (!S.products) await loadProducts();
   // Entrer dans le mode courses = partir faire les courses : la liste passe « En courses »
   // (sans reseau : tant pis, le statut n'est qu'indicatif).
@@ -557,7 +557,8 @@ on('click', 'close-go', (el) => { closeSheet(); go(el.getAttribute('href')); });
 const hiddenStores = (l) => S.q[`shopf${l.id}`] || [];
 // Menu consultable sans quitter le mode courses (lecture seule ; la copie locale sert hors-ligne,
 // prechargee avec la liste et par offline.js).
-const menuUrl = () => hp(`/menu?from=${localDay()}&days=7`);
+// Menu correspondant a la liste : la periode de menu qui contient sa date (pas 7 jours a partir d'aujourd'hui).
+const menuUrl = (l) => hp(`/menu?at=${(l && l.type === 'dated' && l.date) || localDay()}`);
 on('click', 'shop-menu', async () => {
   const body = (m) => {
     const days = [...new Set([...m.meals.map((x) => x.date), ...(m.outings || []).map((x) => x.date)])].sort();
@@ -569,8 +570,8 @@ on('click', 'shop-menu', async () => {
       return `<div class="row line"><span class="muted" style="min-width:5.5em">${esc(SLOT[k])}</span><span class="grow">${o ? esc(o.rest ? `Restes${o.dish ? ' · ' + o.dish : ''}` : 'À l’extérieur') + (o.note ? ` — ${esc(o.note)}` : '') : r.map((x) => esc(x.dish) + (x.persons !== 4 ? ` <span class="muted small">${x.persons} p.</span>` : '')).join('<br>')}</span></div>`;
     }).join('')}`).join('') : '<p class="muted">Aucun repas prévu.</p>';
   };
-  const m = await get(menuUrl()).catch(() => null);
-  sheet(`<h3>Menu</h3>${m ? body(m) : '<p class="muted">Menu indisponible (jamais chargé sur cet appareil).</p>'}`);
+  const m = await get(menuUrl(current)).catch(() => null);
+  sheet(`<h3>Menu${m && m.period ? ` du ${esc(fmtDate(m.period.start, { day: 'numeric', month: 'short' }))} au ${esc(fmtDate(m.period.end, { day: 'numeric', month: 'short' }))}` : ''}</h3>${m ? body(m) : '<p class="muted">Menu indisponible (jamais chargé sur cet appareil).</p>'}`);
 });
 on('click', 'shop-switch', () => shopPickSheet(current));
 function shopFilterSheet() {
