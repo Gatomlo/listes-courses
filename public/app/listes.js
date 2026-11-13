@@ -331,7 +331,7 @@ function itemRow(i, l, o = {}) {
     : l.type === 'backlog' && open && mgr && toNext && !isTemp(i.id)
       ? `<button class="ib" data-a="item-move" data-hold="item-move-pick" data-id="${i.id}" data-to="${toNext.id}" aria-label="Ajouter à la liste du ${esc(fmtDate(toNext.date))}" title="Ajouter à la liste du ${esc(fmtDate(toNext.date))} (appui long : autre liste)">${I('plus')}</button>`
     : o.shop && open && mgr && i.status === 'todo' && !isTemp(i.id) ? ''
-    : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click${i.paid != null ? ' p-leaf' : ''}" data-a="item-price" data-id="${i.id}" aria-label="Prix payé : toucher pour le modifier">${(() => { const est = i.prices && i.prices[i.bought_at || i.at_store_id]; return i.paid != null ? esc(eur(i.paid)) : est != null ? `≈ ${esc(eur(est))}` : `${I('plus', 's')} prix`; })()}</button>`
+    : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click${i.paid != null ? ' p-leaf' : ''}" data-a="item-price" data-id="${i.id}" aria-label="Prix payé : toucher pour le modifier">${(() => { const est = i.prices && i.prices[i.bought_at || i.at_store_id]; return i.paid != null ? esc(eur(i.paid * i.qty)) : est != null ? `≈ ${esc(eur(est * i.qty))}` : `${I('plus', 's')} prix`; })()}</button>`
     : '';
   // Aucun prix connu dans aucun magasin : petite icône discrète (l'estimation du caddie est moins fiable).
   const noPrice = open && !i.deleted && !i.suggestion && i.status !== 'unavailable' && i.prices && Object.values(i.prices).every((v) => v == null);
@@ -930,7 +930,7 @@ on('click', 'item-price', (el) => {
 function priceSheet(i, sid) {
   const avg = i.prices[sid];
   const stores = activeStores();
-  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Prix payé par unité (facultatif)${avg != null ? ` — moyenne ${eur(avg)} chez ${esc(storeName(sid))}` : ''}</p>
+  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Prix payé par unité (facultatif)${avg != null ? ` — moyenne ${eur(avg)} chez ${esc(storeName(sid))}` : ''}${i.qty > 1 ? `<br>La ligne compte ${i.qty} unités : la pastille affiche le total de la ligne.` : ''}</p>
     <input class="txt big" name="price" inputmode="decimal" value="${i.paid != null ? (i.paid / 100).toFixed(2).replace('.', ',') : ''}" placeholder="${avg != null ? (avg / 100).toFixed(2).replace('.', ',') : '0,00'}" data-enter="price-ok" data-id="${i.id}">
     ${stores.length > 1 ? `<label class="row line"><span class="grow">Magasin</span><select class="txt w12" name="store_id">${stores.map((x) => `<option value="${x.id}" ${x.id === sid ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>` : `<input type="hidden" name="store_id" value="${sid}">`}
     ${contSold((S.products.find((p) => p.id === i.product_id) || {}).size)}
