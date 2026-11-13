@@ -114,3 +114,12 @@ test('item.remove : gestionnaire seulement, article retire (mode courses)', asyn
   r = await sync(thomas, [{ op_id: 'rm-3', at: Date.now(), type: 'item.remove', item_id: oeufs.id }]);
   assert.ok(r.data.results[0].ok && r.data.results[0].ignored, 'deja retire : ignore');
 });
+
+test('prix paye : garde sur l\'article coche, efface au decochage', async () => {
+  const pain = item(await list(), 'pain');
+  await sync(lea, [{ op_id: 'pd-1', at: Date.now(), type: 'item.update', item_id: pain.id, fields: { status: 'bought' } },
+    { op_id: 'pd-2', at: Date.now(), type: 'record.add', product_id: P.pain, item_id: pain.id, store_id: im, price: '2,35' }]);
+  assert.equal(item(await list(), 'pain').paid, 235);
+  await sync(lea, [{ op_id: 'pd-3', at: Date.now() + 5, type: 'item.update', item_id: pain.id, fields: { status: 'todo' } }]);
+  assert.equal(item(await list(), 'pain').paid, null);
+});

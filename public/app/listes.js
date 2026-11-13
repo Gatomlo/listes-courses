@@ -331,7 +331,7 @@ function itemRow(i, l, o = {}) {
     : l.type === 'backlog' && open && mgr && toNext && !isTemp(i.id)
       ? `<button class="ib" data-a="item-move" data-hold="item-move-pick" data-id="${i.id}" data-to="${toNext.id}" aria-label="Ajouter à la liste du ${esc(fmtDate(toNext.date))}" title="Ajouter à la liste du ${esc(fmtDate(toNext.date))} (appui long : autre liste)">${I('plus')}</button>`
     : o.shop && open && mgr && i.status === 'todo' && !isTemp(i.id) ? ''
-    : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click" data-a="item-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid != null ? esc(eur(i.paid)) : `${I('plus', 's')} prix`}</button>`
+    : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click${i.paid != null ? ' p-leaf' : ''}" data-a="item-price" data-id="${i.id}" aria-label="Prix payé : toucher pour le modifier">${(() => { const est = i.prices && i.prices[i.bought_at || i.at_store_id]; return i.paid != null ? esc(eur(i.paid)) : est != null ? `≈ ${esc(eur(est))}` : `${I('plus', 's')} prix`; })()}</button>`
     : '';
   // Aucun prix connu dans aucun magasin : petite icône discrète (l'estimation du caddie est moins fiable).
   const noPrice = open && !i.deleted && !i.suggestion && i.status !== 'unavailable' && i.prices && Object.values(i.prices).every((v) => v == null);
@@ -610,7 +610,7 @@ export function storeListView(sid) {
   const priceHere = (i) => (all ? i.prices[i.at_store_id] : (i.prices[s.id] ?? i.prices[i.best_store_id]));
   const sum = (arr) => arr.reduce((t, i) => t + (priceHere(i) != null ? priceHere(i) * i.qty : 0), 0);
   // Caddie : prix payé saisi (« ＋ prix »), sinon prix estimé ; articles sans aucun prix comptés à part.
-  const lineCart = (i) => (i.paid != null ? i.paid : (priceHere(i) ?? 0) * i.qty);
+  const lineCart = (i) => (i.paid != null ? i.paid : (priceHere(i) ?? 0)) * i.qty; // prix par unité de la ligne × quantité
   const cartTotal = done.reduce((t, i) => t + lineCart(i), 0), cartUnknown = done.filter((i) => i.paid == null && priceHere(i) == null).length;
   const cartReal = done.length > 0 && done.every((i) => i.paid != null);
   const total = sum(items.filter((i) => i.status !== 'unavailable'));
@@ -930,8 +930,8 @@ on('click', 'item-price', (el) => {
 function priceSheet(i, sid) {
   const avg = i.prices[sid];
   const stores = activeStores();
-  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Prix payé (facultatif)${avg != null ? ` — moyenne ${eur(avg)} chez ${esc(storeName(sid))}` : ''}</p>
-    <input class="txt big" name="price" inputmode="decimal" placeholder="${avg != null ? (avg / 100).toFixed(2).replace('.', ',') : '0,00'}" data-enter="price-ok" data-id="${i.id}">
+  sheet(`<h3>${esc(i.name)}</h3><p class="muted">Prix payé par unité (facultatif)${avg != null ? ` — moyenne ${eur(avg)} chez ${esc(storeName(sid))}` : ''}</p>
+    <input class="txt big" name="price" inputmode="decimal" value="${i.paid != null ? (i.paid / 100).toFixed(2).replace('.', ',') : ''}" placeholder="${avg != null ? (avg / 100).toFixed(2).replace('.', ',') : '0,00'}" data-enter="price-ok" data-id="${i.id}">
     ${stores.length > 1 ? `<label class="row line"><span class="grow">Magasin</span><select class="txt w12" name="store_id">${stores.map((x) => `<option value="${x.id}" ${x.id === sid ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>` : `<input type="hidden" name="store_id" value="${sid}">`}
     ${contSold((S.products.find((p) => p.id === i.product_id) || {}).size)}
     <label class="row line"><input type="checkbox" class="cb" name="promo"><span class="grow">Prix promo (hors moyenne)</span></label>
@@ -947,7 +947,7 @@ on('click', 'price-ok', async (el) => {
   if (!String(f.price).trim()) return;
   const cents = Math.round(parseFloat(String(f.price).replace(',', '.')) * 100);
   if (cents > 0) { i.paid = cents; setCached(hp(`/lists/${current.id}`), current); render(); }
-  const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'record.add', product_id: i.product_id, store_id: sid, price: f.price, promo: f.promo, cont_n: f.cont_n, cont_u: f.cont_u })]));
+  const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'record.add', product_id: i.product_id, item_id: i.id, store_id: sid, price: f.price, promo: f.promo, cont_n: f.cont_n, cont_u: f.cont_u })]));
   toast(r === null ? 'Prix gardé, envoyé au retour du réseau' : 'Relevé enregistré · moyenne recalculée');
 });
 on('click', 'sugg-ok', async (el) => { const l = await attempt(() => post(hp(`/items/${el.dataset.id}/accept`))); if (l) { toast('Suggestion acceptée'); refreshList(l); } });
