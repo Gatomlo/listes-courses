@@ -592,6 +592,9 @@ body:has(.sheet-bg) .toast{bottom:auto;top:calc(14px + env(safe-area-inset-top))
 .shopbar2{position:sticky;top:calc(54px + env(safe-area-inset-top));z-index:3;display:flex;align-items:center;gap:10px;margin:0 -2px 8px;padding:8px 4px;background:var(--bg)}
 .shopbar2 .prog{flex:1;margin:0}
 .shopbar2 .prog i{background:var(--c)}
+.shopbar2 .cartsum{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;white-space:nowrap}
+.shopbar2 .cartsum b{font-size:15px}
+.shopbar2 .cartsum small{font-size:11px;color:var(--muted)}
 .avatar.sm{width:22px;height:22px;font-size:12px}
 .swipe{position:relative;overflow:hidden}
 .swipe .swipe-del{position:absolute;right:0;top:0;bottom:0;width:96px;background:var(--danger,#b3261e);color:#fff;font-weight:700;border:0;display:flex;align-items:center;justify-content:center;gap:6px}

@@ -476,7 +476,8 @@ function itemsBody(l, items, order, o = {}) {
     ${!items.length ? `<div class="empty">${I('basket', 'l')}<p>${o.empty || `Liste vide. ${isManager() ? 'Ajoutez un article ci-dessous.' : 'Suggérez un article ci-dessous.'}`}</p></div>`
       : !todo.length && cart.length ? `<div class="empty">${I('check', 'l')}<p><b>Tout est dans le caddie.</b></p></div>` : ''}
     ${unav.length ? `<div class="rayon">Indisponibles<span class="n">${unav.length}</span></div><div class="group">${unav.map((i) => itemRow(i, l, o)).join('')}</div>` : ''}
-    ${cart.length ? `<button class="rayon" data-a="cart-toggle" data-k="${key}">${I('cart', 's')} Dans le caddie<span class="n">${cart.length} ${I(S.q[key] ? 'up' : 'down', 's')}</span></button>
+    ${cart.length ? `<button class="rayon" data-a="cart-toggle" data-k="${key}">${I('cart', 's')} Dans le caddie<span class="n">${cart.length}${o.cartSum ? ` · ${o.cartSum}` : ''} ${I(S.q[key] ? 'up' : 'down', 's')}</span></button>
+      ${S.q[key] && o.cartNoPrice ? `<p class="muted small" style="margin:-2px 4px 6px">${plural(o.cartNoPrice, 'article')} sans prix connu : non compté${o.cartNoPrice > 1 ? 's' : ''}.</p>` : ''}
       ${S.q[key] ? `<div class="group">${cart.map((i) => itemRow(i, l, o)).join('')}</div>` : ''}` : ''}`;
 }
 on('click', 'cart-toggle', (el) => { S.q[el.dataset.k] = !S.q[el.dataset.k]; render(); });
@@ -608,7 +609,10 @@ export function storeListView(sid) {
   const done = items.filter((i) => i.status === 'bought');
   const priceHere = (i) => (all ? i.prices[i.at_store_id] : (i.prices[s.id] ?? i.prices[i.best_store_id]));
   const sum = (arr) => arr.reduce((t, i) => t + (priceHere(i) != null ? priceHere(i) * i.qty : 0), 0);
-  const cartTotal = sum(done), cartUnknown = done.filter((i) => priceHere(i) == null).length;
+  // Caddie : prix payé saisi (« ＋ prix »), sinon prix estimé ; articles sans aucun prix comptés à part.
+  const lineCart = (i) => (i.paid != null ? i.paid : (priceHere(i) ?? 0) * i.qty);
+  const cartTotal = done.reduce((t, i) => t + lineCart(i), 0), cartUnknown = done.filter((i) => i.paid == null && priceHere(i) == null).length;
+  const cartReal = done.length > 0 && done.every((i) => i.paid != null);
   const total = sum(items.filter((i) => i.status !== 'unavailable'));
   const open = l.status !== 'closed';
   const pct = items.length ? Math.round((done.length / items.length) * 100) : 0;
@@ -624,10 +628,10 @@ export function storeListView(sid) {
     title: s.name, titleAct: stores.length > 1 ? 'shop-switch' : '', titleLabel: 'Changer de magasin', back: `#/listes/${l.id}`, noNav: true, sub: `Courses du ${shortTitle(l)}${isAwake() ? ' · écran allumé' : ''}`,
     right: `<button class="ib" data-a="shop-menu" aria-label="Voir le menu" title="Voir le menu">${I('bowl')}</button>${stores.length > 1 ? `<button class="ib" data-a="shop-switch" aria-label="Changer de magasin" title="Changer de magasin">${I('store')}</button>` : ''}`,
     body: `<div class="shop">
-      <div class="shopbar2" style="--c:${esc(s.color)}"><b>${done.length}/${items.length}</b><div class="prog"><i style="width:${pct}%"></i></div><span class="price muted small">≈ ${eur(total)}</span>
+      <div class="shopbar2" style="--c:${esc(s.color)}"><b>${done.length}/${items.length}</b><div class="prog"><i style="width:${pct}%"></i></div><span class="cartsum" title="Total des articles dans le caddie (prix payé, sinon prix estimé)"><b class="price">${done.length && !cartReal ? '≈ ' : ''}${eur(cartTotal)}</b><small>${done.length ? 'dans le caddie' : 'caddie vide'} · sur ≈ ${eur(total)}</small></span>
         ${others(l).length ? `<span class="avatar sm" style="--c:var(--plum)" title="${esc(others(l).join(', '))} ${others(l).length > 1 ? 'sont' : 'est'} aussi sur cette liste">${esc(others(l)[0][0])}</span>` : ''}</div>
       ${filt}
-      ${itemsBody(l, items, s.categoryOrder, { shop: true, store: all ? null : s, allStores: all, here: all ? null : s.id, empty: 'Aucun article à prendre.' })}</div>`,
+      ${itemsBody(l, items, s.categoryOrder, { shop: true, cartNoPrice: cartUnknown, cartSum: done.length ? `${cartReal ? '' : '≈ '}${eur(cartTotal)}` : '', store: all ? null : s, allStores: all, here: all ? null : s.id, empty: 'Aucun article à prendre.' })}</div>`,
     dock: open ? `<div class="btn-row">${btnI('plus', isManager() ? 'Ajouter un oubli' : 'Suggérer un article', 'data-a="add-open"')}${real.length ? btnI('check', esc(endLbl), `data-a="shop-end" data-sid="${all ? '' : s.id}" style="flex-grow:3;background:${esc(s.color)}"`, '') : ''}</div>` : null,
   };
 }
@@ -942,7 +946,7 @@ on('click', 'price-ok', async (el) => {
   if (sid && sid !== (i.bought_at || i.at_store_id)) await itemUpdate(i, { status: 'bought', bought_store_id: sid });
   if (!String(f.price).trim()) return;
   const cents = Math.round(parseFloat(String(f.price).replace(',', '.')) * 100);
-  if (cents > 0) { i.paid = cents; render(); }
+  if (cents > 0) { i.paid = cents; setCached(hp(`/lists/${current.id}`), current); render(); }
   const r = await attempt(() => sync(S.me.householdId, [newOp({ type: 'record.add', product_id: i.product_id, store_id: sid, price: f.price, promo: f.promo, cont_n: f.cont_n, cont_u: f.cont_u })]));
   toast(r === null ? 'Prix gardé, envoyé au retour du réseau' : 'Relevé enregistré · moyenne recalculée');
 });
