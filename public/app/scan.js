@@ -88,7 +88,7 @@ function loadPdfjs() {
 // sinon les pages sont dessinées puis lues comme une photo.
 async function readPdf(file) {
   const lib = await loadPdfjs();
-  const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
   const pages = Math.min(doc.numPages, 6);
   let text = '';
   for (let n = 1; n <= pages; n++) {
