@@ -325,10 +325,12 @@ function itemRow(i, l, o = {}) {
     : o.shop && open && mgr && i.status === 'todo' && !isTemp(i.id) ? ''
     : o.shop && open && i.status === 'bought' && !isTemp(i.id) ? `<button class="pill click" data-a="item-price" data-id="${i.id}" aria-label="Indiquer le prix payé">${i.paid != null ? esc(eur(i.paid)) : `${I('plus', 's')} prix`}</button>`
     : '';
+  // Aucun prix connu dans aucun magasin : petite icône discrète (l'estimation du caddie est moins fiable).
+  const noPrice = open && !i.deleted && !i.suggestion && i.status !== 'unavailable' && i.prices && Object.values(i.prices).every((v) => v == null);
   const tap = open && !i.suggestion;
   const swipe = o.shop && open && mgr && i.status === 'todo' && !i.suggestion && !isTemp(i.id);
   const html = `<div class="item line1${i.suggestion ? ' pending' : ''}${i.status === 'bought' && open ? ' done' : ''}${i.deleted ? ' gone' : ''}" id="it${i.id}">${check}
-    <div class="grow nm${tap ? ' click' : ''}" ${tap ? `data-a="item" data-id="${i.id}"` : ''}${o.shop && open && tap && i.status === 'todo' && !isTemp(i.id) ? ` data-hold="item-store-pick" data-id="${i.id}"` : ''}><span class="t">${esc(i.name)}${qtyMark(i, o)}</span>
+    <div class="grow nm${tap ? ' click' : ''}" ${tap ? `data-a="item" data-id="${i.id}"` : ''}${o.shop && open && tap && i.status === 'todo' && !isTemp(i.id) ? ` data-hold="item-store-pick" data-id="${i.id}"` : ''}><span class="t">${esc(i.name)}${qtyMark(i, o)}${noPrice ? ` <span class="noprice" title="Aucun prix connu" aria-label="Aucun prix connu">${I('unknown', 's')}</span>` : ''}</span>
       ${simple ? (one ? `<span class="meta">${one}</span>` : '') : `<span class="meta">${meta || `<span>${esc(i.unit)}</span>`}</span>`}</div>${right || (simple && i.promos && i.promos.length ? '<span class="pill p-carrot">promo</span>' : '')}</div>`;
   // Gestionnaire en courses : balayer vers la gauche pour retirer (swipe.js).
   return swipe ? `<div class="swipe"><button class="swipe-del" data-a="shop-del" data-id="${i.id}" tabindex="-1">${I('trash', 's')} Retirer</button>${html.replace('class="item line1', 'data-swipe="1" class="item line1')}</div>` : html;
