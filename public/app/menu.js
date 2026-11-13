@@ -78,8 +78,8 @@ export function menuView() {
     // Tableaux de 7 jours depuis le premier jour du menu ; derniere ligne completee.
     const weeks = []; for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
     const pad = (w, tag) => `<${tag} class="off"></${tag}>`.repeat(7 - w.length);
-    body = weeks.map((w) => `<table class="wk"><tr><th></th>${w.map((d) => `<th class="${d === today() ? 'today' : ''}">${esc(fmtDate(d, { weekday: 'short', day: 'numeric', month: 'short' }))}${shopDay(d) ? ` <span class="shopday">${I('cart', 's')}</span>` : ''}</th>`).join('')}${pad(w, 'th')}</tr>
-      ${slots.map((s) => `<tr><td class="sl">${SLOT[s]}</td>${w.map((d) => `<td data-drop="${d}" data-slot="${s}">${cell(d, s)}</td>`).join('')}${pad(w, 'td')}</tr>`).join('')}</table>`).join('')
+    body = weeks.map((w) => `<table class="wk"><tr><th></th>${w.map((d) => `<th class="${d === today() ? 'today' : d < today() ? 'past' : ''}">${esc(fmtDate(d, { weekday: 'short', day: 'numeric', month: 'short' }))}${shopDay(d) ? ` <span class="shopday">${I('cart', 's')}</span>` : ''}</th>`).join('')}${pad(w, 'th')}</tr>
+      ${slots.map((s) => `<tr><td class="sl">${SLOT[s]}</td>${w.map((d) => `<td${d < today() ? ' class="past"' : ''} data-drop="${d}" data-slot="${s}">${cell(d, s)}</td>`).join('')}${pad(w, 'td')}</tr>`).join('')}</table>`).join('')
       + (mgr ? '<p class="muted small">Glissez un repas vers un autre jour ou créneau pour le déplacer (si la case est occupée, les deux repas s’échangent).</p>' : '');
   } else {
     body = `<div class="agenda">${days.map((d) => `<div class="day${d === today() ? ' today' : ''}${d < today() ? ' past' : ''}"><div class="d"><span>${esc(fmtDate(d, { weekday: 'short' }).replace('.', ''))}</span><b>${new Date(d + 'T12:00').getDate()}</b></div>

@@ -192,6 +192,14 @@ const nextOne = (l) => `<a class="item click" href="#/listes/${l.id}"><span clas
 export function accueilView() {
   const s = summary, mgr = isManager(), next = s.upcoming.find((l) => !overdue(l));
   const today = todayCard(aheadRows());
+  const fresh = !(S.house.categories || []).some((c) => c.products) && !s.backlog.items && !s.upcoming.length && !s.closed.length;
+  if (fresh && mgr) return {
+    title: 'Accueil', sub: S.house.household.name,
+    body: `<div class="card first"><h3>Bienvenue au Cabas</h3><p class="muted">Trois étapes pour démarrer :</p>
+      <ol class="firststeps"><li><a href="#/magasins"><b>Vos magasins</b><span class="muted small block">Vérifiez ceux proposés et leurs rayons.</span></a></li>
+      <li><a href="#/catalogue"><b>Vos produits</b><span class="muted small block">Ajoutez-en ou importez un fichier CSV (Plus → Import).</span></a></li>
+      <li><button class="linkb" data-a="list-new"><b>Votre première liste</b><span class="muted small block">Ajoutez-y vos articles, puis partez faire les courses.</span></button></li></ol></div>`,
+  };
   return {
     title: 'Accueil', sub: `${S.house.household.name} · ${fmtDate(localDay(), { weekday: 'long', day: 'numeric', month: 'long' })}`,
     body: `${todoBlock()}<div class="home-grid${isPc() ? ' three' : ''}"><div>${today}${backlogBox()}

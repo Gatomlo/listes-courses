@@ -649,3 +649,17 @@ details.more[open]>summary::after{content:'▴'}
 }
 
 .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--leaf);text-decoration:underline;cursor:pointer}
+
+/* Jours ecoules (grille du menu PC), liste compacte des plats, accueil de premier lancement */
+table.wk th.past,table.wk td.past{opacity:.55}
+.dlist{margin-top:8px}
+.drow{display:flex;align-items:center;gap:10px;padding:11px 14px;text-decoration:none;color:inherit;border-top:1px solid var(--line)}
+.drow:first-child{border-top:0}
+.drow b{font:700 15px/1.25 var(--display)}
+.drow .pills{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:45%}
+.soon{color:var(--leaf);font-weight:600}.never{color:var(--faint)}
+.dcard .soon{color:var(--leaf);font-weight:600}
+.firststeps{list-style:none;margin:0;padding:0;display:grid;gap:10px;counter-reset:s}
+.firststeps li{counter-increment:s}
+.firststeps a,.firststeps .linkb{display:block;width:100%;text-align:left;background:var(--sunk);border:0;border-radius:var(--r);padding:12px 14px 12px 46px;position:relative;color:inherit;text-decoration:none;font:inherit;cursor:pointer}
+.firststeps li>*::before{content:counter(s);position:absolute;left:12px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--leaf);color:var(--leaf-ink);display:grid;place-items:center;font-weight:700;font-size:13px}

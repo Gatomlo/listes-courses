@@ -77,13 +77,17 @@ export function platsView() {
   const q = S.q.dish || '', f = S.q.dishFilter || 'all', tg = S.q.dishTag || '', ty = S.q.dishType || '', sl = S.q.dishSlot || '';
   const n = norm(q).trim();
   const list = filteredDishes(), act = activeFilters();
+  // Sans aucune photo, les vignettes ne servent a rien : liste compacte (3 a 4 fois plus de plats a l'ecran).
+  const compact = !S.dishes.some((d) => d.photo);
   const card = (d) => {
     const hits = n && !norm(d.name).includes(n) ? [...(d.part_names || []), ...d.ingredient_names].filter((x) => norm(x).includes(n)) : [];
     const pills = `${d.cost_pp != null ? `<span class="pill" title="Coût estimé par personne${d.cost_partial ? ' (des ingrédients n’ont pas de prix)' : ''}">${esc(ppShort(d))}</span>` : ''}${d.wish ? `<span class="pill" title="Envie">${I('bulb', 's')}</span>` : ''}${d.parts ? `<span class="pill">${I('puzzle', 's')} ${d.parts}</span>` : ''}${d.has_recipe ? `<span class="pill">${I('book', 's')}</span>` : ''}${d.draft ? `<span class="pill">${I('edit', 's')}</span>` : ''}`;
     // Tags en badges sur la photo : 3 au plus, puis « +N ».
     const tags = d.tags.slice(0, 3).map((t) => `<span class="pill">#${esc(t)}</span>`).join('') + (d.tags.length > 3 ? `<span class="pill">+${d.tags.length - 3}</span>` : '');
+    const sub = hits.length ? 'contient ' + esc(hits.join(', ')) : d.next_date ? `<span class="soon">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric' }))}</span>` : d.last_date ? `servi il y a ${daysAgo(d.last_date)} j` : '<span class="never">jamais servi</span>';
+    if (compact) return `<a class="drow" href="#/plats/${d.id}"><span class="grow"><b>${esc(d.name)}</b><span class="muted small block">${sub}</span></span><span class="pills">${pills}${tags}</span>${I('chev', 's chev')}</a>`;
     return `<a class="dcard" href="#/plats/${d.id}">${tile(d.name, pills + tags, '', d.photo)}<div><h4>${esc(d.name)}</h4>
-      <div class="muted small">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.next_date ? `<span style="color:var(--leaf);font-weight:600">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric' }))}</span>` : d.last_date ? `il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</div></div></a>`;
+      <div class="muted small">${hits.length ? 'contient ' + esc(hits.join(', ')) : d.next_date ? `<span class="soon">prévu ${esc(fmtDate(d.next_date, { weekday: 'short', day: 'numeric' }))}</span>` : d.last_date ? `il y a ${daysAgo(d.last_date)} j` : 'jamais servi'}</div></div></a>`;
   };
   const search = `<div class="search grow">${I('search')}<input class="txt" id="dish-q" placeholder="Plat, ingrédient, recette…" value="${esc(q)}" data-in="dish-q"></div>`;
   // Un seul bouton de filtres (a cote de la recherche) ouvre un panneau ; filtres actifs en pastilles retirables.
@@ -92,7 +96,7 @@ export function platsView() {
     title: 'Plats', sub: act.length ? `${list.length} plat${list.length > 1 ? 's' : ''} · ${act.map(([, t]) => t).join(' · ')}` : `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`, large: true,
     right: isManager() ? `<button class="ib" data-a="dish-csv-open" aria-label="Importer des plats (CSV)" title="Importer des plats (CSV)">${I('upload')}</button><a class="ib" href="#/plats/nouveau" aria-label="Nouveau plat">${I('plus')}</a>` : '',
     body: `${filters}
-      <div class="dgrid" style="margin-top:8px">${list.map(card).join('')}</div>
+      <div class="${compact ? 'group dlist' : 'dgrid'}" style="margin-top:8px">${list.map(card).join('')}</div>
       ${list.length ? '' : `<div class="empty">Aucun plat trouvé.${isManager() && q ? `<br><button class="btn" style="margin-top:10px" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}</div>`}`,
   };
 }
