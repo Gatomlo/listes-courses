@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+const compression = require('compression');
 const security = require('./lib/security');
 const auth = require('./lib/auth');
 const { router } = require('./lib/api');
@@ -20,6 +21,8 @@ const INDEX = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
 
 app.disable('x-powered-by');
 app.use(security.headers);
+// Compression gzip/brotli, sauf le flux temps reel (SSE) qui doit partir au fil de l'eau.
+app.use(require('compression')({ filter: (req, res) => !/\/events$/.test(req.path) && compression.filter(req, res) }));
 app.use(express.json({ limit: '5mb' })); // photos des plats (redimensionnees par l'appareil)
 
 // Interface : fichiers toujours revalides (304 si inchanges), sauf la page elle-meme.
