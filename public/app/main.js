@@ -18,7 +18,7 @@ import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
 import { platsView, dishView, cookView, loadDishes, loadDish, publicRecipeView, loadPublicRecipe } from './plats.js';
 import { menuView, exportView, publicView, loadMenu, loadExport, loadPublic } from './menu.js';
-import { listesView, accueilView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList, todayMeals, closeCount, todoCount, rememberShop } from './listes.js';
+import { listesView, accueilView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList, todayMeals, closeCount, todoCount, rememberShop, resumeShopUrl } from './listes.js';
 
 const app = document.getElementById('app');
 
@@ -139,6 +139,7 @@ async function route() {
   // Ecrans de gestion (onglet Plus) : gestionnaires seulement ; un membre est renvoye vers
   // son profil. Le serveur refuse de toute facon les modifications (garde `manager`).
   if (S.house && S.house.role !== 'manager' && MANAGER_ONLY.includes(name)) { go('#/plus'); return; }
+  const prev = S.route; // ecran quitte
   S.route = [name, arg, parts[3]];
   connectEvents();
   try {
@@ -149,6 +150,11 @@ async function route() {
     if (name === 'listes' || name === 'accueil') await Promise.all([loadSummary(), loadSuggestions()]);
     if (name === 'liste' || name === 'magasin') await loadList(arg, name === 'magasin');
     if (name === 'magasin') rememberShop(parts[3]);
+    // Liste « En courses » rouverte depuis un autre ecran : retour au mode courses (sauf depuis le mode courses lui-meme, via la fleche retour).
+    if (name === 'liste' && !(prev && prev[0] === 'magasin' && String(prev[1]) === String(arg))) {
+      const to = resumeShopUrl(currentList());
+      if (to) { history.replaceState(null, '', to); route(); return; }
+    }
     if (name === 'plats') { S.dishReturn = null; await loadDishes(); }
     if (name === 'plat' || name === 'cuisine') await loadDish(arg);
     if (name === 'promos') await loadPromos();

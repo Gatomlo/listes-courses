@@ -523,6 +523,13 @@ export function listView() {
 // Dernier magasin utilise (memorise sur l'appareil) : « Partir faire les courses » y va directement ;
 // le changement se fait par l'icone magasin de l'en-tete.
 const lastShop = () => { try { return localStorage.getItem('cabas-last-shop') || ''; } catch { return ''; } };
+// Liste « En courses » : y revenir (depuis un autre ecran) rouvre le mode courses, dans le dernier magasin utilise.
+export function resumeShopUrl(l) {
+  const last = lastShop();
+  if (!l || l.type !== 'dated' || l.status !== 'shopping' || !last) return null;
+  if (last !== 'tous' && !(storeById(Number(last)) || {}).active) return null;
+  return `#/listes/${l.id}/magasin/${last}`;
+}
 export function rememberShop(sid) { try { localStorage.setItem('cabas-last-shop', String(sid)); } catch { /* stockage indisponible */ } }
 on('click', 'shop-pick', async (el) => {
   const id = Number(el.dataset.id);
@@ -886,9 +893,12 @@ on('click', 'item-check', async (el) => {
   const here = S.route[2] === 'tous' ? i.at_store_id : Number(S.route[2]);
   // Un seul appui : l'article est dans le caddie. Le prix paye reste facultatif : bouton « ＋ prix » sur la ligne.
   if (navigator.vibrate) navigator.vibrate(buying ? 15 : [10, 40, 10]);
-  await itemUpdate(i, buying ? { status: 'bought', bought_store_id: here } : { status: 'todo' });
+  // L'article est mis a jour a l'ecran tout de suite (runOps) : le bouton « ＋ prix » est propose sans attendre
+  // le reseau (sans reseau ou reseau faible, l'envoi peut durer 8 s ; le prix est mis en file comme le cochage).
+  const done = itemUpdate(i, buying ? { status: 'bought', bought_store_id: here } : { status: 'todo' });
   if (!buying) delete i.paid;
   else if (S.route[0] === 'magasin') toast(`${i.name} dans le caddie`, false, { label: '＋ prix', a: 'item-price', id: i.id });
+  await done;
 });
 // Retirer un article depuis le mode courses (gestionnaire) : marche hors-ligne, « Annuler » le remet.
 on('click', 'shop-del', async (el) => {
