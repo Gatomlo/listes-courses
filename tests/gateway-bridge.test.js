@@ -43,3 +43,10 @@ test('aucun compte cree : e-mail inconnu, sans e-mail, anonyme ou sans droit => 
   }
   assert.equal(require('../lib/db').db.prepare('SELECT COUNT(*) n FROM users').get().n, 1);
 });
+
+test('compte local choisi par l\'administrateur de la passerelle (e-mail different) ; un mauvais choix n\'ouvre rien', async () => {
+  const withLocal = (email, local) => ({ 'x-test-gateway': JSON.stringify({ app: 'cabas', role: 'member', local, user: { login: 'x', name: 'X', email, isSuper: false } }) });
+  assert.equal((await me(withLocal('autre@perso.be', 'thomas@exemple.be'))).status, 200, 'rattache a un e-mail different');
+  assert.equal((await me(withLocal(null, 'THOMAS@exemple.be'))).status, 200, 'meme sans e-mail cote passerelle');
+  assert.equal((await me(withLocal('thomas@exemple.be', 'inconnu@exemple.be'))).status, 401, 'pas de repli sur l\'e-mail identique');
+});
