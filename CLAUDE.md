@@ -93,3 +93,5 @@ Envoyer `server.js`, `package.json`, `package-lock.json`, `lib/`, `public/` dans
 
 ## Méthode
 Réponses en français, concises. Une étape du §11 à la fois ; après chaque modification `npm test` ; tester par l'API avant l'interface ; commit après chaque fonctionnalité validée.
+
+- Connexion centralisée (node-gateway) : `lib/gateway-bridge.js` (copie de `node-gateway/docs/gateway-bridge.js`) + `loadUser` dans `lib/auth.js`. Si la passerelle fournit `req.gateway` (droit sur cet outil), l'identité est rattachée au compte local **de même e-mail** (aucun compte créé) via une session locale de 2 h renouvelée en silence. Les pages publiques (partage de recettes…) ne changent pas. Hors passerelle : sans effet. Test : `tests/gateway-bridge.test.js`.
