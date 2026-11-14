@@ -63,4 +63,8 @@ if (require.main === module) {
   app.listen(PORT, () => console.log(`Le Cabas : http://localhost:${PORT}/`));
 }
 
+// Liste des comptes pour l'administration de node-gateway (lecture seule, facultatif : voir node-gateway/README).
+app.gatewayAccounts = () => require('./lib/db').db.prepare('SELECT name, email FROM users ORDER BY name').all()
+  .map((u) => ({ key: u.email, email: u.email, name: u.name }));
+
 module.exports = app;
