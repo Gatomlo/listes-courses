@@ -1,6 +1,6 @@
 // Catalogue commun du foyer : liste par rayon (recherche, filtres), fiche produit
 // (caracteristiques, prix moyens par magasin, releves), creation, fusion, suppression.
-import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
+import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay, renderKeep } from './ui.js';
 import { I, btnI } from './icons.js';
 import { get, post, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadProducts, loadHouse, activeStores, storeById, catName, categoryOrder } from './state.js';
@@ -92,9 +92,7 @@ on('click', 'bulk-del', async () => {
 
 on('input', 'cat-q', (el) => {
   S.q.cat = el.value;
-  render();
-  const i = document.getElementById('cat-q');
-  i.focus(); i.setSelectionRange(i.value.length, i.value.length);
+  renderKeep('cat-q', render);
 });
 on('click', 'cat-filter', (el) => { S.q.catFilter = el.dataset.f; render(); });
 

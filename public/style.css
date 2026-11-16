@@ -666,3 +666,5 @@ table.wk th.past,table.wk td.past{opacity:.55}
 .firststeps li{counter-increment:s}
 .firststeps a,.firststeps .linkb{display:block;width:100%;text-align:left;background:var(--sunk);border:0;border-radius:var(--r);padding:12px 14px 12px 46px;position:relative;color:inherit;text-decoration:none;font:inherit;cursor:pointer}
 .firststeps li>*::before{content:counter(s);position:absolute;left:12px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--leaf);color:var(--leaf-ink);display:grid;place-items:center;font-weight:700;font-size:13px}
+
+.sheet-bg.again,.sheet-bg.again .sheet{animation:none!important}

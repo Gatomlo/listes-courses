@@ -1,6 +1,6 @@
 // Plats : liste (recherche par nom ou ingredient, filtres), fiche (informations,
 // ingredients, recette facultative avec import depuis un lien, menu et historique).
-import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay } from './ui.js';
+import { esc, eur, fmtDate, on, acc, sheet, closeSheet, confirmSheet, toast, formData, isPc, localDay, renderKeep } from './ui.js';
 import { get, post, put, patch, del, attempt } from './api.js';
 import { S, hp, isManager, render, go, loadHouse, loadProducts, catName, categoryOrder } from './state.js';
 import { matchLines } from './ticket.mjs';
@@ -144,7 +144,7 @@ on('click', 'fs-set', (el) => { const k = el.dataset.k; S.q[k] = S.q[k] === el.d
 on('click', 'fs-pick', (el) => { S.q[el.dataset.k] = el.dataset.v; fview = 'main'; fq = ''; render(); filterSheet(); });
 on('click', 'fs-clear', () => { S.q.dishPrice = ''; S.q.dishFilter = ''; S.q.dishSlot = ''; S.q.dishType = ''; S.q.dishTag = ''; render(); filterSheet(); });
 on('input', 'fs-q', (el) => { fq = el.value; filterSheet(); const i = document.getElementById('fs-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
-on('input', 'dish-q', (el) => { S.q.dish = el.value; render(); const i = document.getElementById('dish-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
+on('input', 'dish-q', (el) => { S.q.dish = el.value; renderKeep('dish-q', render); });
 on('click', 'dish-filter', (el) => { S.q.dishFilter = el.dataset.f; render(); });
 on('click', 'dish-price', (el) => { S.q.dishPrice = S.q.dishPrice === el.dataset.k ? '' : el.dataset.k; render(); });
 on('click', 'dish-slot', (el) => { S.q.dishSlot = S.q.dishSlot === el.dataset.t ? '' : el.dataset.t; render(); });

@@ -55,9 +55,11 @@ export function acc(id, { icon = '', title, sum = '', body, def = false }) {
 
 // ---------- Panneau (bas sur mobile, dialogue centre sur PC) ----------
 export function sheet(html) {
+  // Panneau deja ouvert que l'on redessine (ex. recherche a chaque lettre) : pas d'animation, sinon ca clignote.
+  const again = !!document.querySelector('.sheet-bg:not(.pick-ov)');
   closeSheet();
   const bg = document.createElement('div');
-  bg.className = 'sheet-bg';
+  bg.className = again ? 'sheet-bg again' : 'sheet-bg';
   bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><button class="ib x" data-a="close" aria-label="Fermer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>${html}</div>`;
   bg.addEventListener('click', (e) => { if (e.target === bg) closeSheet(); });
   document.body.appendChild(bg);
@@ -133,3 +135,17 @@ on('click', 'undo-last', async () => {
   const f = undoFn; undoFn = null;
   if (f) await f();
 });
+
+// Redessine l'ecran en gardant le meme champ de recherche (focus, curseur, clavier du telephone) : pas de clignotement.
+export function renderKeep(id, fn) {
+  const old = document.getElementById(id);
+  fn();
+  const nu = document.getElementById(id);
+  if (old && nu && old !== nu) {
+    const v = nu.value, pos = old.selectionStart;
+    nu.replaceWith(old);
+    old.value = v;
+    old.focus();
+    try { old.setSelectionRange(pos, pos); } catch { /* ignore */ }
+  }
+}
