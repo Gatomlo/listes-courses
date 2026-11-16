@@ -17,7 +17,7 @@ import './install.js'; // tot : retient l'invite d'installation du navigateur
 import { catalogueView, productView, loadProduct } from './catalogue.js';
 import { scanView } from './scan.js';
 import { platsView, dishView, cookView, loadDishes, loadDish, publicRecipeView, loadPublicRecipe } from './plats.js';
-import { menuView, exportView, publicView, loadMenu, loadExport, loadPublic } from './menu.js';
+import { openWishAdd, menuView, exportView, publicView, loadMenu, loadExport, loadPublic } from './menu.js';
 import { listesView, accueilView, listView, storeListView, loadSummary, loadList, loadSuggestions, listNeedsLoad, currentList, todayMeals, closeCount, todoCount, rememberShop, resumeShopUrl } from './listes.js';
 
 const app = document.getElementById('app');
@@ -167,7 +167,7 @@ async function route() {
     if (name === 'menuexport') await loadExport();
     shell(ROUTES[name]());
     prefetch(); // limite : au plus toutes les 20 min (offline.js)
-    if (pendingClick) { const a = pendingClick; pendingClick = null; document.querySelector(`[data-a="${a}"]`)?.click(); }
+    if (pendingClick) { const a = pendingClick; pendingClick = null; const b = document.querySelector(`[data-a="${a}"]`); if (b) b.click(); else if (a === 'wish-add') openWishAdd(); }
   } catch (e) {
     if (e instanceof ApiError && e.status === 404 && name === 'produit') { go('#/catalogue'); return; }
     if (e instanceof ApiError && e.status === 404 && name === 'liste') { go('#/listes'); return; }

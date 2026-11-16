@@ -136,7 +136,8 @@ const afterWish = async (w, msg) => {
   render();
 };
 const addWish = async (body) => { closeSheet(); afterWish(await attempt(() => post(hp('/wishes'), body)), isManager() ? 'Envie ajoutée' : 'Envie proposée'); };
-on('click', 'wish-add', async () => { wq = ''; if (!S.dishes) await loadDishes(); wishSheet(); });
+export const openWishAdd = async () => { wq = ''; if (!S.dishes) await loadDishes(); wishSheet(); };
+on('click', 'wish-add', openWishAdd);
 on('input', 'wish-q', (el) => { wq = el.value; wishSheet(); const i = document.getElementById('wish-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
 on('click', 'wish-pick', (el) => addWish({ dish_id: Number(el.dataset.id) }));
 on('click', 'wish-name', () => addWish({ name: wq.trim() }));
