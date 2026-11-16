@@ -668,3 +668,6 @@ table.wk th.past,table.wk td.past{opacity:.55}
 .firststeps li>*::before{content:counter(s);position:absolute;left:12px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--leaf);color:var(--leaf-ink);display:grid;place-items:center;font-weight:700;font-size:13px}
 
 .sheet-bg.again,.sheet-bg.again .sheet{animation:none!important}
+/* Fenêtres avec recherche : taille fixe, quel que soit le nombre de résultats */
+.sheet:has(.search){height:min(640px,82vh)}
+.sheet:has(.search) .pick,.sheet:has(.search) .fs-list{max-height:none}
