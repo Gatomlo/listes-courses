@@ -492,7 +492,8 @@ function takeTagInput() {
 }
 on('click', 'tag-add', () => { takeTagInput(); render(); setTimeout(() => document.getElementById('tag-in')?.focus()); });
 on('click', 'tag-rm', (el) => { ed.tags.splice(Number(el.dataset.i), 1); render(); });
-on('click', 'dish-save', async () => {
+on('click', 'dish-save', () => saveDishNow());
+async function saveDishNow() {
   takeTagInput();
   const ings = (list) => list.map((i) => ({ product_id: i.product_id, qty: i.qty, unit: i.iunit || null, note: i.note }));
   const body = { ...ed, ...(ed.photo_data ? { photo_data: ed.photo_data } : ed.photo_url ? { photo_url: ed.photo_url } : ed.photo_remove ? { photo: null } : {}), photo_preview: undefined, ingredients: ings(ed.ingredients), parts: ed.used_in.length ? undefined : ed.parts.map((p) => ({ dish_id: p.dish_id, portions: p.portions })),
@@ -507,7 +508,7 @@ on('click', 'dish-save', async () => {
   S.wishes = null;
   toast(isNew ? 'Plat créé' : wasDraft && !d.draft ? 'Fiche validée' : 'Plat enregistré · listes recalculées');
   if (isNew && S.dishReturn) { S.dishReturn.dish_id = d.id; go('#/menu'); } else if (isNew) go(`#/plats/${d.id}`); else render();
-});
+}
 on('click', 'dish-merge', async () => {
   if (!S.dishes) S.dishes = await get(hp('/dishes'));
   const others = S.dishes.filter((x) => x.id !== ed.id);
@@ -697,8 +698,10 @@ on('click', 'imp-ok', async () => {
   }
   closeSheet();
   await loadProducts();
-  toast(`Recette importée${created ? ` · ${created} produit${created > 1 ? 's' : ''} créé${created > 1 ? 's' : ''}` : ''} · enregistrer pour garder`);
   render();
+  // Enregistrement automatique (évite d'oublier « Enregistrer » : sinon rien n'arrive dans les listes).
+  if (ed.name && String(ed.name).trim()) await saveDishNow();
+  else toast('Recette importée · pensez à donner un nom puis à enregistrer');
 });
 
 // ---------- Mode cuisine : quantites ajustees, recettes enchainees ----------
