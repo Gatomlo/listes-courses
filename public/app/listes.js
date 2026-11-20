@@ -297,6 +297,10 @@ function qtyMark(i, o = {}) {
   const sid = o.shop && !o.allStores && o.here ? o.here : i.at_store_id;
   const k = o.shop && i.packs && i.packs[sid];
   if (k) return ` <span class="faint fw4" title="À prendre chez ${esc(storeName(sid))}">${k.packs} × ${esc(k.size)}</span>`;
+  if (i.qty !== 1 && !i.meal_qty) {
+    const p = S.products.find((x) => x.id === i.product_id), sz = p && p.size && (p.size.u === 'g' || p.size.u === 'ml') ? p.size : null;
+    if (sz && i.qty < 1) return ` <span class="faint fw4">${qtyText(Math.round(i.qty * sz.n))} ${sz.u}</span>`;
+  }
   return i.qty !== 1 ? ` <span class="faint fw4">× ${qtyText(i.qty)}</span>` : '';
 }
 function itemRow(i, l, o = {}) {
@@ -977,7 +981,8 @@ on('click', 'item', async (el) => {
     ${i.suggestion ? `<p class="muted">Suggéré par ${esc(i.suggested_by_name || '?')}</p>` : ''}
     ${current.type === 'dated' && current.status !== 'closed' && !i.suggestion && i.at_store_id ? `<div class="row line"><span class="grow"><b>Magasin</b><span class="muted block">${i.prices && i.prices[i.at_store_id] != null ? `≈ ${eur(i.prices[i.at_store_id] * i.qty)}` : 'prix inconnu'} · touchez pour changer</span></span>${storeButton(i)}</div>` : ''}
     ${i.manual_store ? `<div class="row line"><span class="grow">Magasin choisi : <b>${esc(storeName(i.at_store_id))}</b>${i.best_store_id ? ` (conseil : ${esc(storeName(i.best_store_id))})` : ''}</span><button class="btn sm sec2" data-a="store-advice" data-id="${i.id}">Revenir au conseil</button></div>` : ''}
-    <div class="row"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1">−</button><input class="txt w5 c" name="qty" inputmode="decimal" value="${qtyText(i.qty)}"><button class="btn sm sec2" data-a="qty" data-d="1">＋</button></div>
+    <div class="row"><span class="grow">Quantité</span><button class="btn sm sec2" data-a="qty" data-d="-1">−</button><input class="txt w5 c" name="qty" data-in="qty-pack" inputmode="decimal" value="${qtyText(i.qty)}"><button class="btn sm sec2" data-a="qty" data-d="1">＋</button></div>
+    ${amtSize(p) && !i.meal_qty ? `<div class="row"><span class="grow">Ou en ${amtSize(p).u === 'ml' ? 'millilitres' : 'grammes'}<span class="muted block small">1 emballage = ${esc(String(amtSize(p).n).replace('.', ','))} ${amtSize(p).u}</span></span><input class="txt w5 c" name="amt" data-in="qty-amt" inputmode="decimal" value="${qtyText(Math.round(i.qty * amtSize(p).n))}"><span class="muted">${amtSize(p).u}</span></div>` : ''}
     ${i.prices && !i.suggestion ? unitPrices(i) : ''}
     <button class="item click" data-a="item-more"><span class="grow">Plus de détails<span class="muted block">note, indisponible, récurrent, prix</span></span>${I('down', 's')}</button>
     <div id="item-more" hidden>
@@ -992,10 +997,23 @@ on('click', 'item', async (el) => {
     <div class="btn-row" style="margin-top:14px">${btnI('doc', 'Fiche produit', `data-a="go-product" data-pid="${i.product_id}"`)}${mgr ? btnI('trash', 'Retirer', `data-a="item-del" data-id="${i.id}"`, 'sec2 danger-t') : ''}${btnI('check', 'Enregistrer', `data-a="item-save" data-id="${i.id}"`, '')}</div>`);
 });
 on('click', 'item-more', (el) => { const m = document.getElementById('item-more'); if (m) { m.hidden = !m.hidden; el.querySelector('.muted').textContent = m.hidden ? 'note, indisponible, récurrent, prix' : 'masquer'; } });
+// Produit vendu au poids / volume : la quantité peut se dire en g / ml (170 g d'un produit à 1 kg = 0,17).
+const amtSize = (p) => (p && p.size && (p.size.u === 'g' || p.size.u === 'ml') && p.size.n > 0 ? p.size : null);
+const sheetProduct = () => { const el = document.querySelector('.sheet [data-a="item-save"]'); const i = el && current.items.find((x) => String(x.id) === el.dataset.id); return i && S.products.find((x) => x.id === i.product_id); };
+const syncAmt = () => {
+  const sz = amtSize(sheetProduct()), a = document.querySelector('.sheet [name=amt]'), q = document.querySelector('.sheet [name=qty]');
+  if (sz && a && q) a.value = qtyText(Math.round((Number(String(q.value).replace(',', '.')) || 0) * sz.n));
+};
+on('input', 'qty-amt', (el) => {
+  const sz = amtSize(sheetProduct()), q = document.querySelector('.sheet [name=qty]');
+  const g = Number(String(el.value).replace(',', '.'));
+  if (sz && q && g > 0) q.value = qtyText(Math.round((g / sz.n) * 100) / 100);
+});
+on('input', 'qty-pack', () => syncAmt());
 on('click', 'qty', (el) => {
   const input = document.querySelector('.sheet [name=qty]');
   const v = Number(String(input.value).replace(',', '.')) || 0;
-  input.value = qtyText(Math.max(1, v + Number(el.dataset.d)));
+  input.value = qtyText(Math.round(Math.max(v > 1 ? 1 : v || 1, v + Number(el.dataset.d)) * 100) / 100); syncAmt();
 });
 on('click', 'item-save', async (el) => {
   const f = formData(document.querySelector('.sheet'));
