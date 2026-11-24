@@ -9,7 +9,8 @@ after(() => server.close());
 
 // Faux Google : intercepte seulement generativelanguage.googleapis.com.
 const realFetch = global.fetch;
-let seen = [], reply = null;
+let seen = [], reply = null, overload = 0; // overload : nombre de reponses 503 avant de repondre normalement
+process.env.CABAS_AI_RETRY_MS = '0';
 global.fetch = async (url, opts) => {
   if (!String(url).startsWith('https://generativelanguage.googleapis.com')) return realFetch(url, opts);
   const key = opts.headers['x-goog-api-key'];
@@ -23,6 +24,7 @@ global.fetch = async (url, opts) => {
     { name: 'models/gemini-2.5-flash-image', supportedGenerationMethods: ['generateContent'] },
   ] });
   if (reply instanceof Error) throw reply;
+  if (overload > 0) { overload--; return json(503, { error: { message: 'This model is currently experiencing high demand.' } }); }
   return json(200, { candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] });
 };
 
@@ -109,4 +111,17 @@ test('Gemini en panne : erreur 502 propre (l interface retombe sur l existant)',
   assert.match(r.data.error, /Gemini injoignable/); // message visible, pas « Erreur interne »
   reply = 'pas du json {';
   assert.equal((await thomas.post(`${h}/ai/items`, { text: 'lait' })).status, 502);
+});
+
+test('surcharge passagere (503) : nouvelles tentatives automatiques, puis message clair', async () => {
+  reply = { items: [{ name: 'lait', qty: 1 }] };
+  overload = 2; // deux 503 puis succes
+  let r = await lea.post(`${h}/ai/items`, { text: 'du lait' });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data.items, [{ name: 'lait', qty: 1 }]);
+  overload = 99; // surcharge persistante
+  r = await lea.post(`${h}/ai/items`, { text: 'du lait' });
+  assert.equal(r.status, 503);
+  assert.match(r.data.error, /surchargé/);
+  overload = 0;
 });
