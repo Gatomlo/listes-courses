@@ -216,7 +216,7 @@ export async function loadDish(id) {
   if (id === 'nouveau') {
     ed = { id: null, name: pendingName || '', slots: ['midi', 'soir'], types: [], portions: 4, time_text: '', url: '', steps: '', notes: '', ahead: '', ingredients: [], groups: [], parts: [], used_in: [], tags: [], upcoming: [], past: [], times: 0 };
     pendingName = '';
-    if (pendingAi) { const r = pendingAi; pendingAi = null; if (r.name) ed.name = r.name; if (r.portions) ed.portions = r.portions; setTimeout(() => showImport(r)); }
+    if (pendingAi) { const r = pendingAi; pendingAi = null; applyAiRecipe(r); }
   } else {
     S.dishReturn = null;
     const d = await get(hp(`/dishes/${id}`));
@@ -240,9 +240,9 @@ export function dishView() {
   // Fiche en lecture par defaut ; « Modifier » passe en edition (nouveau plat : edition).
   const mgr = isManager(), canEdit = mgr || !!(ed.draft && ed.draft_by === S.me.id);
   const ro = !canEdit || (!!ed.id && S.q.deditId !== ed.id);
-  const ingRows = (t, empty) => ingsOf(t).map((i, k) => `<div class="item${ro ? '' : ' ing-ed'}"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}${i.is_base ? ' <span class="pill p-grey">de base</span>' : ''}</span>
+  const ingRows = (t, empty) => ingsOf(t).map((i, k) => `<div class="item${ro ? '' : ' ing-ed'}"><span class="grow">${esc(i.name)}${i.note ? ` <span class="muted small">· ${esc(i.note)}</span>` : ''}${i.is_base ? ' <span class="pill p-grey">de base</span>' : ''}${i.pending ? ' <span class="pill p-carrot" title="Produit créé à l’enregistrement">nouveau</span>' : ''}</span>
     ${ro ? `<b class="price">${i.qty != null ? esc(amountText(i.qty, i)) : '<span class="muted fw4">selon goût</span>'}</b>${i.cost != null ? `<span class="muted small" style="min-width:46px;text-align:right">≈ ${eur(i.cost)}</span>` : ''}` : `<input class="txt w5 sm c" value="${i.qty != null ? fmtQ(i.qty) : ''}" placeholder="—" data-ch="ing-qty" data-t="${t}" data-k="${k}"><select class="txt sm w6" data-ch="ing-unit" data-t="${t}" data-k="${k}" aria-label="Unité">${[['', i.unit], ...IUNITS].map(([v, l]) => `<option value="${v}" ${(i.iunit || '') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`}
-    ${i.is_base || convertible(i) ? '' : mgr ? `<button class="pill p-carrot cont" data-a="ing-cont" data-id="${i.product_id}" aria-label="Contenance ?" title="Indiquer la contenance de l'emballage (ex. 500 g) ou le poids d'une pièce ; en attendant : 1 ${esc(i.unit)}">${I('box', 's')}</button>` : `<span class="pill p-carrot cont" aria-label="Contenance ?" title="Contenance du produit inconnue : 1 ${esc(i.unit)} par recette">${I('box', 's')}</span>`}
+    ${i.is_base || i.pending || convertible(i) ? '' : mgr ? `<button class="pill p-carrot cont" data-a="ing-cont" data-id="${i.product_id}" aria-label="Contenance ?" title="Indiquer la contenance de l'emballage (ex. 500 g) ou le poids d'une pièce ; en attendant : 1 ${esc(i.unit)}">${I('box', 's')}</button>` : `<span class="pill p-carrot cont" aria-label="Contenance ?" title="Contenance du produit inconnue : 1 ${esc(i.unit)} par recette">${I('box', 's')}</span>`}
     ${ro ? '' : `<button class="ib" data-a="ing-del" data-t="${t}" data-k="${k}" aria-label="Retirer">${I('x', 's')}</button>`}</div>`).join('') || empty;
   const ingAdd = (t, ph) => (ro ? '' : `<div class="addbox" style="margin:8px 0"><input class="txt" id="ing-q-${t}" autocomplete="off" placeholder="${ph}" data-in="ing-q" data-t="${t}" data-enter="ing-first"><div id="ing-ac-${t}"></div></div>`);
   const variants = ro ? (!ed.groups.length ? '' : `<div class="sec">Variantes <span class="fw4" style="text-transform:none;letter-spacing:0">un choix par groupe au menu</span></div>
@@ -301,7 +301,8 @@ export function dishView() {
       <div class="pills">${ed.tags.map((t, k) => (norm(t) === 'economique' ? `<span class="pill p-leaf" title="Automatique : coût par personne sous le palier des réglages">#${esc(t)} · auto</span>` : `<span class="pill p-grey">#${esc(t)} <button class="x" data-a="tag-rm" data-i="${k}" aria-label="Retirer">✕</button></span>`)).join('')}</div>
       <div class="row gap" style="margin-top:6px"><input class="txt grow" id="tag-in" autocomplete="off" placeholder="Chercher ou créer un tag…" data-in="tag-q" data-enter="tag-add"><button class="btn sm sec2" data-a="tag-add">＋</button></div>
       <div class="pills" id="tag-sug" style="margin-top:6px">${tagSug('')}</div></div>`;
-  const banner = ed.draft ? `<div class="banner">${I('edit')}<span>Proposé par un membre : ${mgr ? 'enregistrer valide la fiche' : 'à valider par un gestionnaire'}.</span></div>` : '';
+  const aiBanner = ed.aiDraft ? `<div class="banner">${I('spark')}<span>Proposition de l’IA : relisez les onglets Ingrédients et Recette. Rien n’est enregistré avant « Enregistrer » ; les produits marqués « nouveau » ne seront créés qu’à ce moment.</span></div>` : '';
+  const banner = aiBanner + (ed.draft ? `<div class="banner">${I('edit')}<span>Proposé par un membre : ${mgr ? 'enregistrer valide la fiche' : 'à valider par un gestionnaire'}.</span></div>` : '');
   const hero = tile(ed.name || '?', pills, 'hero-t', curPhoto());
   const usedIn = ed.used_in.length ? `<p class="small" style="margin:8px 2px">${I('puzzle', 's')} Recette de ${ed.used_in.map((d) => `<a href="#/plats/${d.id}" style="color:var(--plum);font-weight:650">${esc(d.name)}</a>`).join(', ')}</p>` : '';
   const tabsHtml = `<div class="seg" style="margin-top:14px">${tabs.map(([k, t, ic, n]) => `<button class="tb ${cur === k ? 'on' : ''}" data-a="dtab" data-k="${k}" aria-label="${t}" title="${t}">${I(ic, 's')}<span class="tl">${t}</span>${n ? `<span class="tn">${n}</span>` : ''}</button>`).join('')}</div>
@@ -495,8 +496,29 @@ function takeTagInput() {
 on('click', 'tag-add', () => { takeTagInput(); render(); setTimeout(() => document.getElementById('tag-in')?.focus()); });
 on('click', 'tag-rm', (el) => { ed.tags.splice(Number(el.dataset.i), 1); render(); });
 on('click', 'dish-save', () => saveDishNow());
+// Ingredients proposes par l'IA sans produit connu : crees maintenant (jamais avant l'enregistrement du plat).
+async function createPendingProducts() {
+  const lists = [ed.ingredients, ...(ed.groups || []).flatMap((g) => g.options.map((o) => o.ingredients))];
+  const made = new Map(); // nom normalise -> produit (un seul produit par nom)
+  for (const list of lists) {
+    for (const i of list) {
+      if (!i.pending) continue;
+      const key = norm(i.name);
+      let prod = S.products.find((x) => norm(x.name) === key) || made.get(key);
+      if (!prod) {
+        prod = await attempt(() => post(hp('/products'), { ...i.pending, name: i.name }));
+        if (!prod) return false;
+        S.products.push(prod);
+        made.set(key, prod);
+      }
+      i.product_id = prod.id; i.unit = prod.unit; i.pending = null;
+    }
+  }
+  return true;
+}
 async function saveDishNow() {
   takeTagInput();
+  if (!(await createPendingProducts())) return;
   const ings = (list) => list.map((i) => ({ product_id: i.product_id, qty: i.qty, unit: i.iunit || null, note: i.note }));
   const body = { ...ed, ...(ed.photo_data ? { photo_data: ed.photo_data } : ed.photo_url ? { photo_url: ed.photo_url } : ed.photo_remove ? { photo: null } : {}), photo_preview: undefined, ingredients: ings(ed.ingredients), parts: ed.used_in.length ? undefined : ed.parts.map((p) => ({ dish_id: p.dish_id, portions: p.portions })),
     groups: ed.groups.map((g) => ({ name: g.name, options: g.options.map((o) => ({ id: o.id, name: o.name, ingredients: ings(o.ingredients) })) })) };
@@ -580,20 +602,58 @@ function partRecipe(x, f) {
 on('click', 'recipe-view', (el) => recipeSheet(Number(el.dataset.id)));
 
 // ---------- IA (Gemini) : recette suggeree, plat a partir de produits ----------
+// La proposition preremplit la fiche (en modification) : rien n'est enregistre avant « Enregistrer ».
+// Fiche deja remplie : on complete sans ecraser (ingredients manquants, etapes / temps seulement si vides).
+// Ingredient sans produit connu : ligne « nouveau », produit cree a l'enregistrement.
+function applyAiRecipe(r) {
+  const fresh = !ed.id;
+  if (!String(ed.name || '').trim() && r.name) ed.name = r.name;
+  if (fresh && r.portions) ed.portions = r.portions;
+  if (r.time && !String(ed.time_text || '').trim()) ed.time_text = r.time;
+  const hadSteps = !!String(ed.steps || '').trim();
+  if (r.steps.length && !hadSteps) ed.steps = r.steps.join('\n');
+  const matched = matchLines(r.ingredients.map((g) => ({ ...g, label: g.name })), { products: S.products });
+  let added = 0;
+  for (const g of matched) {
+    const q = g.amount != null ? g.amount : 1, u = g.amount != null ? g.amount_unit : null;
+    const note = g.amount == null && g.qty != null ? `${fmtQ(g.qty)}${g.unit ? ' ' + g.unit : ''}` : null;
+    const p = g.product_id && S.products.find((x) => x.id === g.product_id);
+    if (p) {
+      if (ed.ingredients.some((i) => i.product_id === p.id)) continue;
+      addIng(p, q, note, 'c', u);
+    } else {
+      const name = g.name.charAt(0).toUpperCase() + g.name.slice(1);
+      if (ed.ingredients.some((i) => norm(i.name) === norm(name))) continue;
+      ed.ingredients.push({ product_id: null, name, unit: 'paquet', iunit: u, is_base: !!g.base, qty: q, note,
+        pending: { category_id: categoryOrder()[0], unit: 'paquet', is_base: !!g.base } });
+    }
+    added++;
+  }
+  ed.aiDraft = true;
+  S.q.deditId = ed.id || null; // fiche existante : passe en modification
+  S.q.dtab = 'ing';
+  return { added, keptSteps: hadSteps && r.steps.length > 0 };
+}
+function aiApplied(r) {
+  const { added, keptSteps } = applyAiRecipe(r);
+  render();
+  toast(`Proposition de l’IA : ${added} ingrédient${added > 1 ? 's' : ''}${keptSteps ? ', étapes existantes conservées' : `, ${r.steps.length} étape${r.steps.length > 1 ? 's' : ''}`} · à relire puis enregistrer`);
+}
 // Toujours facultatif : sans cle ou en cas d'erreur, un message, et l'import / la saisie a la main restent possibles.
 const aiError = (e) => (e.status === 0 ? 'Pas de réseau : action possible seulement en ligne.' : e.status === 409 ? 'IA non configurée (Foyer → Intelligence artificielle).' : `${e.message} Les fonctions habituelles restent disponibles.`);
 on('click', 'rec-ai', async () => {
   if (!String(ed.name || '').trim()) { toast('Donnez d’abord un nom au plat.', true); return; }
-  sheet('<h3>L’IA prépare une recette…</h3><p class="muted">Quelques secondes : rien n’est enregistré avant votre validation.</p>');
+  sheet('<h3>L’IA prépare une recette…</h3><p class="muted">Quelques secondes : la fiche sera préremplie, rien n’est enregistré avant « Enregistrer ».</p>');
   let r;
   try { r = await post(hp('/ai/recipe'), { name: ed.name, portions: ed.portions }); } catch (e) { closeSheet(); toast(aiError(e), true); return; }
-  await showImport(r);
+  closeSheet();
+  aiApplied(r);
 });
 const aid = { ids: [], portions: 4 };
 const aidProducts = () => aid.ids.map((id) => S.products.find((p) => p.id === id)).filter(Boolean);
 const aidChips = (chips) => (chips.length ? chips.map((p) => `<span class="pill p-leaf">${esc(p.name)} <button class="ib" style="min-width:0;padding:0 2px" data-a="aid-rm" data-id="${p.id}" aria-label="Retirer ${esc(p.name)}">${I('x', 's')}</button></span>`).join('') : '<span class="muted small">Aucun produit choisi.</span>');
 const aidBody = () => `<h3>${I('spark', 's')} Plat à partir de produits</h3>
-    <p class="muted small">Choisissez des produits : l’IA propose un plat avec sa recette, à relire avant de l’enregistrer.</p>
+    <p class="muted small">Choisissez des produits : l’IA propose un plat, dont la fiche est préremplie. Vous relisez avant d’enregistrer.</p>
     <div class="addbox"><input class="txt" id="aid-q" autocomplete="off" placeholder="Chercher un produit…" data-in="aid-q"><div id="aid-ac"></div></div>
     <div id="aid-chips" class="row gap wrap" style="margin:8px 0">${aidChips(aidProducts())}</div>
     <div class="row gap"><button class="btn sec2 sm" data-a="aid-list">Reprendre les articles d’une liste</button>
@@ -636,7 +696,7 @@ on('click', 'aid-list', async () => {
 on('click', 'aid-go', async () => {
   const names = aidProducts().map((p) => p.name);
   if (!names.length) { toast('Choisissez au moins un produit.', true); return; }
-  sheet('<h3>L’IA cherche un plat…</h3><p class="muted">Quelques secondes : rien n’est enregistré avant votre validation.</p>');
+  sheet('<h3>L’IA cherche un plat…</h3><p class="muted">Quelques secondes : la fiche sera préremplie, rien n’est enregistré avant « Enregistrer ».</p>');
   let r;
   try { r = await post(hp('/ai/dish'), { names, portions: aid.portions }); } catch (e) { closeSheet(); toast(aiError(e), true); return; }
   closeSheet();
@@ -680,9 +740,7 @@ async function showImport(r) {
   if (!S.products) await loadProducts();
   const matched = matchLines(r.ingredients.map((g) => ({ ...g, label: g.name })), { products: S.products });
   imp = {
-    ...r, f: r.source === 'ai'
-      ? { name: !ed.name, portions: !!r.portions && !ed.id, time: !!r.time && !ed.time_text, steps: r.steps.length > 0 && !String(ed.steps || '').trim(), photo: false }
-      : { name: !ed.name, portions: !!r.portions, time: !!r.time, steps: r.steps.length > 0, photo: !!r.image && !ed.photo },
+    ...r, f: { name: !ed.name, portions: !!r.portions, time: !!r.time, steps: r.steps.length > 0, photo: !!r.image && !ed.photo },
     ing: matched.map((g) => { const p = g.product_id && S.products.find((x) => x.id === g.product_id);
       // Quantite reprise de la recette (modifiable) ; sans equivalent (gousse, pincee...) :
       // 1 emballage, la quantite lue gardee en note.
@@ -701,7 +759,7 @@ function impMatch(g) {
 }
 function importSheet() {
   const m = imp;
-  sheet(`<h3>${I(m.source === 'ai' ? 'spark' : 'book', 's')} ${esc(m.name || 'Recette')}</h3><p class="muted small">${m.source === 'ai' ? 'Proposition de l’IA, à relire : vérifiez quantités et produits, puis cochez ce qu’il faut reprendre.' : 'Trouvé sur la page : cocher ce qu’il faut reprendre.'}</p>
+  sheet(`<h3>${I('book', 's')} ${esc(m.name || 'Recette')}</h3><p class="muted small">Trouvé sur la page : cocher ce qu'il faut reprendre.</p>
     ${m.image ? `<label class="row line"><input type="checkbox" class="cb" data-ch="imp-f" data-k="photo" ${m.f.photo ? 'checked' : ''}><img src="${esc(m.image)}" alt="" style="width:72px;height:54px;object-fit:cover;border-radius:10px"><span class="grow"><b>Photo</b> de la recette</span></label>` : ''}
     ${[['name', 'Nom', m.name], ['portions', 'Portions', m.portions && `${m.portions} personnes`], ['time', 'Temps', m.time], ['steps', 'Étapes', m.steps.length && `${m.steps.length} étapes`]]
       .filter(([, , v]) => v).map(([k, t, v]) => `<label class="row line"><input type="checkbox" class="cb" data-ch="imp-f" data-k="${k}" ${m.f[k] ? 'checked' : ''}><span class="grow"><b>${t}</b> · ${esc(v)}</span></label>`).join('')}
