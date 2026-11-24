@@ -106,6 +106,7 @@ test('Gemini en panne : erreur 502 propre (l interface retombe sur l existant)',
   reply = new Error('boom');
   const r = await thomas.post(`${h}/ai/items`, { text: 'lait' });
   assert.equal(r.status, 502);
+  assert.match(r.data.error, /Gemini injoignable/); // message visible, pas « Erreur interne »
   reply = 'pas du json {';
   assert.equal((await thomas.post(`${h}/ai/items`, { text: 'lait' })).status, 502);
 });
