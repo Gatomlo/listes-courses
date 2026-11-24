@@ -640,12 +640,13 @@ function aiApplied(r) {
   toast(`Proposition de l’IA : ${added} ingrédient${added > 1 ? 's' : ''}${keptSteps ? ', étapes existantes conservées' : `, ${r.steps.length} étape${r.steps.length > 1 ? 's' : ''}`} · à relire puis enregistrer`);
 }
 // Toujours facultatif : sans cle ou en cas d'erreur, un message, et l'import / la saisie a la main restent possibles.
+const AI_WAIT = 65000; // Gemini peut etre lent (nouvelles tentatives si surcharge) : plus que le delai reseau habituel
 const aiError = (e) => (e.status === 0 ? 'Pas de réseau : action possible seulement en ligne.' : e.status === 409 ? 'IA non configurée (Foyer → Intelligence artificielle).' : `${e.message} Les fonctions habituelles restent disponibles.`);
 on('click', 'rec-ai', async () => {
   if (!String(ed.name || '').trim()) { toast('Donnez d’abord un nom au plat.', true); return; }
   sheet('<h3>L’IA prépare une recette…</h3><p class="muted">Quelques secondes : la fiche sera préremplie, rien n’est enregistré avant « Enregistrer ».</p>');
   let r;
-  try { r = await post(hp('/ai/recipe'), { name: ed.name, portions: ed.portions }); } catch (e) { closeSheet(); toast(aiError(e), true); return; }
+  try { r = await post(hp('/ai/recipe'), { name: ed.name, portions: ed.portions }, { timeout: AI_WAIT }); } catch (e) { closeSheet(); toast(aiError(e), true); return; }
   closeSheet();
   aiApplied(r);
 });
@@ -698,7 +699,7 @@ on('click', 'aid-go', async () => {
   if (!names.length) { toast('Choisissez au moins un produit.', true); return; }
   sheet('<h3>L’IA cherche un plat…</h3><p class="muted">Quelques secondes : la fiche sera préremplie, rien n’est enregistré avant « Enregistrer ».</p>');
   let r;
-  try { r = await post(hp('/ai/dish'), { names, portions: aid.portions }); } catch (e) { closeSheet(); toast(aiError(e), true); return; }
+  try { r = await post(hp('/ai/dish'), { names, portions: aid.portions }, { timeout: AI_WAIT }); } catch (e) { closeSheet(); toast(aiError(e), true); return; }
   closeSheet();
   pendingAi = r; pendingName = r.name || '';
   go('#/plats/nouveau');

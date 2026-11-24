@@ -29,10 +29,12 @@ function setOnline(v) {
 window.addEventListener('online', () => setOnline(true));
 window.addEventListener('offline', () => setOnline(false));
 
-export async function api(method, url, body) {
+// opts.timeout (ms) : delai propre a un appel lent (IA) ; son depassement n'est PAS une perte de reseau.
+export async function api(method, url, body, opts = {}) {
   let res;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, opts.timeout || TIMEOUT);
   try {
     res = await fetch('api/' + url, {
       method,
@@ -42,6 +44,7 @@ export async function api(method, url, body) {
       signal: ctrl.signal,
     });
   } catch {
+    if (opts.timeout && timedOut && navigator.onLine) throw new ApiError(408, 'La réponse met trop de temps à arriver : réessayez.');
     setOnline(false);
     throw new ApiError(0, 'Pas de réseau.');
   } finally {
@@ -71,7 +74,7 @@ export async function get(url) {
 export const setCached = (url, data) => store.set('cabas-get:' + url, data);
 export const getCached = (url) => store.get('cabas-get:' + url, undefined);
 
-export const post = (u, b) => api('POST', u, b);
+export const post = (u, b, opts) => api('POST', u, b, opts);
 export const patch = (u, b) => api('PATCH', u, b);
 export const put = (u, b) => api('PUT', u, b);
 export const del = (u) => api('DELETE', u);

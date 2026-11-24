@@ -170,7 +170,7 @@ async function aiMatch(lines) {
   const todo = lines.filter((l) => !l.product_id && l.label);
   if (!todo.length || !S.house?.ai || !net.online) return;
   try {
-    const r = await Promise.race([post(hp('/ai/match'), { labels: todo.map((l) => l.label) }), new Promise((_, no) => setTimeout(() => no(new Error('délai')), 15000))]);
+    const r = await Promise.race([post(hp('/ai/match'), { labels: todo.map((l) => l.label) }, { timeout: 15000 }), new Promise((_, no) => setTimeout(() => no(new Error('délai')), 15000))]);
     (r.product_ids || []).forEach((id, i) => { if (id && S.products.some((p) => p.id === id)) { todo[i].product_id = id; todo[i].how = 'ai'; } });
   } catch { /* repli : association a la main */ }
 }

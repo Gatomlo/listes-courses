@@ -18,7 +18,7 @@ export function parseMulti(text) {
 export const looksFree = (text) => !!S.house?.ai && net.online && (/\s(et|avec|puis|de quoi|ainsi que)\s/i.test(text) || String(text).trim().split(/\s+/).length >= 4) && !/[,;\n]/.test(text);
 async function aiEntries(text) {
   try {
-    const r = await Promise.race([post(hp('/ai/items'), { text }), new Promise((_, no) => setTimeout(() => no(new Error('délai')), 12000))]);
+    const r = await Promise.race([post(hp('/ai/items'), { text }, { timeout: 12000 }), new Promise((_, no) => setTimeout(() => no(new Error('délai')), 12000))]);
     return (r.items || []).map((i) => ({ qty: i.qty || 1, name: i.name })).filter((i) => i.name);
   } catch { return null; }
 }
