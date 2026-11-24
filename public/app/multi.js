@@ -1,8 +1,8 @@
 // Ajout de plusieurs articles d'un coup (« lait, 2 beurre, œufs ») : decoupe, rapprochement
 // avec les produits, apercu avant ajout, produits inconnus crees. Marche hors-ligne (operations).
 import { esc, sheet, closeSheet, toast, on } from './ui.js';
-import { sync, newOp, attempt } from './api.js';
-import { S, isManager, loadProducts } from './state.js';
+import { sync, newOp, attempt, post, net } from './api.js';
+import { S, hp, isManager, loadProducts } from './state.js';
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
@@ -12,6 +12,15 @@ export function parseMulti(text) {
     const m = t.match(/^(\d+(?:[.,]\d+)?)\s*(?:x|×)?\s+(.+)$/i);
     return m ? { qty: Number(m[1].replace(',', '.')) || 1, name: m[2].trim() } : { qty: 1, name: t };
   });
+}
+// Phrase libre (« un paquet de pâtes et de quoi faire une sauce ») : l'IA decoupe si elle est configuree.
+// Repli (pas d'IA, hors-ligne, erreur, delai) : decoupe par virgules ci-dessus.
+export const looksFree = (text) => !!S.house?.ai && net.online && (/\s(et|avec|puis|de quoi|ainsi que)\s/i.test(text) || String(text).trim().split(/\s+/).length >= 4) && !/[,;\n]/.test(text);
+async function aiEntries(text) {
+  try {
+    const r = await Promise.race([post(hp('/ai/items'), { text }), new Promise((_, no) => setTimeout(() => no(new Error('délai')), 12000))]);
+    return (r.items || []).map((i) => ({ qty: i.qty || 1, name: i.name })).filter((i) => i.name);
+  } catch { return null; }
 }
 function match(name) {
   const n = norm(name);
@@ -25,7 +34,9 @@ const preview = () => sheet(`<h3>${isManager() ? 'Ajouter' : 'Suggérer'} ${pend
 
 // listId : liste ou ajouter ; after : rappel apres l'ajout (rechargement de l'ecran).
 export async function multiAdd(listId, text, after) {
-  const entries = parseMulti(text);
+  let entries = null;
+  if (looksFree(text)) { toast('L’IA lit votre phrase…'); entries = await aiEntries(text); }
+  if (!entries || !entries.length) entries = parseMulti(text);
   if (!entries.length) return false;
   if (!S.products) await loadProducts();
   entries.forEach((e) => { e.product = match(e.name); });

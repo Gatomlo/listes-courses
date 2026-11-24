@@ -94,7 +94,7 @@ export function platsView() {
   const filters = `<div class="row gap">${search}<button class="btn sec2 fbtn" data-a="dish-filters" aria-label="Filtres">${I('sliders')}${act.length ? `<span class="badge">${act.length}</span>` : ''}</button>${act.length ? `<button class="btn sec2 fbtn" data-a="dish-unfilter" aria-label="Effacer les filtres">${I('x')}</button>` : ''}</div>`;
   return {
     title: 'Plats', sub: act.length ? `${list.length} plat${list.length > 1 ? 's' : ''} · ${act.map(([, t]) => t).join(' · ')}` : `${S.dishes.length} plat${S.dishes.length > 1 ? 's' : ''} du foyer`, large: true,
-    right: isManager() ? `<button class="ib" data-a="dish-csv-open" aria-label="Importer des plats (CSV)" title="Importer des plats (CSV)">${I('upload')}</button><a class="ib" href="#/plats/nouveau" aria-label="Nouveau plat">${I('plus')}</a>` : '',
+    right: isManager() ? `${S.house.ai ? `<button class="ib" data-a="aid-open" aria-label="Plat à partir de produits (IA)" title="Plat à partir de produits (IA)">${I('spark')}</button>` : ''}<button class="ib" data-a="dish-csv-open" aria-label="Importer des plats (CSV)" title="Importer des plats (CSV)">${I('upload')}</button><a class="ib" href="#/plats/nouveau" aria-label="Nouveau plat">${I('plus')}</a>` : '',
     body: `${filters}
       <div class="${compact ? 'group dlist' : 'dgrid'}" style="margin-top:8px">${list.map(card).join('')}</div>
       ${list.length ? '' : `<div class="empty">Aucun plat trouvé.${isManager() && q ? `<br><button class="btn" style="margin-top:10px" data-a="dish-new-named">＋ Créer le plat « ${esc(q)} »</button>` : ''}</div>`}`,
@@ -205,6 +205,7 @@ on('click', 'dish-csv-go', async () => {
 // ---------- Fiche plat ----------
 let ed = null;          // plat en cours d'edition
 let pendingName = '';
+let pendingAi = null;    // proposition de l'IA (plat a partir de produits) a relire dans le nouveau plat
 // Creation depuis le menu : S.dishReturn = { date, slot } ; apres enregistrement, retour au menu.
 export function newDishFrom(name, ret) { pendingName = name || ''; S.dishReturn = ret; go('#/plats/nouveau'); }
 export async function loadDish(id) {
@@ -215,6 +216,7 @@ export async function loadDish(id) {
   if (id === 'nouveau') {
     ed = { id: null, name: pendingName || '', slots: ['midi', 'soir'], types: [], portions: 4, time_text: '', url: '', steps: '', notes: '', ahead: '', ingredients: [], groups: [], parts: [], used_in: [], tags: [], upcoming: [], past: [], times: 0 };
     pendingName = '';
+    if (pendingAi) { const r = pendingAi; pendingAi = null; if (r.name) ed.name = r.name; if (r.portions) ed.portions = r.portions; setTimeout(() => showImport(r)); }
   } else {
     S.dishReturn = null;
     const d = await get(hp(`/dishes/${id}`));
@@ -258,8 +260,9 @@ export function dishView() {
   const steps = String(ed.steps || '').split('\n').map((x) => x.trim()).filter(Boolean);
   const aheadRo = ed.ahead ? `<div class="card ahead"><div class="row small" style="margin-bottom:4px">${I('bell', 's')}<b>À faire à l’avance</b><span class="muted">· la veille</span></div><div class="pre">${esc(ed.ahead)}</div></div>` : '';
   const tabRec = ro ? `${aheadRo}${ed.url ? `<a class="card click row" href="${esc(ed.url)}" target="_blank" rel="noopener">${I('link')}<span class="grow small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(ed.url)}</span>${I('arrowR', 's')}</a>` : ''}
-      ${steps.length ? `<div class="card"><ol class="steps">${steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></div>` : '<div class="empty">Pas d’étapes renseignées.</div>'}${ed.notes ? `<div class="sec">Notes</div><div class="card pre">${esc(ed.notes)}</div>` : ''}`
+      ${steps.length ? `<div class="card"><ol class="steps">${steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></div>` : `<div class="empty">Pas d’étapes renseignées.${mgr && S.house.ai && ed.id ? `<br><button class="btn sec2" style="margin-top:10px" data-a="rec-ai">${I('spark', 's')} Suggérer la recette (IA)</button>` : ''}</div>`}${ed.notes ? `<div class="sec">Notes</div><div class="card pre">${esc(ed.notes)}</div>` : ''}`
     : `<div class="card form"><label class="muted small">Lien vers une recette en ligne</label><div class="row gap"><input class="txt grow" value="${esc(ed.url)}" placeholder="https://…" data-ch="ed" data-f="url">${mgr ? `<button class="btn sm" data-a="rec-import">${I('upload', 's')} Importer</button><button class="btn sm sec2" data-a="rec-paste" title="Coller la liste des ingrédients">Coller</button>` : ''}</div>
+      ${mgr && S.house.ai ? `<button class="btn sec2 full" data-a="rec-ai">${I('spark', 's')} Suggérer la recette (IA)</button><p class="muted small">L’IA propose ingrédients et étapes pour « ${esc(ed.name || 'ce plat')} » : vous relisez avant d’appliquer.</p>` : ''}
       ${mgr ? '<p class="muted small">Importer lit nom, portions, temps, ingrédients et étapes quand le site les publie. Si le site refuse, « Coller » reprend la liste des ingrédients copiée depuis la page.</p>' : ''}
       <label class="muted small">Étapes (une par ligne)</label><textarea class="txt" rows="7" data-ch="ed" data-f="steps">${esc(ed.steps)}</textarea>
       <label class="muted small">Notes</label><textarea class="txt" rows="2" data-ch="ed" data-f="notes">${esc(ed.notes)}</textarea>
@@ -577,6 +580,71 @@ function partRecipe(x, f) {
 }
 on('click', 'recipe-view', (el) => recipeSheet(Number(el.dataset.id)));
 
+// ---------- IA (Gemini) : recette suggeree, plat a partir de produits ----------
+// Toujours facultatif : sans cle ou en cas d'erreur, un message, et l'import / la saisie a la main restent possibles.
+const aiError = (e) => (e.status === 0 ? 'Pas de réseau : action possible seulement en ligne.' : e.status === 409 ? 'IA non configurée (Foyer → Intelligence artificielle).' : `${e.message} Les fonctions habituelles restent disponibles.`);
+on('click', 'rec-ai', async () => {
+  if (!String(ed.name || '').trim()) { toast('Donnez d’abord un nom au plat.', true); return; }
+  sheet('<h3>L’IA prépare une recette…</h3><p class="muted">Quelques secondes : rien n’est enregistré avant votre validation.</p>');
+  let r;
+  try { r = await post(hp('/ai/recipe'), { name: ed.name, portions: ed.portions }); } catch (e) { closeSheet(); toast(aiError(e), true); return; }
+  await showImport(r);
+});
+const aid = { ids: [], portions: 4 };
+const aidProducts = () => aid.ids.map((id) => S.products.find((p) => p.id === id)).filter(Boolean);
+const aidChips = (chips) => (chips.length ? chips.map((p) => `<span class="pill p-leaf">${esc(p.name)} <button class="ib" style="min-width:0;padding:0 2px" data-a="aid-rm" data-id="${p.id}" aria-label="Retirer ${esc(p.name)}">${I('x', 's')}</button></span>`).join('') : '<span class="muted small">Aucun produit choisi.</span>');
+const aidBody = () => `<h3>${I('spark', 's')} Plat à partir de produits</h3>
+    <p class="muted small">Choisissez des produits : l’IA propose un plat avec sa recette, à relire avant de l’enregistrer.</p>
+    <div class="addbox"><input class="txt" id="aid-q" autocomplete="off" placeholder="Chercher un produit…" data-in="aid-q"><div id="aid-ac"></div></div>
+    <div id="aid-chips" class="row gap wrap" style="margin:8px 0">${aidChips(aidProducts())}</div>
+    <div class="row gap"><button class="btn sec2 sm" data-a="aid-list">Reprendre les articles d’une liste</button>
+      <label class="row gap grow end small">Personnes <input class="txt w5 c" type="number" min="1" max="20" value="${aid.portions}" data-ch="aid-p"></label></div>
+    <div class="row end" style="margin-top:12px"><button class="btn sec2" data-a="close">Annuler</button><button class="btn" data-a="aid-go">${I('spark', 's')} Proposer un plat</button></div>`;
+const aidRefresh = () => { const b = document.getElementById('aid-chips'); if (b) b.innerHTML = aidChips(aidProducts()); };
+on('click', 'aid-open', async () => {
+  if (!S.products) await loadProducts();
+  aid.ids = []; aid.portions = 4;
+  sheet(aidBody());
+  setTimeout(() => document.getElementById('aid-q')?.focus());
+});
+on('input', 'aid-q', (el) => {
+  const n = norm(el.value).trim(), box = document.getElementById('aid-ac');
+  const ms = n ? S.products.filter((p) => norm(p.name).includes(n) && !aid.ids.includes(p.id)).slice(0, 6) : [];
+  box.innerHTML = ms.length ? `<div class="ac">${ms.map((p) => `<button data-a="aid-add" data-id="${p.id}"><span class="grow">${esc(p.name)}</span><span class="muted">${esc(catName(p.category_id))}</span></button>`).join('')}</div>` : '';
+});
+on('click', 'aid-add', (el) => {
+  const id = Number(el.dataset.id);
+  if (!aid.ids.includes(id) && aid.ids.length < 30) aid.ids.push(id);
+  const q = document.getElementById('aid-q'); if (q) { q.value = ''; q.focus(); }
+  document.getElementById('aid-ac').innerHTML = '';
+  aidRefresh();
+});
+on('click', 'aid-rm', (el) => { aid.ids = aid.ids.filter((id) => id !== Number(el.dataset.id)); aidRefresh(); });
+on('change', 'aid-p', (el) => { aid.portions = Math.min(Math.max(parseInt(el.value, 10) || 4, 1), 20); });
+// Articles d'une liste (la prochaine liste datee, sinon « A prevoir ») : cuisiner avec ce qui est prevu.
+on('click', 'aid-list', async () => {
+  const r = await attempt(() => get(hp('/lists')));
+  if (!r) return;
+  const l = (r.upcoming || [])[0] || r.backlog;
+  if (!l) { toast('Aucune liste en cours.', true); return; }
+  const d = await attempt(() => get(hp(`/lists/${l.id}`)));
+  if (!d) return;
+  const items = (d.items || []).filter((i) => i.suggestion !== 'pending');
+  for (const i of items) if (!aid.ids.includes(i.product_id) && aid.ids.length < 30) aid.ids.push(i.product_id);
+  aidRefresh();
+  toast(`${items.length} article${items.length > 1 ? 's' : ''} de la liste`);
+});
+on('click', 'aid-go', async () => {
+  const names = aidProducts().map((p) => p.name);
+  if (!names.length) { toast('Choisissez au moins un produit.', true); return; }
+  sheet('<h3>L’IA cherche un plat…</h3><p class="muted">Quelques secondes : rien n’est enregistré avant votre validation.</p>');
+  let r;
+  try { r = await post(hp('/ai/dish'), { names, portions: aid.portions }); } catch (e) { closeSheet(); toast(aiError(e), true); return; }
+  closeSheet();
+  pendingAi = r; pendingName = r.name || '';
+  go('#/plats/nouveau');
+});
+
 // ---------- Import d'une recette depuis un lien ----------
 let imp = null;
 on('click', 'rec-import', async () => {
@@ -613,7 +681,9 @@ async function showImport(r) {
   if (!S.products) await loadProducts();
   const matched = matchLines(r.ingredients.map((g) => ({ ...g, label: g.name })), { products: S.products });
   imp = {
-    ...r, f: { name: !ed.name, portions: !!r.portions, time: !!r.time, steps: r.steps.length > 0, photo: !!r.image && !ed.photo },
+    ...r, f: r.source === 'ai'
+      ? { name: !ed.name, portions: !!r.portions && !ed.id, time: !!r.time && !ed.time_text, steps: r.steps.length > 0 && !String(ed.steps || '').trim(), photo: false }
+      : { name: !ed.name, portions: !!r.portions, time: !!r.time, steps: r.steps.length > 0, photo: !!r.image && !ed.photo },
     ing: matched.map((g) => { const p = g.product_id && S.products.find((x) => x.id === g.product_id);
       // Quantite reprise de la recette (modifiable) ; sans equivalent (gousse, pincee...) :
       // 1 emballage, la quantite lue gardee en note.
@@ -632,7 +702,7 @@ function impMatch(g) {
 }
 function importSheet() {
   const m = imp;
-  sheet(`<h3>${I('book', 's')} ${esc(m.name || 'Recette')}</h3><p class="muted small">Trouvé sur la page : cocher ce qu'il faut reprendre.</p>
+  sheet(`<h3>${I(m.source === 'ai' ? 'spark' : 'book', 's')} ${esc(m.name || 'Recette')}</h3><p class="muted small">${m.source === 'ai' ? 'Proposition de l’IA, à relire : vérifiez quantités et produits, puis cochez ce qu’il faut reprendre.' : 'Trouvé sur la page : cocher ce qu’il faut reprendre.'}</p>
     ${m.image ? `<label class="row line"><input type="checkbox" class="cb" data-ch="imp-f" data-k="photo" ${m.f.photo ? 'checked' : ''}><img src="${esc(m.image)}" alt="" style="width:72px;height:54px;object-fit:cover;border-radius:10px"><span class="grow"><b>Photo</b> de la recette</span></label>` : ''}
     ${[['name', 'Nom', m.name], ['portions', 'Portions', m.portions && `${m.portions} personnes`], ['time', 'Temps', m.time], ['steps', 'Étapes', m.steps.length && `${m.steps.length} étapes`]]
       .filter(([, , v]) => v).map(([k, t, v]) => `<label class="row line"><input type="checkbox" class="cb" data-ch="imp-f" data-k="${k}" ${m.f[k] ? 'checked' : ''}><span class="grow"><b>${t}</b> · ${esc(v)}</span></label>`).join('')}

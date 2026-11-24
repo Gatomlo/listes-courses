@@ -7,7 +7,7 @@ import { packBlock, unitOptions, catOptions, catSubOptions, subName, contField, 
 import { SLOT, tile, isAwake, syncWake } from './plats.js';
 import { startScan } from './scan.js';
 import { I, btnI } from './icons.js';
-import { multiAdd, micButton } from './multi.js';
+import { multiAdd, micButton, looksFree } from './multi.js';
 
 const STATUS = { prep: 'En préparation', shopping: 'En courses', closed: 'Clôturée' };
 const longDate = (d) => fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -861,7 +861,7 @@ on('click', 'add-item', (el) => addItem(Number(el.dataset.id)));
 on('click', 'add-first', () => {
   const q = document.getElementById('add-q').value.trim();
   // Plusieurs articles d'un coup (virgules) : apercu puis ajout.
-  if (q.includes(',')) { closeSheet(); multiAdd(current.id, q, () => refreshList()); return; }
+  if (q.includes(',') || looksFree(q)) { closeSheet(); multiAdd(current.id, q, () => refreshList()); return; }
   const ms = matches(q);
   if (ms.length) addItem(ms[0].id); else if (q) document.querySelector('[data-a=add-new]')?.click();
 });

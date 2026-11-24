@@ -3,7 +3,7 @@
 // catalogue -> validation -> operation receipt.save (fonctionne aussi hors-ligne).
 import { esc, eur, on, acc, sheet, closeSheet, toast, formData, localDay, isPc } from './ui.js';
 import { I } from './icons.js';
-import { get, sync, newOp, attempt } from './api.js';
+import { get, post, sync, newOp, attempt, net } from './api.js';
 import { S, hp, render, go, loadProducts, activeStores, storeById, catName, categoryOrder } from './state.js';
 import { parseTicket, detectStore, matchLines } from './ticket.mjs';
 import { unitOptions, catSubOptions, subName, contField } from './catalogue.js';
@@ -160,8 +160,19 @@ async function analyse(text) {
   scan.aliases = aliases;
   scan.lines = matchLines(t.items, { products: S.products, aliases, storeId: scan.storeId, listItems: scan.listItems })
     .map((l) => ({ ...l, on: true }));
+  await aiMatch(scan.lines);
   scan.status = 'review';
   render();
+}
+// Libelles que la ressemblance n'a pas reconnus : l'IA (si configuree) propose un produit, marque « proposé par l'IA ».
+// Aucune erreur n'est bloquante : sans IA, hors-ligne ou en cas d'echec, l'ecran de validation reste manuel.
+async function aiMatch(lines) {
+  const todo = lines.filter((l) => !l.product_id && l.label);
+  if (!todo.length || !S.house?.ai || !net.online) return;
+  try {
+    const r = await Promise.race([post(hp('/ai/match'), { labels: todo.map((l) => l.label) }), new Promise((_, no) => setTimeout(() => no(new Error('délai')), 15000))]);
+    (r.product_ids || []).forEach((id, i) => { if (id && S.products.some((p) => p.id === id)) { todo[i].product_id = id; todo[i].how = 'ai'; } });
+  } catch { /* repli : association a la main */ }
 }
 
 // ---------- Ecran de validation ----------
@@ -205,7 +216,7 @@ export function scanView() {
       <input class="txt w6 sm c" value="${esc(l.cont || '')}" placeholder="format" data-ch="scan-cont" data-i="${i}" aria-label="Format vendu (ex. 400 g)"><label class="row small"><input type="checkbox" class="cb" data-ch="scan-promo" data-i="${i}" ${l.promo ? 'checked' : ''}>promo</label></div>
       ${l.create ? `<div class="pill p-carrot">＋ créer « ${esc(l.create.name)} » (${esc(catName(Number(l.create.category_id)))}${l.create.subcategory_id ? ` › ${esc(subName(l.create.subcategory_id))}` : ''})</div>`
         : `<button class="txt sm pick-btn" data-a="scan-pick" data-i="${i}">${esc(pickLabel(l.product_id))} ▾</button>`}
-      <div class="muted small">${l.how === 'alias' ? '<span class="pill p-plum">correspondance mémorisée</span> ' : l.how === 'guess' ? '<span class="pill p-grey">proposé</span> ' : ''}${avg != null ? `moyenne ${eur(avg)}` : ''}${delta && Math.abs(delta) >= 1 ? ` · <b class="${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '+' : ''}${delta} %</b>` : ''}</div>
+      <div class="muted small">${l.how === 'alias' ? '<span class="pill p-plum">correspondance mémorisée</span> ' : l.how === 'guess' ? '<span class="pill p-grey">proposé</span> ' : l.how === 'ai' ? '<span class="pill p-plum">proposé par l’IA</span> ' : ''}${avg != null ? `moyenne ${eur(avg)}` : ''}${delta && Math.abs(delta) >= 1 ? ` · <b class="${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '+' : ''}${delta} %</b>` : ''}</div>
       </div></div>`;
   }).join('');
   return {

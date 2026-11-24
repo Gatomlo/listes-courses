@@ -1,11 +1,47 @@
 // Ecran Foyer : membres et invitations, reglages, tags des plats.
 import { esc, eur, on, acc, sheet, closeSheet, confirmSheet, toast, formData } from './ui.js';
 import { I } from './icons.js';
-import { patch, post, put, del, attempt } from './api.js';
+import { get, patch, post, put, del, attempt } from './api.js';
 import { S, hp, isManager, render, loadHouse } from './state.js';
 import { rulesHtml, editRules, ruleText, copyRules } from './modeles.js';
 
 const DOW = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+
+// ---------- IA (Gemini) : une cle et un modele pour toute l'installation ----------
+function aiBlock() {
+  if (S.ai === undefined) {
+    S.ai = null;
+    get(hp('/ai')).then((c) => { S.ai = c; render(); }).catch(() => { S.ai = { error: true }; render(); });
+  }
+  const c = S.ai;
+  const body = !c ? '<p class="muted">Chargement…</p>' : c.error ? '<p class="muted">Réglages indisponibles (pas de réseau ?).</p>' : `
+    <p class="muted small">Sans clé ou si Gemini ne répond pas, l’application utilise ses fonctions habituelles. Seuls des noms de produits, de plats et des libellés de ticket sont envoyés à Google. La clé est partagée par tous les foyers de cette installation.</p>
+    <div class="row gap" style="margin:6px 0"><span class="pill ${c.configured ? 'p-leaf' : 'p-grey'}">${c.configured ? `Clé enregistrée · ${esc(c.key_hint)}${c.source === 'env' ? ' (serveur)' : ''}` : 'Aucune clé'}</span></div>
+    <label class="row"><span class="grow"><b>${c.configured ? 'Modifier la clé' : 'Clé API Gemini'}</b><span class="muted block">À créer sur aistudio.google.com/apikey</span></span></label>
+    <div class="row gap"><input class="txt grow" type="password" id="ai-key" autocomplete="off" placeholder="${c.configured ? 'Nouvelle clé (remplace l’actuelle)' : 'Coller la clé ici'}" data-enter="ai-key-save"><button class="btn sm" data-a="ai-key-save">Enregistrer</button></div>
+    ${c.configured ? `<label class="row" style="margin-top:10px"><span class="grow"><b>Modèle</b><span class="muted block">Liste fournie par Google pour votre clé</span></span>
+      <select class="txt w12" id="ai-model" data-ch="ai-model">${aiModels(c).map((m) => `<option value="${esc(m.id)}" ${m.id === c.model ? 'selected' : ''}>${esc(m.label)}${m.label === m.id ? '' : ` (${esc(m.id)})`}</option>`).join('')}</select></label>
+      <div class="row end" style="margin-top:8px">${c.source === 'base' ? '<button class="btn sm danger" data-a="ai-key-del">Supprimer la clé</button>' : ''}</div>` : ''}`;
+  return acc('ai', { icon: `${I('sliders', 's')} `, title: 'Intelligence artificielle', sum: S.ai && S.ai.configured ? ' · Gemini activé' : ' · désactivée', def: 'closed', body });
+}
+// Modèles proposés : ceux de Google, plus le modèle courant s'il n'y figure pas (liste indisponible).
+const aiModels = (c) => { const l = c.models || []; return l.some((m) => m.id === c.model) ? l : [{ id: c.model, label: c.model }, ...l]; };
+const setAi = (c) => { S.ai = c; if (S.house) S.house.ai = !!c.configured; render(); };
+on('click', 'ai-key-save', async () => {
+  const key = (document.getElementById('ai-key').value || '').trim();
+  if (!key) { toast('Collez d’abord la clé.', true); return; }
+  const c = await attempt(() => put(hp('/ai'), { api_key: key }));
+  if (c) { setAi(c); toast('Clé enregistrée'); }
+});
+on('click', 'ai-key-del', async () => {
+  if (!(await confirmSheet({ title: 'Supprimer la clé Gemini ?', text: 'L’IA sera désactivée : les fonctions habituelles prennent le relais.', ok: 'Supprimer', danger: true }))) return;
+  const c = await attempt(() => del(hp('/ai/key')));
+  if (c) { setAi({ ...c, models: [] }); toast('Clé supprimée'); }
+});
+on('change', 'ai-model', async (el) => {
+  const c = await attempt(() => put(hp('/ai'), { model: el.value }));
+  if (c) { setAi(c); toast('Modèle enregistré'); }
+});
 
 const roleLabel = (r) => (r === 'manager' ? 'Gestionnaire' : 'Membre');
 
@@ -45,6 +81,7 @@ export function foyerView() {
         body: H.tags.map((t) => `<div class="ord"><span class="grow">#${esc(t.name)} <span class="muted">· ${t.dishes} plat${t.dishes > 1 ? 's' : ''}${t.auto ? ` · automatique${H.household.eco_cents ? `, sous ${eur(H.household.eco_cents)} par personne` : ' (palier à fixer dans les réglages)'}` : ''}</span></span>
           ${mgr && !t.auto ? `<button class="ic" title="Renommer" data-a="tag-rename" data-id="${t.id}">✎</button><button class="ic" title="Fusionner" data-a="tag-merge" data-id="${t.id}">⇄</button><button class="ic" title="Supprimer" data-a="tag-del" data-id="${t.id}">✕</button>` : ''}</div>`).join('')
           || '<p class="muted">Aucun tag : ajoutez-en depuis la fiche d’un plat.</p>' })}
+      ${mgr ? aiBlock() : ''}
       ${mgr ? acc('adv', { icon: `${I('sliders', 's')} `, title: 'Avancé', sum: ` · imports, lien d’affichage${h.adv_menu ? ', modèles, types' : ''}`,
         body: `${h.adv_menu ? `<div class="sec" style="margin-top:0">Modèles de semaine · ${H.models.length}</div>${modelsBody}
           <div class="sec">Types de plats · ${H.types.length}</div>${typesBody}` : ''}
